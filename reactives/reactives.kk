@@ -6,6 +6,16 @@ named effect rref<a>
 fun watch(r: rref<a>, p: provider<b>, immediate: bool = True): io b
   r.watchinner(p, immediate)
 
+type container
+  Container(
+    providers: ref<global, list<forall<a> provider<a>>>
+    // TODO: Provider state
+    // TODO: Store provider resumptions
+    // TODO: Store provider subscriptions to other provider states
+    // 
+
+  )
+
 rec type provider<a>
   Provider(
     listeners: ref<global, list<(a) -> io ()>>,

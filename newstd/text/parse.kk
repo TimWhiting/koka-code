@@ -134,27 +134,22 @@ fun reraise(p: parser<r,either<perror<r>,a>,e>): <parse<r>|e> a
     Right(r) -> r
 
 fun takeAdvance(s: sslice, i: int): (list<char>, sslice)
-  if i == 0 then ([], s) else
+  if i == 0 || s.count == 0 then ([], s) else
     match s.next
       Nothing -> ([], s)
       Just((c,rest)) ->
         val (cs, newS) = takeAdvance(unsafe-decreasing(rest), i - 1)
         (Cons(c, cs), newS)
 
-fun startsWith(s: sslice, cs: list<char>): bool
-  var chrs := cs
-  val res = s.foreach-while fn(c)
-    match chrs
-      Nil -> Just(True)
-      Cons(c', cs') -> 
-        if c == c' then 
-          chrs := cs' 
-          Nothing
-        else 
-          Just(False)
-  match res
-    Nothing -> False
-    Just(b) -> b
+fun startsWith(s: sslice, cs: list<char>): (bool, sslice, int)
+  match cs
+    Nil -> (True, s, 0)
+    Cons(c', cs') ->
+      match s.next
+        Just((c, rest)) | c' == c ->
+          val (r, re, i) = startsWith(rest.unsafe-decreasing, cs'.tail.unsafe-decreasing)
+          (r, re, i + 1)
+        _ -> (False, s, 0)
 
 fun run(parser: parser<r,a,<exn|e>>, s: string): <exn|e> either<perror<r>, a>
   var p := Position(0)
@@ -176,11 +171,10 @@ fun run(parser: parser<r,a,<exn|e>>, s: string): <exn|e> either<perror<r>, a>
         p := increment(p, i)
         Right(())
     fun tryText(t: string)
-      trace("Checking if " ++ rem.string)
-      trace("Starts with " ++ t)
-      if rem.startsWith(t.list) then
-        rem := rem.advance(t.count)
-        p := increment(p, t.count)
+      val (v, rem', cnt) = rem.startsWith(t.list)
+      if v then
+        rem := rem'
+        p := increment(p, cnt)
         Right(())
       else Left(Expected(t, p))
     final ctl fail(e)
@@ -188,20 +182,12 @@ fun run(parser: parser<r,a,<exn|e>>, s: string): <exn|e> either<perror<r>, a>
     fun offset()
       p.offset
     fun tryPattern(pat: regex)
-      // TODO: Not performant, we need regex for slices, or quick conversion from slice to string / offset
-      val st = rem.string
-      trace("Executing pattern " ++ pat.source ++ " on " ++ st ++ " at " ++ p.show ++ "")
-      match pat.exec(st)
+      match pat.exec(rem)
         Nil -> 
-          trace("Fail")
           Left(ExpectedPatternMatch(pat.source, p))
         ms ->
-          // trace("Succ")
           val c = ms[0].default("".slice).count
-          trace("Succeed with count" ++ c.show)
-          trace("Old rem " ++ rem.string)
           rem := rem.advance(c)
-          trace("New rem " ++ rem.string)
           p := increment(p, c)
           Right(ms.map(fn(s') s'.string))
     fun mark()

@@ -13,7 +13,6 @@ type container
     // TODO: Store provider resumptions
     // TODO: Store provider subscriptions to other provider states
     // 
-
   )
 
 rec type provider<a>

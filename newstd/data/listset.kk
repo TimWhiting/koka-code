@@ -1,10 +1,15 @@
-alias listset<v> = list<v> 
+pub value struct set<v,e::E>
+  list: list<v> 
+  eq: (v, v) -> e bool
 
-fun member(l: listset<v>, a: v, eq: (v, v) -> e bool): e bool
-  any(l, fn(x) eq(x, a))
+pub fun set(l: list<v>, eq: (v, v) -> e bool): <> set<v,e>
+  Set(l, eq)
 
-fun union(l: listset<v>, l2: listset<v>, eq: (v, v) -> e bool): e listset<v>
-  l2.foldl(l, fn(acc, x) add(acc, x, eq))
+pub fun member(l: set<v,e>, a: v): e bool
+  any(l.list, fn(x) (l.eq)(x, a))
 
-fun add(l: listset<v>, a: v, eq: (v, v) -> e bool): e listset<v>
-  if (member(l, a, eq)) then l else Cons(a, l)
+pub fun union(l: set<v,e>, l2: set<v,e>): e set<v,e>
+  l2.list.foldl(l, fn(acc, x) acc.add(x))
+
+pub fun add(l: set<v,e>, a: v): e set<v,e>
+  if (l.member(a)) then l else l(list=Cons(a, l.list))

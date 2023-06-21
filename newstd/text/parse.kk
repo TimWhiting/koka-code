@@ -111,6 +111,8 @@ pub fun takeAdvance(s: sslice, i: int): (list<char>, sslice)
         (Cons(c, cs), newS)
 
 pub fun startsWith(s: sslice, cs: list<char>): (bool, sslice, int)
+  trace("Test " ++ s.string.show)
+  trace("Looking for " ++ cs.string.show)
   match cs
     Nil -> (True, s, 0)
     Cons(c', cs') ->
@@ -118,7 +120,13 @@ pub fun startsWith(s: sslice, cs: list<char>): (bool, sslice, int)
         Just((c, rest)) | c' == c ->
           val (r, re, i) = startsWith(rest.unsafe-decreasing, cs'.tail.unsafe-decreasing)
           (r, re, i + 1)
-        _ -> (False, s, 0)
+        _ -> 
+          trace("returning false")
+          (False, s, 0)
+
+
+fun increment(pos: position, i: int): position
+  Position(pos.offset + i)
 
 pub fun run(parser: parser<r,a,<exn|e>>, s: string): <exn|e> either<perror<r>, a>
   var p := Position(0)
@@ -131,19 +139,20 @@ pub fun run(parser: parser<r,a,<exn|e>>, s: string): <exn|e> either<perror<r>, a
       else
         val (taken, rest) = rem.takeAdvance(i)
         rem := rest
-        p := increment(p, i)
+        p := p.increment(i)
         Right(taken.string)
     fun trySkip(i: int)
       if i > rem.count then Left(NotEnough(i, p))
       else
         rem := rem.advance(i)
-        p := increment(p, i)
+        p := p.increment(i)
         Right(())
     fun tryText(t: string)
       val (v, rem', cnt) = rem.startsWith(t.list)
       if v then
+        trace("count" ++ cnt.show)
         rem := rem'
-        p := increment(p, cnt)
+        p := p.increment(cnt)
         Right(())
       else Left(Expected(t, p))
     final ctl fail(e)
@@ -155,9 +164,10 @@ pub fun run(parser: parser<r,a,<exn|e>>, s: string): <exn|e> either<perror<r>, a
         Nil -> 
           Left(ExpectedPatternMatch(pat.source, p))
         ms ->
+          // TODO: Assert that start of capture equals start of slice
           val c = ms[0].default("".slice).count
           rem := rem.advance(c)
-          p := increment(p, c)
+          p := p.increment(c)
           Right(ms.map(fn(s') s'.string))
     fun mark()
       marks := marks ++ [(rem, p)]
@@ -285,10 +295,7 @@ pub fun tryParse(p: parser<r,a,e>): <parse<r>|e> either<perror<r>,a>
     fun tryPattern(pat) tryPattern(pat)
   p()
 
-pub struct position { offset: int }
-
-pub fun increment(pos: position, i: int): position
-  Position(pos.offset + i)
+pub value struct position { offset: int }
 
 pub fun show(e: perror<e>, errShow: (e) -> string): string
   match e
@@ -339,56 +346,51 @@ fun parseInt(): <parse<r>|e> int
         Nothing -> failHere(fn(p) Expected("int", pos))
 
 
-val alnum = "^[a-zA-Z0-9]+".regex()
-pub fun takeAlphanum(): <parse<r>|e> string
-  takePattern(alnum)
+val alphaRegex = "^[a-zA-Z]".regex()
+pub fun takeAlpha(): <parse<r>|e> string
+  takePattern(alphaRegex)
 
-val alnums = "^[a-zA-Z0-9]+".regex() 
+val alnumRegex = "^[a-zA-Z0-9]+".regex()
+pub fun takeAlphanum(): <parse<r>|e> string
+  takePattern(alnumRegex)
+
 pub fun takeAlphanum1(): <parse<r>|e> string
-  takePattern(alnums)
+  takePattern(alnumRegex)
 
 pub fun skipWhitespace(): <parse<r>|e> ()
-  skipWhile(OneOf(" \t\r"))
+  skipWhile(OneOf(" \t\r\n"))
 
-pub fun slash(): <parse<r>|e> ()
+pub fun parseSlash(): <parse<r>|e> ()
   text("/")
 
-pub fun space(): <parse<r>|e> ()
+pub fun parseSpace(): <parse<r>|e> ()
   text(" ")
 
 pub fun nonWhitespace(): <parse<r>|e> string
   takeWhile1(Ranges([('!', '~')]))
 
-pub fun numeric(): <parse<r>|e> int
-  with atomic
-  val numQuery = Ranges([('0', '9')])
-  val text = takeWhile1(numQuery)
-  match parse-int(text)
-    Just(i) -> i
-    Nothing -> failHere(fn(p) ExpectedCharQuery(numQuery, p))
-
-pub fun openParen(): <parse<r>|e> ()
+pub fun parseOpenParen(): <parse<r>|e> ()
   text("(")
 
-pub fun closeParen(): parse<e> ()
+pub fun parseCloseParen(): parse<e> ()
   text(")")
 
-pub fun colon(): parse<e> ()
+pub fun parseColon(): parse<e> ()
   text(":")
 
-pub fun comma(): parse<e> ()
+pub fun parseComma(): parse<e> ()
   text(",")
 
-pub fun crlf(): parse<e> ()
+pub fun parseCrlf(): parse<e> ()
   text("\r\n")
 
-pub fun newline(): <parse<r>|e> ()
+pub fun parseNewline(): <parse<r>|e> ()
   text("\n")
 
-pub fun endOfLine(): parse<e> ()
-  newline.or(crlf)
+pub fun parseEndOfLine(): parse<e> ()
+  parseNewline.or(parseCrlf)
 
-pub fun endOfInput(): parse<e> ()
+pub fun parseEndOfInput(): parse<e> ()
   with atomic
   val posMarker = offset()
   match tryTake(1)

@@ -111,8 +111,6 @@ pub fun takeAdvance(s: sslice, i: int): (list<char>, sslice)
         (Cons(c, cs), newS)
 
 pub fun startsWith(s: sslice, cs: list<char>): (bool, sslice, int)
-  trace("Test " ++ s.string.show)
-  trace("Looking for " ++ cs.string.show)
   match cs
     Nil -> (True, s, 0)
     Cons(c', cs') ->
@@ -121,7 +119,6 @@ pub fun startsWith(s: sslice, cs: list<char>): (bool, sslice, int)
           val (r, re, i) = startsWith(rest.unsafe-decreasing, cs'.tail.unsafe-decreasing)
           (r, re, i + 1)
         _ -> 
-          trace("returning false")
           (False, s, 0)
 
 
@@ -150,7 +147,6 @@ pub fun run(parser: parser<r,a,<exn|e>>, s: string): <exn|e> either<perror<r>, a
     fun tryText(t: string)
       val (v, rem', cnt) = rem.startsWith(t.list)
       if v then
-        trace("count" ++ cnt.show)
         rem := rem'
         p := p.increment(cnt)
         Right(())
@@ -297,14 +293,18 @@ pub fun tryParse(p: parser<r,a,e>): <parse<r>|e> either<perror<r>,a>
 
 pub value struct position { offset: int }
 
-pub fun show(e: perror<e>, errShow: (e) -> string): string
+pub fun show(e: perror<e>, errShow: (e) -> string, input: string): string
   match e
     ExpectedCharQuery(q, p) -> "Expected " ++ q.show ++ " at " ++ p.show
     ExpectedPatternMatch(pat, p) -> "Expected pattern " ++ pat ++ " at " ++ p.show
-    Expected(t, p) -> "Expected " ++ t ++ " at " ++ p.show
+    Expected(t, p) -> "Expected " ++ t ++ " at " ++ p.show ++ " but found " ++ showLineOffset(input, p.offset)
     NotEnough(i, p) -> "Not enough input at " ++ p.show ++ ", expected " ++ i.show
-    In(label, p, err) -> "In " ++ label ++ " at " ++ p.show ++ ": " ++ show(err, errShow)
+    In(label, p, err) -> "In " ++ label ++ " at " ++ p.show ++ ": " ++ show(err, errShow, input)
     UserDefined(err) -> errShow(err) 
+
+fun showLineOffset(s: string, offset: int): string
+  val sub = s.slice.advance(offset)
+  sub.advance(-10).substr(0, min(offset, 10)).string ++ "(" ++ sub.substr(0,1).string ++ ")" ++ sub.substr(1, 10).string
 
 pub fun show(q: charQuery): string
   match q

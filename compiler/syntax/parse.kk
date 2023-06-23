@@ -1,12 +1,12 @@
 import std/text/parse
 import std/os/path
 import std/os/file
-import syntax/lexer
-import syntax/lexeme
-import syntax/layout
-import syntax/syntax
-import common/syntax
-import common/range
+import compiler/syntax/lexer
+import compiler/syntax/lexeme
+import compiler/syntax/layout
+import compiler/syntax/syntax
+import compiler/common/syntax
+import compiler/common/range
 
 fun lexParse(insSemi: bool, preprocess: list<lexeme> -> list<lexeme>, p: (source) -> <parse,fsys,exn|e> a, sourceName: string): <exn,fsys|e> parse-error<a>
   val r = read-text-file(sourceName.path)

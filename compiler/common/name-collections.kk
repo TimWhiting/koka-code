@@ -1,8 +1,8 @@
 import std/data/map
 import std/data/set
-import common/name
-import common/failure
-import platform/config
+import compiler/common/name
+import compiler/common/failure
+import compiler/platform/config
 
 alias name-map<a> = map<name, a>;
 

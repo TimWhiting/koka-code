@@ -1,8 +1,8 @@
 import std/text/parse
 import std/text/regex
 import std/text/unicode
-import common/name
-import common/range
+import compiler/common/name
+import compiler/common/range
 
 pub fun isTypeVar(n: name): bool
   !"[a-z][0-9]*".regex().exec(n.nameId).is-empty
@@ -119,7 +119,7 @@ pub fun show(l: lex): <> string
     LexKeyword(k, d) -> "\"" ++ k ++ "\"" ++ (if d.is-empty then "" else " (" ++ d ++ ")")
     LexSpecial(s) -> "\"" ++ s ++ "\""
     LexComment(s) -> "comment \"" ++ s ++ "\""
-    LexWhite(_) -> "white"
+    LexWhite(x) -> "white(" ++ x ++ ")"
     LexInsLCurly -> "start of statements ('{')"
     LexInsRCurly -> "end of statements ('}')"
     LexInsSemi -> "end of statement (';')"

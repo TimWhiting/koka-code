@@ -1,5 +1,5 @@
-import common/name
-import common/syntax
+import compiler/common/name
+import compiler/common/syntax
 
 // Special
 val nameExpr        = ".expr".newName

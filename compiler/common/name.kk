@@ -1,5 +1,5 @@
-import lib/pprint
-import common/range
+import compiler/lib/pprint
+import compiler/common/range
 
 struct name
   pub nameModule: string

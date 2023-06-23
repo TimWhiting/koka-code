@@ -1,12 +1,10 @@
-module type/type
-
-import common/syntax
-import common/name
-import common/name-prim
-import common/id
-import common/range
-import common/failure
-import kind/kind
+import compiler/common/syntax
+import compiler/common/name
+import compiler/common/name-prim
+import compiler/common/id
+import compiler/common/range
+import compiler/common/failure
+import compiler/kind/kind
 
 pub type ktype
   TForAll(vars: list<typeVar>, pred: list<pred>, r: ktype) // rho

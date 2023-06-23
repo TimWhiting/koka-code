@@ -1,5 +1,5 @@
-import common/name
-import common/name-prim
+import compiler/common/name
+import compiler/common/name-prim
 
 type kind
   KCon(constant: kindCon) // Kind constants: "*","->","!","H","P"

@@ -1,8 +1,8 @@
-import common/syntax
-import common/name
-import common/range
 import std/num/float64
-import type/type
+import compiler/common/syntax
+import compiler/common/name
+import compiler/common/range
+import compiler/type/type
 
 struct core
   name: name

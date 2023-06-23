@@ -121,7 +121,6 @@ pub fun startsWith(s: sslice, cs: list<char>): (bool, sslice, int)
         _ -> 
           (False, s, 0)
 
-
 fun increment(pos: position, i: int): position
   Position(pos.offset + i)
 
@@ -203,9 +202,11 @@ pub fun scope1(t: string, p: parser<r,a,e>): <parse<r>|e> a
   p()
 
 pub fun sep1(s: parser<r,s,<div|e>>, p: parser<r,a,<div|e>>): <parse<r>,div|e> list<a>
-  Cons(p(),many
-    s()
-    p()
+  Cons(
+    p(),
+    many
+      s()
+      p()
   )
 
 pub fun skipUntil(q: charQuery): <parse<r>|e> ()
@@ -236,7 +237,7 @@ pub fun toPattern(q: charQuery): string
         val p = "[" ++ c1.show ++ "-" ++ c2.show ++ "]"
         if acc.is-empty then p else acc ++ "|" ++ p
 
-pub fun take(i: int): <parse<r>|e> string
+pub fun takeChars(i: int): <parse<r>|e> string
   reraise({tryTake(i)})
 
 pub fun takePattern(p: regex): <parse<r>|e> string

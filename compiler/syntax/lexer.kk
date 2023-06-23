@@ -3,10 +3,10 @@ import std/text/regex
 import std/text/unicode
 import std/os/path
 import std/os/file
-import common/name
-import common/range
 import std/num/float64
-import syntax/lexeme
+import compiler/common/name
+import compiler/common/range
+import compiler/syntax/lexeme
 
 inline fun list(p: parser<e,a>): parser<e,list<a>>
   fn () [p()]
@@ -524,7 +524,7 @@ fun lexing(source: source, lineNo: int, input: string): <div> parse-error<list<l
 
 fun main()
   // Make sure to set $ulimit -s unlimited$ to allow more stack space
-  val r = read-text-file("src-koka/syntax/lexer.kk".path)
+  val r = read-text-file("/Users/timwhiting/koka_code/compiler/syntax/lexer.kk".path)
   val x = lexer("test", 0, r)
   match x
     ParseOk(u, _) -> u.map(show).join(",").println
@@ -537,7 +537,7 @@ pub fun parseGreedy(input0 : sslice, action : () -> <parse|e> a ) : e parse-erro
       ParseOk(x, input)
     fun current-input()
       input
-    brk fail(msg)
+    final ctl fail(msg)
       ParseError(msg, input)
     fun satisfy(pred)
       val inp = input

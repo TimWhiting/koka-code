@@ -1,4 +1,4 @@
-import lib/printer
+import compiler/lib/printer
 
 alias docs = list<doc>
 type doc

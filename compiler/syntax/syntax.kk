@@ -1,8 +1,8 @@
-import common/range
-import common/name
-import common/name-prim
-import common/syntax
 import std/num/float64
+import compiler/common/range
+import compiler/common/name
+import compiler/common/name-prim
+import compiler/common/syntax
 
 struct program<t, k>
   source: source

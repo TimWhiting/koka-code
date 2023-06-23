@@ -1,8 +1,8 @@
-import syntax/lexeme
-import syntax/lexer
-import syntax/syntax
-import common/range
-import common/name
+import compiler/syntax/lexeme
+import compiler/syntax/lexer
+import compiler/syntax/syntax
+import compiler/common/range
+import compiler/common/name
 import std/os/file
 import std/os/path
 

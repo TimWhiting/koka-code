@@ -86,17 +86,19 @@ fun parseChar()
   val x = takePattern(charRegex)
   SChar(x.slice.advance(2).string)
 
-val symbolRegex = "^([^.#; \\]\\t\\r\\n()',`\"][^; \\t\\r\\n()',`\"]*|[.][^; \\t\\r\\n()',`\"\\]]+)".regex()
+val symbolRegex = "^([^.#; \\]\\t\\r\\n()',`\"][^; \\]\\t\\r\\n()',`\"]*|[.][^; \\t\\r\\n()',`\"\\]]+)".regex()
 fun parseSymbol()
   with tokenizer
   SSymbol(takePattern(symbolRegex))
 
-val boolRegex = r"^#[ft]".regex();
+val boolRegex = r"^#[ftFT]".regex();
 fun parseBool()
   with tokenizer
-  SBool("#t" == takePattern(boolRegex))
+  val v = takePattern(boolRegex)
+  SBool("#t" == v || "#T" == v)
 
 fun parseNum()
+  with atomic
   with tokenizer
   SNumber(parseFloat())
 
@@ -120,6 +122,7 @@ fun parseCloseList()
 fun parseCells()
   optional(parseWhitespace)
   val x = many(parseAtom)
+  optional(parseWhitespace)
   match optional({text(".")})
     Just(_) ->
       optional(parseWhitespace)
@@ -132,6 +135,7 @@ fun parseVector()
   text("#(")
   optional(parseWhitespace)
   val x = many(parseAtom)
+  optional(parseWhitespace)
   text(")")
   SVector(x)
 
@@ -185,6 +189,7 @@ fun parseAtom()
 fun parseProgram()
   optional(parseWhitespace)
   val p = Program(many(parseAtom))
+  optional(parseWhitespace)
   parseEndOfInput()
   p
 
@@ -238,22 +243,22 @@ r"(lambda ,(lambda->formals exp))",
 
 
 fun main()
-  parseTest(parseNum, "1.53", show)
-  parseTest(parseChar, r"#\newline", show)
-  parseTest(parseBool, "#t", show)
-  parseTest(parseSymbol, "+", show)
-  parseTest(parseString, "\"Hello\"", show)
-  parseTest(parseList, "(+)", show)
-  parseTest(parseList, "(+ 3 5)", show)
-  parseTest(parseList, "[+ 3 5]", show)
-  parseTest(parseList, "{+ 3 5 . (list a b c)}", show)
-  programs.foreach fn(p)
-    parseTest(parseProgram, p, show)
-  // list-directory-recursive("higher-order-programs/scheme".path).foreach fn(p)
-  //   if is-file(p) then
-  //     if p.show.ends-with(".scm\"").is-just then
-  //       p.show.println()
-  //       parseTest(parseProgram, read-text-file(p), show, p.show)
+  // parseTest(parseNum, "1.53", show)
+  // parseTest(parseChar, r"#\newline", show)
+  // parseTest(parseBool, "#t", show)
+  // parseTest(parseSymbol, "+", show)
+  // parseTest(parseString, "\"Hello\"", show)
+  // parseTest(parseList, "(+)", show)
+  // parseTest(parseList, "(+ 3 5)", show)
+  // parseTest(parseProgram, "[+ 3 5]", show)
+  // parseTest(parseList, "{+ 3 5 . (list a b c)}", show)
+  
+  // programs.foreach fn(p)
+  //   parseTest(parseProgram, p, show)
+  list-directory-recursive("/Users/timwhiting/koka_code/higher-order-programs/scheme".path).foreach fn(p)
+    if is-file(p) then // nbody
+      if p.show.ends-with(".scm\"").is-just then
+        parseTest(parseProgram, read-text-file(p), show, p.show)
 
 // TODO: Emit tokens including all whitespace etc. Let AST include token references.
 // Really should add macros to Koka so we can dynamically create an AST with tokens for each constructor

@@ -37,7 +37,7 @@ pub type perror<e>
   ExpectedPatternMatch(pat: string, offset: int)
   NotEnough(i: int, offset: int)
   In(label: string, offset: int, err: perror<e>)
-  UserDefined(err: e)
+  UserDefined(err: e, offset: int)
   ExpectedCharQuery(q: charQuery, offset: int)
 
 pub fun failHere(e: (int -> perror<r>)): parse<r> a
@@ -116,7 +116,7 @@ pub fun startsWith(s: sslice, cs: list<char>): (bool, sslice, int)
     Cons(c', cs') ->
       match s.next
         Just((c, rest)) | c' == c ->
-          val (r, re, i) = startsWith(rest.unsafe-decreasing, cs'.tail.unsafe-decreasing)
+          val (r, re, i) = startsWith(rest.unsafe-decreasing, cs'.unsafe-decreasing)
           (r, re, i + 1)
         _ -> 
           (False, s, 0)
@@ -291,16 +291,16 @@ pub fun tryParse(p: parser<r,a,e>): <parse<r>|e> either<perror<r>,a>
 
 pub fun show(e: perror<e>, errShow: (e) -> string, input: string): string
   match e
-    ExpectedCharQuery(q, offset) -> "Expected " ++ q.show ++ " at " ++ offset.show
-    ExpectedPatternMatch(pat, offset) -> "Expected pattern " ++ pat ++ " at " ++ offset.show
+    ExpectedCharQuery(q, offset) -> "Expected " ++ q.show ++ " at " ++ offset.show ++ " but found " ++ showLineOffset(input, offset)
+    ExpectedPatternMatch(pat, offset) -> "Expected pattern " ++ pat ++ " at " ++ offset.show ++ " but found " ++ showLineOffset(input, offset)
     Expected(t, offset) -> "Expected " ++ t ++ " at " ++ offset.show ++ " but found " ++ showLineOffset(input, offset)
-    NotEnough(i, offset) -> "Not enough input at " ++ offset.show ++ ", expected " ++ i.show
-    In(label, offset, err) -> "In " ++ label ++ " at " ++ offset.show ++ ": " ++ show(err, errShow, input)
-    UserDefined(err) -> errShow(err) 
+    NotEnough(i, offset) -> "Not enough input at " ++ offset.show ++ ", expected " ++ i.show ++ " but found " ++ showLineOffset(input, offset)
+    In(label, offset, err) -> "In " ++ label ++ " at " ++ offset.show ++ ": " ++ show(err, errShow, input) ++ " but found " ++ showLineOffset(input, offset)
+    UserDefined(err, offset) -> errShow(err) ++ " but found " ++ showLineOffset(input, offset)
 
 fun showLineOffset(s: string, offset: int): string
   val sub = s.slice.advance(offset)
-  sub.advance(-10).substr(0, min(offset, 10)).string ++ "(" ++ sub.substr(0,1).string ++ ")" ++ sub.substr(1, 10).string
+  sub.advance(-10).substr(0, min(offset, 10)).string ++ "(->" ++ sub.substr(0,1).string ++ "<-)" ++ sub.substr(1, 10).string
 
 pub fun show(q: charQuery): string
   match q
@@ -312,13 +312,15 @@ pub fun show(q: charQuery): string
         else acc ++ ", " ++ c1.show ++ "-" ++ c2.show
 
 // Common
-val leadingDotRegex = r"^[+-]?\.[0-9]+([eE][+-]?[0-9]+)?".regex() 
-val wholeFloatRegex = r"^[+-]?[0-9]+(\.[0-9]+)?([eE][+-]?[0-9]+)?".regex() 
+val leadingDotRegex = r"^\.[0-9]+([eE][+-]?[0-9]+)?".regex() 
+val wholeFloatRegex = r"^[0-9]+(\.[0-9]+)?([eE][+-]?[0-9]+)?".regex() 
+val plusOrMinusRegex = r"^[+-]?".regex()
 
 pub fun parseFloat(): <parse<r>|e> float64
-  val result = parseWholeFloat.or(parseLeadingDotFloat)
   val pos = offset()
-  match parse-float64(result)
+  val pMinus = takePattern(plusOrMinusRegex)
+  val result = parseLeadingDotFloat.or(parseWholeFloat)
+  match parse-float64(pMinus ++ result)
     Just(i) -> i
     Nothing -> failHere(fn(p) Expected("float", pos))
 

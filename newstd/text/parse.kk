@@ -33,15 +33,15 @@ pub value type charQuery
   Ranges(ranges: list<(char, char)>)
 
 pub type perror<e>
-  Expected(expected: string, pos: position)
-  ExpectedPatternMatch(pat: string, pos: position)
-  NotEnough(i: int, pos: position)
-  In(label: string, pos: position, err: perror<e>)
+  Expected(expected: string, offset: int)
+  ExpectedPatternMatch(pat: string, offset: int)
+  NotEnough(i: int, offset: int)
+  In(label: string, offset: int, err: perror<e>)
   UserDefined(err: e)
-  ExpectedCharQuery(q: charQuery, pos: position)
+  ExpectedCharQuery(q: charQuery, offset: int)
 
-pub fun failHere(e: (position -> perror<r>)): parse<r> a
-  fail(e(Position(offset())))
+pub fun failHere(e: (int -> perror<r>)): parse<r> a
+  fail(e(offset()))
 
 pub fun halve(first: parser<r,f,e>, separator: parser<r,s,e>, second: parser<r,s,e>): <parse<r>|e> (f, s)
   val a = first()
@@ -77,9 +77,9 @@ pub fun or(p1: parser<r,a,e>, p2: parser<r,a,e>): <parse<r>|e> a
         fail(e)
     Right(r) -> r
 
-pub fun ors(ps: list<parser<r,a,<exn|e>>>): <parse<r>,exn|e> a
+pub fun ors(ps: list<parser<r,a,e>>): <parse<r>|e> a
   match ps
-    Nil -> fail(Expected("List size > 1 for or parser", Position(offset())))
+    Nil -> fail(Expected("List size > 1 for or parser", offset()))
     Cons(p1, Cons(p2, Nil)) -> or(p1, p2)
     Cons(p, pp) -> or(p, fn() ors(pp))
 
@@ -121,51 +121,48 @@ pub fun startsWith(s: sslice, cs: list<char>): (bool, sslice, int)
         _ -> 
           (False, s, 0)
 
-fun increment(pos: position, i: int): position
-  Position(pos.offset + i)
-
 pub fun run(parser: parser<r,a,<exn|e>>, s: string): <exn|e> either<perror<r>, a>
-  var p := Position(0)
+  var offset := 0
   var rem := s.slice
   var marks := []
   handle(parser)
     return(a) Right(a)
     fun tryTake(i: int)
-      if i > rem.count then Left(NotEnough(i, p))
+      if i > rem.count then Left(NotEnough(i, offset))
       else
         val (taken, rest) = rem.takeAdvance(i)
         rem := rest
-        p := p.increment(i)
+        offset := offset + i
         Right(taken.string)
     fun trySkip(i: int)
-      if i > rem.count then Left(NotEnough(i, p))
+      if i > rem.count then Left(NotEnough(i, offset))
       else
         rem := rem.advance(i)
-        p := p.increment(i)
+        offset := offset + i
         Right(())
     fun tryText(t: string)
       val (v, rem', cnt) = rem.startsWith(t.list)
       if v then
         rem := rem'
-        p := p.increment(cnt)
+        offset := offset + cnt
         Right(())
-      else Left(Expected(t, p))
+      else Left(Expected(t, offset))
     final ctl fail(e)
       Left(e)
     fun offset()
-      p.offset
+      offset
     fun tryPattern(pat: regex)
       match pat.exec(rem)
         Nil -> 
-          Left(ExpectedPatternMatch(pat.source, p))
+          Left(ExpectedPatternMatch(pat.source, offset))
         ms ->
           // TODO: Assert that start of capture equals start of slice
           val c = ms[0].default("".slice).count
           rem := rem.advance(c)
-          p := p.increment(c)
+          offset := offset + c
           Right(ms.map(fn(s') s'.string))
     fun mark()
-      marks := marks ++ [(rem, p)]
+      marks := marks ++ [(rem, offset)]
       marks.length - 1
     fun unmark(i: int)
       marks := marks.take(i)
@@ -173,10 +170,10 @@ pub fun run(parser: parser<r,a,<exn|e>>, s: string): <exn|e> either<perror<r>, a
     fun reset(i: int)
       match marks[i]
         Nothing -> throw("Invalid Mark: " ++ i.show)
-        Just((rem', p')) ->
+        Just((rem', position')) ->
           marks := marks.take(i)
           rem := rem'
-          p := p'
+          offset := position'
           ()
     fun labels()
       []
@@ -184,7 +181,7 @@ pub fun run(parser: parser<r,a,<exn|e>>, s: string): <exn|e> either<perror<r>, a
 pub fun scope(t: string, p: parser<r,a,e>): <parse<r>|e> a
   val off = offset()
   match tryParse({scope1(t, p)})
-    Left(e) -> fail(In(t, Position(off), e))
+    Left(e) -> fail(In(t, off, e))
     Right(r) -> r
       
 pub fun scope1(t: string, p: parser<r,a,e>): <parse<r>|e> a
@@ -256,7 +253,7 @@ pub fun takeWhile(q: charQuery): <parse<r>|e> string
 pub fun takeWhile1(q: charQuery): <parse<r>|e> string
   val initial = offset()
   val res = takePattern(q.toPattern.regex)
-  if offset() == initial then fail(ExpectedCharQuery(q, Position(initial)))
+  if offset() == initial then fail(ExpectedCharQuery(q, initial))
   else res
 
 pub fun takeWhitespace(): <parse<r>|e> string
@@ -292,15 +289,13 @@ pub fun tryParse(p: parser<r,a,e>): <parse<r>|e> either<perror<r>,a>
     fun tryPattern(pat) tryPattern(pat)
   p()
 
-pub value struct position { offset: int }
-
 pub fun show(e: perror<e>, errShow: (e) -> string, input: string): string
   match e
-    ExpectedCharQuery(q, p) -> "Expected " ++ q.show ++ " at " ++ p.show
-    ExpectedPatternMatch(pat, p) -> "Expected pattern " ++ pat ++ " at " ++ p.show
-    Expected(t, p) -> "Expected " ++ t ++ " at " ++ p.show ++ " but found " ++ showLineOffset(input, p.offset)
-    NotEnough(i, p) -> "Not enough input at " ++ p.show ++ ", expected " ++ i.show
-    In(label, p, err) -> "In " ++ label ++ " at " ++ p.show ++ ": " ++ show(err, errShow, input)
+    ExpectedCharQuery(q, offset) -> "Expected " ++ q.show ++ " at " ++ offset.show
+    ExpectedPatternMatch(pat, offset) -> "Expected pattern " ++ pat ++ " at " ++ offset.show
+    Expected(t, offset) -> "Expected " ++ t ++ " at " ++ offset.show ++ " but found " ++ showLineOffset(input, offset)
+    NotEnough(i, offset) -> "Not enough input at " ++ offset.show ++ ", expected " ++ i.show
+    In(label, offset, err) -> "In " ++ label ++ " at " ++ offset.show ++ ": " ++ show(err, errShow, input)
     UserDefined(err) -> errShow(err) 
 
 fun showLineOffset(s: string, offset: int): string
@@ -316,16 +311,13 @@ pub fun show(q: charQuery): string
         if acc.is-empty then c1.show ++ "-" ++ c2.show
         else acc ++ ", " ++ c1.show ++ "-" ++ c2.show
 
-pub fun show(p: position): string
-  p.offset.show
-
 // Common
 val leadingDotRegex = r"^[+-]?\.[0-9]+([eE][+-]?[0-9]+)?".regex() 
 val wholeFloatRegex = r"^[+-]?[0-9]+(\.[0-9]+)?([eE][+-]?[0-9]+)?".regex() 
 
 pub fun parseFloat(): <parse<r>|e> float64
   val result = parseWholeFloat.or(parseLeadingDotFloat)
-  val pos = Position(offset())
+  val pos = offset()
   match parse-float64(result)
     Just(i) -> i
     Nothing -> failHere(fn(p) Expected("float", pos))
@@ -341,7 +333,7 @@ fun parseInt(): <parse<r>|e> int
   match tryParse({takePattern(wholeNumRegex)})
     Left(e) -> fail(e)
     Right(x) -> 
-      val pos = Position(offset())
+      val pos = offset()
       match parse-int(x)
         Just(i) -> i
         Nothing -> failHere(fn(p) Expected("int", pos))
@@ -396,4 +388,4 @@ pub fun parseEndOfInput(): parse<e> ()
   val posMarker = offset()
   match tryTake(1)
     Left(_) -> ()
-    Right(_) -> fail(Expected("End of string", Position(posMarker)))
+    Right(_) -> fail(Expected("End of string", posMarker))

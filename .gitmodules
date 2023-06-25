@@ -1,0 +1,3 @@
+[submodule "higher-order-programs"]
+	path = higher-order-programs
+	url = git@github.com:byu-static-analysis-lab/higher-order-programs

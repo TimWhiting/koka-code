@@ -1,10 +1,10 @@
 named effect rref<a>
   fun emit(a: a): ()
-  ctl watchinner<b>(p: provider<b>, immediate: bool): b
+  ctl watch_<b>(p: provider<b>, immediate: bool): b
   ctl yield(): ()
 
 fun watch(r: rref<a>, p: provider<b>, immediate: bool = True): io b
-  r.watchinner(p, immediate)
+  r.watch_(p, immediate)
 
 type container
   Container(
@@ -52,7 +52,7 @@ fun mkProvider(reactor: rref<a> -> io a, show: (a) -> io string, name="Provider"
         l(a)
     raw ctl yield()
       continuex := (fn() {rcontext.resume(())})
-    raw ctl watchinner(o, triggerImmediately)
+    raw ctl watch_(o, triggerImmediately)
       o.listeners.set(Cons(fn(b) {rcontext.resume(b)}, !(o.listeners)))
       if triggerImmediately then
         (o.current)()

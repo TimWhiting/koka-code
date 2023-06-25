@@ -1,5 +1,8 @@
 import newstd/text/parse
 import std/text/regex
+import std/os/path
+import std/os/file
+import std/os/dir
 import std/num/float64
 
 value struct position
@@ -18,6 +21,7 @@ type sexpr
   SUnquote(e: sexpr, pos: position = Position(-1, -1))
   SUnquoteSplicing(e: sexpr, pos: position = Position(-1, -1))
   SSplice(e: sexpr, pos: position = Position(-1, -1))
+  SVector(e: list<sexpr>, pos: position=Position(-1, -1))
 
 fun updatePos(s: sexpr, p: position)
   match s
@@ -32,6 +36,7 @@ fun updatePos(s: sexpr, p: position)
     SUnquote(e, _) -> SUnquote(e, p)
     SUnquoteSplicing(e, _) -> SUnquoteSplicing(e, p)
     SSplice(e, _) -> SSplice(e, p)
+    SVector(e, _) -> SVector(e, p)
 
 type program
   Program(terms: list<sexpr>)
@@ -53,6 +58,7 @@ fun show(s: sexpr): div string
     SUnquote(t) -> "," ++ show(t)
     SUnquoteSplicing(t) -> ",@" ++ show(t)
     SSplice(t) -> "@" ++ show(t)
+    SVector(l) -> "#(" ++ l.map(show).join(" ") ++ ")"
 
 fun bracket(p1, p2, p3)
   p1()
@@ -94,12 +100,16 @@ fun parseNum()
   with tokenizer
   SNumber(parseFloat())
 
+val commentRegex = r"^;[^\n\r]*".regex()
+fun parseComment()
+  takePattern(commentRegex)
+
 val openListRegex = r"^[([{]".regex()
 val closeListRegex = r"^[)\]}]".regex()
 val whitespace = r"^[\n\r\t ]+".regex()
 
 fun parseWhitespace()
-  takePattern(whitespace)
+  many({(fn() takePattern(whitespace)).or(parseComment)})
 
 fun parseOpenList()
   takePattern(openListRegex)
@@ -107,8 +117,8 @@ fun parseOpenList()
 fun parseCloseList()
   takePattern(closeListRegex)
 
-fun parseCells(): <div,exn,parse<string>> sexpr
-  with tokenizer
+fun parseCells()
+  optional(parseWhitespace)
   val x = many(parseAtom)
   match optional({text(".")})
     Just(_) ->
@@ -117,9 +127,17 @@ fun parseCells(): <div,exn,parse<string>> sexpr
       SList(x, Just(x2))
     Nothing -> SList(x, Nothing)
 
+fun parseVector()
+  with tokenizer
+  text("#(")
+  optional(parseWhitespace)
+  val x = many(parseAtom)
+  text(")")
+  SVector(x)
+
 fun parseList()
   with tokenizer
-  bracket(parseOpenList, fn() parseCells(), parseCloseList)
+  bracket(parseOpenList, parseCells, parseCloseList)
 
 fun parseQuote()
   with tokenizer
@@ -153,22 +171,16 @@ fun parseAtom()
     parseChar,
     parseString,
     parseBool,
-    // parseLiteralVector,
+    parseVector,
     parseSymbol,
     parseQuote,
     parseQuasiquote,
     parseUnquoteSplicing,
     parseUnquote,
     parseSplice,
-    {fail(Expected("Atom", Position(offset())))}])
+    {fail(Expected("Atom", offset()))}])
   optional(parseWhitespace)
   x
-
-fun parseToEof(p: parser<r,a,e>): <> parser<r,a,e>
-  fn()
-    val x = p()
-    parseEndOfInput()
-    x
 
 fun parseProgram()
   optional(parseWhitespace)
@@ -176,11 +188,13 @@ fun parseProgram()
   parseEndOfInput()
   p
 
-fun parseTest(parser, input, showX): <console,exn,div> ()
+fun parseTest(parser, input, showX, file="None")
   val result = parser.run(input)
   match result
-    Right(x) -> println("Success: " ++ showX(x))
-    Left(err) -> println("Error: " ++ err.show(fn(x: string) x, input))
+    Right(x) -> 
+      showX(x)
+      println("Success: ")
+    Left(err) -> println("Error: " ++ err.show(fn(x: string) x, input) ++ " in file " ++ file)
 
 val programs = [
 r"
@@ -235,6 +249,11 @@ fun main()
   parseTest(parseList, "{+ 3 5 . (list a b c)}", show)
   programs.foreach fn(p)
     parseTest(parseProgram, p, show)
+  // list-directory-recursive("higher-order-programs/scheme".path).foreach fn(p)
+  //   if is-file(p) then
+  //     if p.show.ends-with(".scm\"").is-just then
+  //       p.show.println()
+  //       parseTest(parseProgram, read-text-file(p), show, p.show)
 
 // TODO: Emit tokens including all whitespace etc. Let AST include token references.
 // Really should add macros to Koka so we can dynamically create an AST with tokens for each constructor

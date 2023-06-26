@@ -110,8 +110,12 @@ val openListRegex = r"^[([{]".regex()
 val closeListRegex = r"^[)\]}]".regex()
 val whitespace = r"^[\n\r\t ]+".regex()
 
+val whiteChars = ['\n','\t',' ','\r']
+fun parseWhite()
+  many({takeOneOf(whiteChars)}).string
+
 fun parseWhitespace()
-  many({(fn() takePattern(whitespace)).or(parseComment)})
+  many({parseWhite.or(parseComment)})
 
 fun parseOpenList()
   takePattern(openListRegex)

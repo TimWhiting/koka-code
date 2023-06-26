@@ -6,6 +6,7 @@ pub effect parse<e>
   fun unmark(i: int): ()
   fun reset(i: int): ()
   fun tryPattern(p: regex): either<perror<e>, list<string>>
+  fun tryQuery(p: charQuery): either<perror<e>, char>
   fun trySkip(i: int): either<perror<e>, ()>
   fun tryTake(i: int): either<perror<e>, string>
   fun labels(): list<string>
@@ -29,7 +30,7 @@ pub fun between(open: parser<r,a,e>, close: parser<r,a,e>, mid: parser<r,b,e>): 
   productL({productR(open,mid)},close)
 
 pub value type charQuery
-  OneOf(text: string)
+  OneOf(text: list<char>)
   Ranges(ranges: list<(char, char)>)
 
 pub type perror<e>
@@ -117,9 +118,32 @@ pub fun startsWith(s: sslice, cs: list<char>): (bool, sslice, int)
       match s.next
         Just((c, rest)) | c' == c ->
           val (r, re, i) = startsWith(rest.unsafe-decreasing, cs'.unsafe-decreasing)
-          (r, re, i + 1)
+          if r then (True, re, i + 1)
+          else (False, s, 0)
         _ -> 
           (False, s, 0)
+
+pub fun query(s: sslice, q: charQuery): (bool, sslice, int)
+  match q
+    OneOf(text) ->
+      match s.next
+        Nothing -> (False, s, 0)
+        Just((c', rest)) ->
+          if text.any(fn(c) c == c') then
+            (True, rest, 1)
+          else
+            (False, s, 0)
+    Ranges(ranges) ->
+      match s.next
+        Nothing -> (False, s, 0)
+        Just((c, rest)) ->
+          fun matchRanges(r)
+            match r
+              Nil -> (False, s, 0)
+              Cons((c1, c2), rs) ->
+                if c >= c1 && c <= c2 then (True, rest, 1)
+                else matchRanges(rs.unsafe-decreasing)
+          matchRanges(ranges)
 
 pub fun run(parser: parser<r,a,<exn|e>>, s: string): <exn|e> either<perror<r>, a>
   var offset := 0
@@ -161,6 +185,14 @@ pub fun run(parser: parser<r,a,<exn|e>>, s: string): <exn|e> either<perror<r>, a
           rem := rem.advance(c)
           offset := offset + c
           Right(ms.map(fn(s') s'.string))
+    fun tryQuery(q: charQuery)
+      val (v, rem', cnt) = rem.query(q)
+      if v then
+        val char = rem.substr(0,1).string.head-char.unjust
+        rem := rem'
+        offset := offset + cnt
+        Right(char)
+      else Left(ExpectedCharQuery(q, offset))
     fun mark()
       marks := marks ++ [(rem, offset)]
       marks.length - 1
@@ -195,6 +227,7 @@ pub fun scope1(t: string, p: parser<r,a,e>): <parse<r>|e> a
     fun tryTake(i) tryTake(i)
     fun trySkip(i) trySkip(i)
     fun tryText(s) tryText(s)
+    fun tryQuery(q) tryQuery(q)
     fun tryPattern(pat) tryPattern(pat)
   p()
 
@@ -213,7 +246,7 @@ pub fun skipUntil(q: charQuery): <parse<r>|e> ()
 
 pub fun notInPattern(q: charQuery): string
   match q
-    OneOf(t) -> "^[^" ++ t ++ "]"
+    OneOf(t) -> "^[^" ++ t.string ++ "]"
     Ranges(chars) ->
       chars.foldl("^") fn(acc:string, v)
         val (c1:char, c2:char) = v
@@ -227,7 +260,7 @@ pub fun skipWhile(q: charQuery): <parse<r>|e> ()
 
 pub fun toPattern(q: charQuery): string
   match q
-    OneOf(t) -> "[" ++ t ++ "]"
+    OneOf(t) -> "[" ++ t.string ++ "]"
     Ranges(chars) ->
       chars.foldl("^") fn(acc:string, v)
         val (c1:char, c2:char) = v
@@ -236,6 +269,9 @@ pub fun toPattern(q: charQuery): string
 
 pub fun takeChars(i: int): <parse<r>|e> string
   reraise({tryTake(i)})
+
+pub fun takeOneOf(l: list<char>): <parse<r>|e> char
+  reraise({tryQuery(OneOf(l))})
 
 pub fun takePattern(p: regex): <parse<r>|e> string
   val res = reraise({tryPattern(p)})
@@ -257,7 +293,7 @@ pub fun takeWhile1(q: charQuery): <parse<r>|e> string
   else res
 
 pub fun takeWhitespace(): <parse<r>|e> string
-  takeWhile(OneOf(" \t\r"))
+  takeWhile(OneOf([' ','\t','\r']))
 
 pub fun text(t: string): <parse<r>|e> ()
   reraise({tryText(t)})
@@ -286,6 +322,7 @@ pub fun tryParse(p: parser<r,a,e>): <parse<r>|e> either<perror<r>,a>
     fun tryTake(i) tryTake(i)
     fun trySkip(i) trySkip(i)
     fun tryText(t) tryText(t)
+    fun tryQuery(q) tryQuery(q)
     fun tryPattern(pat) tryPattern(pat)
   p()
 
@@ -304,7 +341,7 @@ fun showLineOffset(s: string, offset: int): string
 
 pub fun show(q: charQuery): string
   match q
-    OneOf(t) -> "one of " ++ t
+    OneOf(t) -> "one of " ++ t.string
     Ranges(chars) ->
       chars.foldl("") fn(acc:string, v)
         val (c1:char, c2:char) = v
@@ -353,7 +390,7 @@ pub fun takeAlphanum1(): <parse<r>|e> string
   takePattern(alnumRegex)
 
 pub fun skipWhitespace(): <parse<r>|e> ()
-  skipWhile(OneOf(" \t\r\n"))
+  skipWhile(OneOf([' ','\t','\r','\n']))
 
 pub fun parseSlash(): <parse<r>|e> ()
   text("/")

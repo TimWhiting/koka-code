@@ -4,6 +4,39 @@ import compiler/common/name
 import compiler/common/range
 import compiler/type/type
 
+fun isUnit(e: expr): bool
+  match e
+    Con(name) | name.getName == nameTuple(0) -> True
+    _ -> False
+
+fun isTrue(e: expr): bool
+  match e
+    Con(name) | name.getName == nameTrue -> True
+    _ -> False
+
+fun isFalse(e: expr): bool
+  match e
+    Con(name) | name.getName == nameFalse -> True
+    _ -> False
+
+val exprUnit = Con(TName(nameUnit, typeUnit), ConEnum(nameTpUnit, DataEnum, valueRepZero, 0))
+
+val pEFalse = patExprBool(nameFalse, 0)
+val patFalse = pEFalse.fst
+val exprFalse = pEFalse.snd
+
+val pETrue = patExprBool(nameTrue, 1)
+val patTrue = pETrue.fst
+val exprTrue = pETrue.snd
+
+fun patExprBool(n: name, t: int): (pattern, expr)
+  val name = TName(n, typeBool)
+  val conEnum = ConEnum(nameTpBool, DataEnum, valueRepZero, t)
+  val conInfo = ConInfo(name, nameTpBool, [], [], [], TFun([], typeTotal, typeBool), Inductive, rangeNull, [], [], False)
+  val pat = PCon(name, [], conEnum, [], [], typeBool, conInfo, False)
+  val expr = Con(name, conEnum)
+  (pat, expr)
+
 struct core
   name: name
   imports: kimports
@@ -15,7 +48,7 @@ struct core
 
 alias fixDefs = list<fixDef>;
 type fixDef
-  FixDef(name: name, fixity: fixity)
+  FixDef(name: name, fixity: fixity);
 
 alias kimports = list<kimport>;
 struct kimport
@@ -106,53 +139,18 @@ type dataRepr
   DataAsList // one constructor with fields, and one singleton (don't need a tag, for example can distinguish pointer vs enum)
   DataSingleNormal // one constructor with fields, and multiple singletons (distinguish one pointer vs enums)
   DataNormal(hasSingletons: bool)
-  DataOpen
+  DataOpen;
 
 type conRepr
-  ConEnum(name: name, repr: dataRepr, tag: int) // part of enumeration (none has fields)
-  ConIso(name: name, repr: dataRepr, tag: int) // one constructor with one field
-  ConSingleton(name: name, repr: dataRepr, tag: int) // constructor without fields (and not part of an enum)
-  ConSingle(name: name, repr: dataRepr, tag: int) // there is only one constructor and it is not iso or singleton (and this is it)
-  ConAsJust(name: name, repr: dataRepr, asNothing: name, tag: int) // constructor is the just node of a maybe-like datatype  (only use for DataAsMaybe, not for DataStructAsMaybe)
-  ConStruct(name: name, repr: dataRepr, tag: int) // constructor as value type
-  ConAsCons(name: name, repr: dataRepr, asNil: name, tag: int) // constructor is the cons node of a list-like datatype  (may have one or more fields)
-  ConOpen(name: name, repr: dataRepr) // constructor of open data type
-  ConNormal(name: name, repr: dataRepr, tag: int) // a regular constructor
-
-fun isConSingleton(c: conRepr): bool
-  match c
-    ConSingleton(_, _, _) -> True
-    _ -> False
-
-fun isConNormal(c: conRepr): bool
-  match c
-    ConNormal(_, _) -> True
-    _ -> False
-
-fun isConIso(c: conRepr): bool
-  match c
-    ConIso(_, _, _) -> True
-    _ -> False
-
-fun isDataStruct(d: dataRepr): bool
-  match d
-    DataStruct -> True
-    _ -> False
-
-fun isDataMaybe(d: dataRepr): bool
-  match d
-    DataAsMaybe -> True
-    _ -> False
-  
-fun isDataStructAsMaybe(d: dataRepr): bool
-  match d
-    DataStructAsMaybe -> True
-    _ -> False
-
-fun isConAsJust(c: conRepr): bool
-  match c
-    ConAsJust(_, _, _, _) -> True
-    _ -> False
+  ConEnum(name: name, repr: dataRepr, valueRepr: valueRepr, tag: int) // part of enumeration (none has fields)
+  ConIso(name: name, repr: dataRepr, valueRepr: valueRepr, tag: int) // one constructor with one field
+  ConSingleton(name: name, repr: dataRepr, valueRepr: valueRepr, tag: int) // constructor without fields (and not part of an enum)
+  ConSingle(name: name, repr: dataRepr, valueRepr: valueRepr, tag: int) // there is only one constructor and it is not iso or singleton (and this is it)
+  ConAsJust(name: name, repr: dataRepr, valueRepr: valueRepr, asNothing: name, tag: int) // constructor is the just node of a maybe-like datatype  (only use for DataAsMaybe, not for DataStructAsMaybe)
+  ConStruct(name: name, repr: dataRepr, valueRepr: valueRepr, tag: int) // constructor as value type
+  ConAsCons(name: name, repr: dataRepr, valueRepr: valueRepr, asNil: name, tag: int) // constructor is the cons node of a list-like datatype  (may have one or more fields)
+  ConOpen(name: name, repr: dataRepr, valueRepr: valueRepr) // constructor of open data type
+  ConNormal(name: name, repr: dataRepr, valueRepr: valueRepr, tag: int); // a regular constructor
   
 // Value data is not heap allocated and needs no header
 fun isValue(d: dataRepr): bool
@@ -169,10 +167,6 @@ fun isValue(c: conRepr): bool
 
 fun isValue(d: dataInfo): bool
   d.def.isValue
-
-
-
-
 
 // Definition Groups
 

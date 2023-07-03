@@ -3,13 +3,13 @@ alias rho = ktype // unqualified type
 
 type ktype
   TForAll(r: rho)
-  Default()
+  TDefault()
 
-fun maxSynonymRank(t: ktype): int
+fun maxSynonymRank(t: rho): int
   match t
     TForAll(r) -> maxSynonymRank(r)
-    Default() -> 0
+    TDefault() -> 0
 
 fun main(): <console> ()
-  val h = TForAll(Default)
+  val h = TForAll(TDefault)
   maxSynonymRank(h).println

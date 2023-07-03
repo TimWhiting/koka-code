@@ -5,11 +5,11 @@ import std/os/file
 import std/os/dir
 import std/num/float64
 
-value struct position
+pub value struct position
   start: int
   end: int
 
-type sexpr
+pub type sexpr
   SBool(b: bool, pos: position = Position(-1, -1))
   SChar(c: string, pos: position = Position(-1, -1))
   SString(s: string, pos: position = Position(-1, -1))
@@ -38,13 +38,12 @@ fun updatePos(s: sexpr, p: position)
     SSplice(e, _) -> SSplice(e, p)
     SVector(e, _) -> SVector(e, p)
 
-type program
-  Program(terms: list<sexpr>)
+pub alias sprogram = list<sexpr>
 
-fun show(p: program): div string
-  p.terms.map(show).join("\n")
+pub fun show(p: sprogram): div string
+  p.map(show).join("\n")
 
-fun show(s: sexpr): div string
+pub fun show(s: sexpr): div string
   match s
     SBool(b) -> if b then "#t" else "#f"
     SChar(c) -> r"#\" ++ c
@@ -188,7 +187,7 @@ fun parseAtom()
 
 fun parseProgram()
   optional(parseWhitespace)
-  val p = Program(many(parseAtom))
+  val p = many(parseAtom)
   optional(parseWhitespace)
   parseEndOfInput()
   p
@@ -243,22 +242,22 @@ r"(lambda ,(lambda->formals exp))",
 
 
 fun main()
-  // parseTest(parseNum, "1.53", show)
-  // parseTest(parseChar, r"#\newline", show)
-  // parseTest(parseBool, "#t", show)
-  // parseTest(parseSymbol, "+", show)
-  // parseTest(parseString, "\"Hello\"", show)
-  // parseTest(parseList, "(+)", show)
-  // parseTest(parseList, "(+ 3 5)", show)
-  // parseTest(parseProgram, "[+ 3 5]", show)
-  // parseTest(parseList, "{+ 3 5 . (list a b c)}", show)
+  parseTest(parseNum, "1.53", show)
+  parseTest(parseChar, r"#\newline", show)
+  parseTest(parseBool, "#t", show)
+  parseTest(parseSymbol, "+", show)
+  parseTest(parseString, "\"Hello\"", show)
+  parseTest(parseList, "(+)", show)
+  parseTest(parseList, "(+ 3 5)", show)
+  parseTest(parseProgram, "[+ 3 5]", show)
+  parseTest(parseList, "{+ 3 5 . (list a b c)}", show)
   
   // programs.foreach fn(p)
   //   parseTest(parseProgram, p, show)
-  list-directory-recursive("/Users/timwhiting/koka_code/higher-order-programs/scheme".path).foreach fn(p)
-    if is-file(p) then // nbody
-      if p.show.ends-with(".scm\"").is-just then
-        parseTest(parseProgram, read-text-file(p), show, p.show)
+  // list-directory-recursive("/Users/timwhiting/koka_code/higher-order-programs/scheme".path).foreach fn(p)
+  //   if is-file(p) then // nbody
+  //     if p.show.ends-with(".scm\"").is-just then
+  //       parseTest(parseProgram, read-text-file(p), show, p.show)
 
 // TODO: Emit tokens including all whitespace etc. Let AST include token references.
 // Really should add macros to Koka so we can dynamically create an AST with tokens for each constructor

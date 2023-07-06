@@ -27,7 +27,7 @@ fun show(v: jsValue)
     JsDouble(d) -> d.std/core/show
     JsString(s) -> s.std/core/show
     JsArray(l) -> "[" ++ l.map(show).join(", ") ++ "]"
-    JsObject(o) -> "{" ++ o.list.map(fn ((k, v1)) k.std/core/show ++ ": " ++ v1.show).join(",\n ") ++ "}"
+    JsObject(o) -> "{" ++ o.list.map(fn ((k, v1)) k ++ ": " ++ v1.show).join(",\n ") ++ "}"
 
 fun jsLookup(v: jsValue, keys: list<string>): jsValue
   match keys
@@ -94,32 +94,31 @@ inline fun takeString()
 fun pString()
   with scope("pstring")
   val s = takeString()
-  JsString(s)
+  JsString(s.slice.substr(1, s.count - 1).string)
 
 fun pArray()
   with scope("parray")
-  token("[")
-  val xs = separatedTrailing(pValue,{token(",")})
+  pToken("[")
+  val xs = separatedTrailing(pValue,{pToken(",")})
   optional(pWhitespace)
-  token("]")
+  pToken("]")
   JsArray(xs)
 
 fun pMember()
   with scope("pmember")
   val k = takeString()
   optional(pWhitespace)
-  token(":")
+  pToken(":")
   val v = pValue()
-  optional(pWhitespace)
   (k, v)
 
 fun pObject()
   with scope("pobject")
-  token("{")
-  val members = separatedTrailing(pMember, {token(",")})
+  pToken("{")
+  val members = separatedTrailing(pMember, {pToken(",")})
   optional(pWhitespace)
   val o = JsObject(linearMap(members, fn(s: string, s1: string) s == s1))
-  token("}")
+  pToken("}")
   o
 
 fun pValue()
@@ -128,13 +127,13 @@ fun pValue()
   optional(pWhitespace)
   v
 
-val spacesRegex = "^[ \n\t\r]+".regex()
+val spacesRegex = r"^([ \n\t\r]|\/\/[^\n]+)+".regex()
 fun pWhitespace()
   spacesRegex.takePattern()
 
 fun pToken(s: string)
   text(s)
-  pWhitespace()
+  optional(pWhitespace)
 
 fun parse(s: string)
   s.println
@@ -151,5 +150,8 @@ fun parse2(p, s: string, rshow)
   x.println
   
 fun main()
-  parse(r#"{"hello":"world",}"#)
+  parse(r#"{
+  "hello":"world", // Something here
+}"#
+  )
   

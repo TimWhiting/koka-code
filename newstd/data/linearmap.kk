@@ -1,6 +1,6 @@
 pub value struct linearMap<k,v,e>
   pub list: list<(k,v)> 
-  eq: (k, k) -> e bool
+  pub eq: (k, k) -> e bool
 
 pub fun linearMap(l: list<(k,v)>, eq: (k, k) -> e bool): <> linearMap<k,v,e>
   LinearMap(l, eq)
@@ -37,3 +37,10 @@ pub fun set(m: linearMap<k,v,e>, k: k, v: v): e linearMap<k,v,e>
 
 fun set(l: list<(k,v)>, k: k, v: v, eq: (k, k) -> e bool): e list<(k,v)>
   update(l, k, fn(_) v, v, eq)
+
+pub fun foldr(m: linearMap<k,v,e>, acc: a, f: (k, v, a) -> e a): e a
+  m.list.foldr(acc, fn((k, v), x) f(k, v, x))
+
+pub fun map(m: linearMap<k,v,e>, f: (k, v) -> e (k, v)): e linearMap<k,v,e>
+  m(list=m.list.map(fn((k,v)) f(k,v)))
+

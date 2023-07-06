@@ -40,8 +40,8 @@ fun dff(g: graph<v>): forest<v>
   g.dfs(g.vertices)
 
 fun dfs(g: graph<v>, vs: list<v>): forest<v>
-  unsafe-total
-    Forest(vs.map(fn(v) g.tree(v, ref(linearSet([v], g.eq))))).prune(g.eq)
+  with unsafe-total
+  Forest(vs.map(fn(v) g.tree(v, ref(linearSet([v], g.eq))))).prune(g.eq)
 
 fun tree(g: graph<v>, v: v, visited: ref<h, linearSet<v,<read<h>,write<h>,div>>>): <div,read<h>,write<h>> tree<v>
   val f = g.successors(v).flatmap fn(v')
@@ -67,8 +67,8 @@ fun prune(fs: forest<v>, eq: (v,v) -> bool): forest<v>
   linearSet([], eq).chop(fs).snd
 
 fun preorder(g: graph<v>): list<v>
-  unsafe-total
-    g.dff.preorderF
+  with unsafe-total
+  g.dff.preorderF
 
 fun preorderF(f: forest<v>): div list<v>
   f.list.flatmap(preorderT)
@@ -80,8 +80,8 @@ fun postorder(g: graph<v>): list<v>
   g.dff.postorderF
 
 pub fun postorderF(f: forest<v>): list<v>
-  unsafe-total
-    postorderF'(f.list, [])
+  with unsafe-total
+  postorderF'(f.list, [])
 
 fun postorderT'(t: tree<v>, vs: list<v>): div list<v>
   postorderF'(t.fs.list, Cons(t.head, vs))
@@ -95,8 +95,8 @@ fun scc(nodes: list<node<v>>, eq: (v, v) -> bool): list<list<v>>
   sccG(nodes.graph(eq))
 
 fun sccG(g: graph<v>): list<list<v>>
-  unsafe-total
-    g.sccF.map(preorderT)
+  with unsafe-total
+  g.sccF.map(preorderT)
 
 fun sccF(g: graph<v>): list<tree<v>>
   g.transpose.dfs(g.topsort).list.reverse
@@ -105,13 +105,20 @@ fun topsort(g: graph<v>): list<v>
   g.postorder.reverse
 
 fun reachable(g: graph<v>, v: v): list<v>
-  unsafe-total
-    g.dfs([v]).preorderF
+  with unsafe-total
+  g.dfs([v]).preorderF
 
 fun path(g: graph<v>, v: v, w: v): bool
   g.reachable(v).find(fn(e) (g.eq)(e, w)).is-just
 
-fun main()
-  // "".println
-  scc([(0,[1]),(1,[1,2,3]),(2,[1]),(3,[]),(4,[])], (==)).show-list(fn(l) l.show-list(show)).println
-
+// fun main()
+//   // "".println
+//   scc([(0,[1]),(1,[1,2,3]),(2,[1]),(3,[]),(4,[])], (==)).show-list(fn(l) l.show-list(show)).println
+//   scc([('a',"jg".list)
+//     ,  ('b',"ia".list)
+//     ,  ('c',"he".list)
+//     ,  ('d',"".list)
+//     ,  ('e',"jhd".list)
+//     ,  ('f',"i".list)
+//     ,  ('g',"fb".list)
+//     ,  ('h',"".list)], (==)).show-list(fn(l) l.show-list(show)).println

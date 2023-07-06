@@ -289,14 +289,14 @@ pub fun tryParse(p: parser<r,a,e>): <parse<r>|e> either<perror<r>,a>
     fun tryPattern(pat) tryPattern(pat)
   p()
 
-pub fun show(e: perror<e>, errShow: (e) -> string, input: string): string
+pub fun show(e: perror<e>, errShow: (e) -> string, input: string, indent:string=""): string
   match e
-    ExpectedCharQuery(q, offset) -> "Expected " ++ q.show ++ " at " ++ offset.show ++ " but found " ++ showLineOffset(input, offset)
-    ExpectedPatternMatch(pat, offset) -> "Expected pattern " ++ pat ++ " at " ++ offset.show ++ " but found " ++ showLineOffset(input, offset)
-    Expected(t, offset) -> "Expected " ++ t ++ " at " ++ offset.show ++ " but found " ++ showLineOffset(input, offset)
-    NotEnough(i, offset) -> "Not enough input at " ++ offset.show ++ ", expected " ++ i.show ++ " but found " ++ showLineOffset(input, offset)
-    In(label, offset, err) -> "In " ++ label ++ " at " ++ offset.show ++ ": " ++ show(err, errShow, input) ++ " but found " ++ showLineOffset(input, offset)
-    UserDefined(err, offset) -> errShow(err) ++ " but found " ++ showLineOffset(input, offset)
+    ExpectedCharQuery(q, offset) -> indent ++ "Expected " ++ q.show ++ " at " ++ offset.show ++ " but found " ++ showLineOffset(input, offset)
+    ExpectedPatternMatch(pat, offset) -> indent ++ "Expected pattern " ++ pat ++ " at " ++ offset.show ++ " but found " ++ showLineOffset(input, offset)
+    Expected(t, offset) -> indent ++ "Expected " ++ t ++ " at " ++ offset.show ++ " but found " ++ showLineOffset(input, offset)
+    NotEnough(i, offset) -> indent ++ "Not enough input at " ++ offset.show ++ ", expected " ++ i.show ++ " but found " ++ showLineOffset(input, offset)
+    In(label, offset, err) -> indent ++ "In " ++ label ++ " at position " ++ offset.show ++ " found " ++ showLineOffset(input, offset) ++ "\n" ++ show(err, errShow, input, indent ++ "  ")
+    UserDefined(err, offset) -> indent ++ errShow(err) ++ " but found " ++ showLineOffset(input, offset)
 
 fun showLineOffset(s: string, offset: int): string
   val sub = s.slice.advance(offset)
@@ -391,3 +391,12 @@ pub fun parseEndOfInput(): parse<e> ()
   match tryTake(1)
     Left(_) -> ()
     Right(_) -> fail(Expected("End of string", posMarker))
+
+pub fun separatedTrailing(p: parser<r,a,<div|e>>, sep: parser<r,b,<div|e>>): <div,parse<r>|e> list<a>
+  val x = optional(p)
+  match x
+    Just(x1) -> 
+      val xs = many({with atomic; sep(); p()})
+      optional(sep)
+      Cons(x1, xs)
+    Nothing -> []

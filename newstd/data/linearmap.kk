@@ -1,5 +1,5 @@
 pub value struct linearMap<k,v,e>
-  list: list<(k,v)> 
+  pub list: list<(k,v)> 
   eq: (k, k) -> e bool
 
 pub fun linearMap(l: list<(k,v)>, eq: (k, k) -> e bool): <> linearMap<k,v,e>
@@ -20,6 +20,9 @@ fun get(l: list<(k,v)>, k: k, eq: (k, k) -> e bool): <exn|e> v
   match l
     Cons((kk, vv), rst) -> if mask<exn>{(eq)(kk, k)} then vv else rst.get(k, eq)
     Nil -> throw("not found")
+
+pub fun maybeGet(m: linearMap<k,v,e>, k: k): e maybe<v>
+  catch({Just(m.list.get(k, m.eq))}, fn(x) {Nothing})
 
 pub fun getDefault(m: linearMap<k,v,e>, k: k, v: v): e v
   m.list.getDefault(k, v, m.eq)

@@ -13,58 +13,85 @@ pub type sexpr
   SBool(b: bool, pos: position = Position(-1, -1))
   SChar(c: string, pos: position = Position(-1, -1))
   SString(s: string, pos: position = Position(-1, -1))
-  SSymbol(s: string, pos: position = Position(-1, -1))
+  SName(s: string, pos: position = Position(-1, -1))
   SNumber(n: float64, pos: position = Position(-1, -1))
-  SList(l: list<sexpr>, r: maybe<sexpr>, pos: position = Position(-1, -1))
-  SQuote(e: sexpr, pos: position = Position(-1, -1))
-  SQuasiquote(e: sexpr, pos: position = Position(-1, -1))
-  SUnquote(e: sexpr, pos: position = Position(-1, -1))
-  SUnquoteSplicing(e: sexpr, pos: position = Position(-1, -1))
-  SSplice(e: sexpr, pos: position = Position(-1, -1))
-  SVector(e: list<sexpr>, pos: position=Position(-1, -1))
+  SCons(l: sexpr, r: sexpr, pos: position = Position(-1, -1))
+  SNil(pos: position = Position(-1, -1))
+
+val sQuote = SName("quote")
+val sQuasiquote = SName("quasiquote")
+val sUnquote = SName("unquote")
+val sUnquoteSplicing = SName("unquote-splicing")
+val sSplice = SName("splice")
+val sCons = SName("cons")
+val sList = SName("list")
+val sAppend = SName("append")
+val sDefine = SName("define")
+val sLambda = SName("lambda")
+val sLambday = SName("λ")
+val sLet = SName("let")
+val sLetStar = SName("let*")
+val sLetRec = SName("letrec")
+val sSetBang = SName("set!")
+val sBegin = SName("begin")
+val sVoid = SName("void")
+val sIf = SName("if")
+val sIfZero = SName("if-zero")
+val sCond = SName("cond")
+val sElse = SName("else")
+val sRightArrow = SName("=>")
+val sAnd = SName("and")
+val sOr = SName("or")
+val sValues = SName("values")
+val sLetValues = SName("let-values")
+val sVector = SName("vectorLiteral")
 
 fun updatePos(s: sexpr, p: position)
   match s
-    SBool(b, _) -> SBool(b, p)
-    SChar(c, _) -> SChar(c, p)
-    SString(s1, _) -> SString(s1, p)
-    SSymbol(s1, _) -> SSymbol(s1, p)
-    SNumber(n, _) -> SNumber(n, p)
-    SList(l, r, _) -> SList(l, r, p)
-    SQuote(e, _) -> SQuote(e, p)
-    SQuasiquote(e, _) -> SQuasiquote(e, p)
-    SUnquote(e, _) -> SUnquote(e, p)
-    SUnquoteSplicing(e, _) -> SUnquoteSplicing(e, p)
-    SSplice(e, _) -> SSplice(e, p)
-    SVector(e, _) -> SVector(e, p)
+    SBool(b) -> SBool(b, p)
+    SChar(c) -> SChar(c, p)
+    SString(s1) -> SString(s1, p)
+    SName(s1) -> SName(s1, p)
+    SNumber(n) -> SNumber(n, p)
+    SCons(l, r) -> SCons(l, r, p)
+    SNil() -> SNil(p)
 
 pub alias sprogram = list<sexpr>
 
 pub fun show(p: sprogram): div string
   p.map(show).join("\n")
 
+pub fun toList(s: sexpr): pure list<sexpr>
+  match s
+    SCons(car, cdr) -> Cons(car, cdr.unsafe-decreasing.toList)
+    SNil() -> []
+    _ -> throw("toList not implemented for " ++ s.show) 
+
+pub fun toDottedList(s: sexpr): (list<sexpr>, sexpr)
+  match s
+    SCons(car, cdr) -> 
+      val (lst, end) = cdr.unsafe-decreasing.toDottedList
+      (Cons(car, lst), end)
+    _ -> ([], s)
+
 pub fun show(s: sexpr): div string
   match s
     SBool(b) -> if b then "#t" else "#f"
     SChar(c) -> r"#\" ++ c
     SString(s1) -> "\"" ++ s1 ++ "\""
-    SSymbol(s1) -> s1
+    SName(s1) -> s1
     SNumber(n) -> n.show()
-    SList(l, Nothing) -> "(" ++ l.map(show).join(" ") ++ ")"
-    SList(l, Just(r)) -> "(" ++ l.map(show).join(" ") ++ " . " ++ show(r) ++ ")"
-    SQuote(t) -> "'" ++ show(t)
-    SQuasiquote(t) -> "`" ++ show(t)
-    SUnquote(t) -> "," ++ show(t)
-    SUnquoteSplicing(t) -> ",@" ++ show(t)
-    SSplice(t) -> "@" ++ show(t)
-    SVector(l) -> "#(" ++ l.map(show).join(" ") ++ ")"
+    SNil() -> "()"
+    SCons() ->
+      match s.toDottedList
+        (l, SNil()) -> "(" ++ l.map(show).join(" ") ++ ")"
+        (l, end) -> "(" ++ l.map(show).join(" ") ++ " . " ++ show(end) ++ ")"
 
 fun bracket(p1, p2, p3)
   p1()
   val x = p2()
   p3()
   x
-
 
 fun tokenizer(p)
   val start = offset()
@@ -88,7 +115,7 @@ fun parseChar()
 val symbolRegex = "^([^.#; \\]\\t\\r\\n()',`\"][^; \\]\\t\\r\\n()',`\"]*|[.][^; \\t\\r\\n()',`\"\\]]+)".regex()
 fun parseSymbol()
   with tokenizer
-  SSymbol(takePattern(symbolRegex))
+  SName(takePattern(symbolRegex))
 
 val boolRegex = r"^#[ftFT]".regex();
 fun parseBool()
@@ -126,8 +153,19 @@ fun parseCells()
     Just(_) ->
       optional(parseWhitespace)
       val x2 = parseAtom()
-      SList(x, Just(x2))
-    Nothing -> SList(x, Nothing)
+      mklist(x, Just(x2))
+    Nothing -> mklist(x, Nothing)
+
+fun mklist(l: list<sexpr>, m: maybe<sexpr> = Nothing): sexpr
+  match l
+    Nil -> m.default(SNil())
+    Cons(h, t) -> SCons(h, mklist(t.unsafe-decreasing, m)) 
+
+fun isList(s: sexpr): bool
+  match s
+    SNil() -> True
+    SCons(_, b) -> b.isList
+    _ -> False
 
 fun parseVector()
   with tokenizer
@@ -136,7 +174,7 @@ fun parseVector()
   val x = many(parseAtom)
   optional(parseWhitespace)
   text(")")
-  SVector(x)
+  mklist(Cons(sVector, x))
 
 fun parseList()
   with tokenizer
@@ -145,27 +183,27 @@ fun parseList()
 fun parseQuote()
   with tokenizer
   text("'")
-  SQuote(parseAtom())
+  mklist([sQuote, parseAtom()])
 
 fun parseQuasiquote()
   with tokenizer
   text("`")
-  SQuasiquote(parseList())
+  mklist([sQuasiquote, parseList()])
 
 fun parseUnquoteSplicing()
   with tokenizer
   text(",@")
-  SUnquoteSplicing(parseAtom())
+  mklist([sUnquoteSplicing, parseAtom()])
 
 fun parseUnquote()
   with tokenizer
   text(",")
-  SUnquote(parseAtom())
+  mklist([sUnquote, parseAtom()])
 
 fun parseSplice()
   with tokenizer
   text("@")
-  SSplice(parseList())
+  mklist([sSplice, parseList()])
 
 fun parseAtom()
   val x = ors([
@@ -199,6 +237,15 @@ fun parseTest(parser, input, showX, file="None")
       showX(x)
       println("Success: ")
     Left(err) -> println("Error: " ++ err.show(fn(x: string) x, input) ++ " in file " ++ file)
+
+
+fun parseFile(f: string): io list<sexpr>
+  parseProgramFromString(read-text-file(f.path))
+
+fun parseProgramFromString(s: string): pure list<sexpr>
+  match parseProgram.run(s)
+    Right(x) -> x
+    Left(err) -> throw(err.show(fn(x: string) x, s))
 
 val programs = [
 r"
@@ -241,16 +288,16 @@ r"(lambda ,(lambda->formals exp))",
 ]
 
 
-fun main()
-  parseTest(parseNum, "1.53", show)
-  parseTest(parseChar, r"#\newline", show)
-  parseTest(parseBool, "#t", show)
-  parseTest(parseSymbol, "+", show)
-  parseTest(parseString, "\"Hello\"", show)
-  parseTest(parseList, "(+)", show)
-  parseTest(parseList, "(+ 3 5)", show)
-  parseTest(parseProgram, "[+ 3 5]", show)
-  parseTest(parseList, "{+ 3 5 . (list a b c)}", show)
+// fun main()
+//   parseTest(parseNum, "1.53", show)
+//   parseTest(parseChar, r"#\newline", show)
+//   parseTest(parseBool, "#t", show)
+//   parseTest(parseSymbol, "+", show)
+//   parseTest(parseString, "\"Hello\"", show)
+//   parseTest(parseList, "(+)", show)
+//   parseTest(parseList, "(+ 3 5)", show)
+//   parseTest(parseProgram, "[+ 3 5]", show)
+//   parseTest(parseList, "{+ 3 5 . (list a b c)}", show)
   
   // programs.foreach fn(p)
   //   parseTest(parseProgram, p, show)

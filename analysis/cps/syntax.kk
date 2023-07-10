@@ -1,54 +1,29 @@
 import parse
-
-val sQuote = SName("quote")
-val sQuasiquote = SName("quasiquote")
-val sUnquote = SName("unquote")
-val sUnquoteSplicing = SName("unquote-splicing")
-val sCons = SName("cons")
-val sList = SName("list")
-val sAppend = SName("append")
-val sDefine = SName("define")
-val sLambda = SName("lambda")
-val sLambday = SName("λ")
-val sLet = SName("let")
-val sLetStar = SName("let*")
-val sLetRec = SName("letrec")
-val sSetBang = SName("set!")
-val sBegin = SName("begin")
-val sVoid = SName("void")
-val sIf = SName("if")
-val sIfZero = SName("if-zero")
-val sCond = SName("cond")
-val sElse = SName("else")
-val sRightArrow = SName("=>")
-val sAnd = SName("and")
-val sOr = SName("or")
-val sValues = SName("values")
-val sLetValues = SName("let-values")
-val sVector = SName("vectorLiteral")
-
+import std/os/path
+import std/os/file
+import std/os/dir
 
 type exp
   SelfLit(lit: sexpr)
   QuoteLit(lit: sexpr)
   Ref(name: sexpr)
   App(f: exp, args: list<exp>)
-  KLambda(formals: formals, body: body)
-  ULambda(formals: formals, body: body)
-  Lambda(formals: formals, body: body)
-  IfE(test: exp, ifTrue: exp, ifFalse: exp)
+  KLambda(formals: (list<sexpr>, maybe<sexpr>), body: body)
+  ULambda(formals: (list<sexpr>, maybe<sexpr>), body: body)
+  Lambda(formals: (list<sexpr>, maybe<sexpr>), body: body)
+  IfE(test: exp, ifTrue: exp, ifFalse: maybe<exp>)
   SetE(name: sexpr, value: exp)
   Values(vals: list<exp>)
-  LetValues(bindings: list<binding>, body: body)
+  LetValues(bindings: list<(sexpr, exp)>, body: body)
   Begin(body: body)
   And(exps: list<exp>)
   Or(exps: list<exp>)
   Cond(clauses: list<clause>)
   Undefined
   Void
-  Let(bindings: list<binding>, body: body)
-  LetStar(bindings: list<binding>, body: body)
-  LetRec(bindings: list<binding>, body: body)
+  Let(bindings: list<(sexpr, exp)>, body: body)
+  LetStar(bindings: list<(sexpr, exp)>, body: body)
+  LetRec(bindings: list<(sexpr, exp)>, body: body)
 
 alias binding = (sexpr, exp)
 alias formals = (list<sexpr>, maybe<sexpr>)
@@ -70,77 +45,199 @@ type clause
 type program
   Program(defs: list<def>)
 
-fun parseProgram(s: list<sexpr>): program
+fun expansion(e: sexpr): exp
+  match e
+    SCons(car, cdr) -> consExp(car.expansion, cdr.expansion)
+    _ -> QuoteLit(e)
+
+fun consExp(car: exp, cdr: exp): exp
+  App(Ref(sCons), [car, cdr])
+
+fun parseProgram(s: list<sexpr>): pure program
   Program(s.map(fn(e) e.parseDef))
 
-fun parseDef(e: sexpr): def
+fun parseOptionalExpr(s: list<sexpr>): pure maybe<exp>
+  match s
+    [] -> Nothing
+    [e] -> Just(e.parseExpr)
+
+fun parseExpr(e: sexpr): pure exp
+  // trace("parseExpr: " ++ e.show)
   match e
-    SList([SName("define"), SName(name), value]) ->
-      VariableDef(SName(name), value.parseExp)
-    SList(Cons(SName("define"), Cons(SList([SName(name), formals]), body))) ->
-      FunctionDef(name, formals.parseFormals, body.parseBody)
+    SNumber() -> SelfLit(e)
+    SBool() -> SelfLit(e)
+    SChar() -> SelfLit(e)
+    SString() -> SelfLit(e)
+    SName() -> Ref(e)
+    ex -> 
+      match ex.toList
+        [SName("quote"), l] -> l.expansion
+        [SName("quasiquote"), l] -> l.parseQuasiquote
+        Cons(SName("lambda"), Cons(formals, body)) -> Lambda(formals.parseFormals, body.parseBody)
+        Cons(SName("λ"), Cons(formals, body)) -> Lambda(formals.parseFormals, body.parseBody)
+        Cons(SName("let"), Cons(bindings, body)) -> 
+          match bindings
+            name as SName() ->
+              match body
+                Cons(binds, realBody) ->
+                  val bds = [binds.parseBinding]
+                  val lam = Lambda((bds.map(fst), Nothing), realBody.parseBody)
+                  LetRec([(name, lam)], Body([], [App(Ref(name), bds.map(snd))]))
+            _ -> Let(bindings.toList.parseBindings, body.parseBody)
+        Cons(SName("let*"), Cons(bindings, body)) -> LetStar(bindings.toList.parseBindings, body.parseBody)
+        Cons(SName("letrec"), Cons(bindings, body)) -> LetRec(bindings.toList.parseBindings, body.parseBody)
+        [SName("set!"), s, exp] -> SetE(s, exp.parseExpr)
+        Cons(SName("begin"), body) -> Begin(body.parseBody)
+        Cons(SName("if-zero"), Cons(test, Cons(ifTrue, ifFalse))) -> IfE(App(Ref(SName("eq?")), [test.parseExpr]), ifTrue.parseExpr, ifFalse.parseOptionalExpr)
+        Cons(SName("if"), Cons(test, Cons(ifTrue, ifFalse))) -> IfE(test.parseExpr, ifTrue.parseExpr, ifFalse.parseOptionalExpr)
+        Cons(SName("or"), exps) -> Or(exps.map(parseExpr))
+        Cons(SName("and"), exps) -> And(exps.map(parseExpr))
+        Cons(c, s) -> App(c.parseExpr, s.map(parseExpr))
+        _ -> SelfLit(e)
+
+fun parseBindings(bds: list<sexpr>): pure list<binding>
+  bds.map(fn(b) b.parseBinding)
+
+fun parseBinding(s: sexpr): pure binding
+  match s
+    SCons(name, SCons(exp, SNil())) -> (name, exp.parseExpr)
+    _ -> throw("Binding with no expression")
+
+
+fun listExp(es: list<exp>)
+  match es
+    [] -> QuoteLit(SNil())
+    Cons(hd, tail) -> consExp(hd, listExp(tail))
+
+fun parseQuasiquote(e: sexpr, depth:int=1)
+  val l = e.toList
+  match l
+    [c as SName("unquote"), s] -> if depth == 1 then parseExpr(s) else listExp([QuoteLit(c), s.parseQuasiquote(depth - 1)])
+    [c as SName("quasiquote"), s] -> listExp([QuoteLit(c), s.parseQuasiquote(depth + 1)])
+    _ -> match e
+      SCons(SCons(c as SName("unquote-splicing"), SCons(exp, SNil())), tl) -> 
+        if depth == 1 then App(Ref(sAppend), [exp.parseExpr, tl.parseQuasiquote(depth)]) 
+        else consExp(listExp([QuoteLit(c), exp.parseQuasiquote(depth - 1)]), tl.parseQuasiquote(depth))
+      SCons(s, tl) -> consExp(s.parseQuasiquote(depth), tl.parseQuasiquote(depth))
+    
+
+fun parseDef(e: sexpr): pure def
+  match e
+    SCons(SName("define"), SCons(SName(name), value)) ->
+      VariableDef(SName(name), value.parseExpr)
+    SCons(SCons(SName("define"), SCons(SCons(SName(name), formals), body))) ->
+      FunctionDef(SName(name), formals.parseFormals, body.toList.parseBody)
     _ ->
-      ImplicitDef(e.parseExp)
+      ImplicitDef(e.parseExpr)
 
-fun parseExpr(e: sexpr): exp
-  return SelfLit(e)
+fun parseFormals(s: sexpr): pure formals
+  if s.isList then
+    (s.toList, Nothing)
+  else
+    match s
+      SCons() ->
+        val (x, r) = s.toDottedList
+        (x, Just(r))
+      SName() -> ([], Just(s))
 
-fun show(p: program)
+fun parseBody(l: list<sexpr>): pure body
+  var defs := []
+  var exps := []
+  l.foreach fn(s)
+    match s
+      SCons(SName("define"), v) ->
+        defs := Cons(v.parseDef, defs)
+      _ ->
+        exps := Cons(s.parseExpr, exps)
+  Body(defs.reverse, exps.reverse)
+
+fun show(p: program): div string
   p.defs.map(fn(d) d.show).join("\n")
 
-fun show(d: def)
+fun show(d: def): div string
   match d
     ImplicitDef(value) ->
       value.show
     VariableDef(name, value) ->
-      "(define " + name.show + " " + value.show + ")"
+      "(define " ++ name.show ++ " " ++ value.show ++ ")"
     FunctionDef(name, formals, body) ->
-      "(define (" + name.show + " " + formals.show + ") " + body.show + ")"
+      "(define (" ++ name.show ++ " " ++ formals.show ++ ") " ++ body.show ++ ")"
 
-fun show(e: exp)
+fun show(b: body): div string
+  match b
+    Body(defs, exps) ->
+      defs.map(fn(d) d.show).join("\n") ++ "\n" ++ exps.map(fn(e) e.show).join("\n")
+
+fun show(f: formals): div string
+  match f
+    (formals, ms) ->
+      "(" ++ formals.map(show).join(" ") ++ ms.map(fn(m) " . " ++ m.show).default("") ++ ")"
+
+fun show(b: binding): div string
+  match b
+    (name, value) ->
+      "(" ++ name.show ++ " " ++ value.show ++ ")"
+
+fun show(c: clause): div string
+  match c
+    SelfClause(test) ->
+      test.show
+    TestClause(test, exps) ->
+      "(" ++ test.show ++ " => " ++ exps.map(show).join(" ") ++ ")"
+    ProcClause(test, proc) ->
+      "(" ++ test.show ++ " " ++ proc.show ++ ")"
+    ElseClause(exps) ->
+      "(else " ++ exps.map(show).join(" ") ++ ")"
+
+fun show(e: exp): div string
   match e
     SelfLit(lit) ->
       lit.show
     QuoteLit(lit) ->
-      "'" + lit.show
+      "'" ++ lit.show
     Ref(name) ->
       name.show
     App(f, args) ->
-      "(" + f.show + " " + args.map(fn(a) a.show).join(" ") + ")"
+      "(" ++ f.show ++ " " ++ args.map(show).join(" ") ++ ")"
     KLambda(formals, body) ->
-      "(lambda " + formals.show + " " + body.show + ")"
+      "(lambda " ++ formals.show ++ " " ++ body.show ++ ")"
     ULambda(formals, body) ->
-      "(λ " + formals.show + " " + body.show + ")"
+      "(λ " ++ formals.show ++ " " ++ body.show ++ ")"
     Lambda(formals, body) ->
-      "(lambda " + formals.show + " " + body.show + ")"
+      "(lambda " ++ formals.show ++ " " ++ body.show ++ ")"
     IfE(test, ifTrue, ifFalse) ->
-      "(if " + test.show + " " + ifTrue.show + " " + ifFalse.show + ")"
+      "(if " ++ test.show ++ " " ++ ifTrue.show ++ " " ++ ifFalse.map(show).default("") ++ ")"
     SetE(name, value) ->
-      "(set! " + name.show + " " + value.show + ")"
+      "(set! " ++ name.show ++ " " ++ value.show ++ ")"
     Values(vals) ->
-      "(values " + vals.map(fn(v) v.show).join(" ") + ")"
+      "(values " ++ vals.map(show).join(" ") ++ ")"
     LetValues(bindings, body) ->
-      "(let-values (" + bindings.map(fn(b) b.show).join(" ") + ") " + body.show + ")"
+      "(let-values (" ++ bindings.show-list(fn(x) x.show) ++ ") " ++ body.show ++ ")"
     Begin(body) ->
-      "(begin " + body.show + ")"
+      "(begin " ++ body.show ++ ")"
     And(exps) ->
-      "(and " + exps.map(fn(e) e.show).join(" ") + ")"
+      "(and " ++ exps.map(show).join(" ") ++ ")"
     Or(exps) ->
-      "(or " + exps.map(fn(e) e.show).join(" ") + ")"
+      "(or " ++ exps.map(show).join(" ") ++ ")"
     Cond(clauses) ->
-      "(cond " + clauses.map(fn(c) c.show).join(" ") + ")"
+      "(cond " ++ clauses.map(show).join(" ") ++ ")"
     Undefined ->
-      "#<undefined>"
+      "#undefined"
     Void ->
-      "#<void>"
+      "#void"
     Let(bindings, body) ->
-      "(let (" + bindings.map(fn(b) b.show).join(" ") + ") " + body.show + ")"
+      "(let (" ++ bindings.map(show).join(" ") ++ ") " ++ body.show ++ ")"
     LetStar(bindings, body) ->
-      "(let* (" + bindings.map(fn(b) b.show).join(" ") + ") " + body.show + ")"
+      "(let* (" ++ bindings.map(show).join(" ") ++ ") " ++ body.show ++ ")"
     LetRec(bindings, body) ->
-      "(letrec (" + bindings.map(fn(b) b.show).join(" ") + ") " + body.show + ")"
+      "(letrec (" ++ bindings.map(show).join(" ") ++ ") " ++ body.show ++ ")"
 
 fun main()
-  val s = parse.parseFile("test.scm")
-  val p = parseProgram(s)
-  println(p.show)
+  try({
+    list-directory-recursive("higher-order-programs/scheme".path).foreach fn(p)
+      if is-file(p) then // nbody
+        if p.show.ends-with(".scm\"").is-just then
+          val s = parseFile(p.string)
+          val pr = parseProgram(s)
+          println(pr.show)
+    },fn(e) {println("Error " ++ e.show)})

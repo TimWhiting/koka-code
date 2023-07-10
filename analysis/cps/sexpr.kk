@@ -287,8 +287,19 @@ r"(lambda ,(lambda->formals exp))",
 
 ]
 
+fun (==)(s1: sexpr, s2: sexpr): bool
+  match (s1, s2)
+    (SBool(b1), SBool(b2)) -> b1 == b2
+    (SNumber(n1), SNumber(n2)) -> n1 == n2
+    (SChar(c1), SChar(c2)) -> c1 == c2
+    (SString(s1), SString(s2)) -> s1 == s2
+    (SName(n1), SName(n2)) -> n1 == n2
+    (SNil(), SNil()) -> True
+    (SCons(h1, t1), SCons(h2, t2)) -> (==)(h1.unsafe-decreasing, h2.unsafe-decreasing) && (==)(t1.unsafe-decreasing, t2.unsafe-decreasing)
+    _ -> False
 
-fun main()
+
+// fun main()
 //   parseTest(parseNum, "1.53", show)
 //   parseTest(parseChar, r"#\newline", show)
 //   parseTest(parseBool, "#t", show)
@@ -298,8 +309,8 @@ fun main()
 //   parseTest(parseList, "(+ 3 5)", show)
 //   parseTest(parseProgram, "[+ 3 5]", show)
 //   parseTest(parseList, "{+ 3 5 . (list a b c)}", show)
-  val p = "/Users/timwhiting/koka_code/higher-order-programs/scheme/r6rs/nbody.scm".path
-  parseTest(parseProgram, read-text-file(p), show, p.show)
+  // val p = "/Users/timwhiting/koka_code/higher-order-programs/scheme/r6rs/nbody.scm".path
+  // parseTest(parseProgram, read-text-file(p), show, p.show)
   // programs.foreach fn(p)
   //   parseTest(parseProgram, p, show)
   // list-directory-recursive("/Users/timwhiting/koka_code/higher-order-programs/scheme".path).foreach fn(p)

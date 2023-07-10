@@ -128,7 +128,7 @@ fun parseNum()
   with tokenizer
   SNumber(parseFloat())
 
-val commentRegex = r"^;[^\n\r]*".regex()
+val commentRegex = r"^;[^\n]*".regex()
 fun parseComment()
   takePattern(commentRegex)
 
@@ -137,7 +137,7 @@ val closeListRegex = r"^[)\]}]".regex()
 val whitespace = r"^[\n\r\t ]+".regex()
 
 fun parseWhitespace()
-  many({(fn() takePattern(whitespace)).or(parseComment)})
+  many1({(fn() takePattern(whitespace)).or(parseComment)})
 
 fun parseOpenList()
   takePattern(openListRegex)
@@ -205,15 +205,15 @@ fun parseSplice()
   text("@")
   mklist([sSplice, parseList()])
 
-fun parseAtom()
+fun parseAtom(): <div,parse<string>> sexpr
   val x = ors([
     parseList,
     parseNum,
     parseChar,
     parseString,
     parseBool,
-    parseVector,
     parseSymbol,
+    parseVector,
     parseQuote,
     parseQuasiquote,
     parseUnquoteSplicing,
@@ -288,7 +288,7 @@ r"(lambda ,(lambda->formals exp))",
 ]
 
 
-// fun main()
+fun main()
 //   parseTest(parseNum, "1.53", show)
 //   parseTest(parseChar, r"#\newline", show)
 //   parseTest(parseBool, "#t", show)
@@ -298,7 +298,8 @@ r"(lambda ,(lambda->formals exp))",
 //   parseTest(parseList, "(+ 3 5)", show)
 //   parseTest(parseProgram, "[+ 3 5]", show)
 //   parseTest(parseList, "{+ 3 5 . (list a b c)}", show)
-  
+  val p = "/Users/timwhiting/koka_code/higher-order-programs/scheme/r6rs/nbody.scm".path
+  parseTest(parseProgram, read-text-file(p), show, p.show)
   // programs.foreach fn(p)
   //   parseTest(parseProgram, p, show)
   // list-directory-recursive("/Users/timwhiting/koka_code/higher-order-programs/scheme".path).foreach fn(p)

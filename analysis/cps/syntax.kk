@@ -80,12 +80,12 @@ fun parseExpr(e: sexpr): pure exp
             name as SName() ->
               match body
                 Cons(binds, realBody) ->
-                  val bds = [binds.parseBinding]
+                  val bds = binds.parseBindings
                   val lam = Lambda((bds.map(fst), Nothing), realBody.parseBody)
                   LetRec([(name, lam)], Body([], [App(Ref(name), bds.map(snd))]))
-            _ -> Let(bindings.toList.parseBindings, body.parseBody)
-        Cons(SName("let*"), Cons(bindings, body)) -> LetStar(bindings.toList.parseBindings, body.parseBody)
-        Cons(SName("letrec"), Cons(bindings, body)) -> LetRec(bindings.toList.parseBindings, body.parseBody)
+            _ -> Let(bindings.parseBindings, body.parseBody)
+        Cons(SName("let*"), Cons(bindings, body)) -> LetStar(bindings.parseBindings, body.parseBody)
+        Cons(SName("letrec"), Cons(bindings, body)) -> LetRec(bindings.parseBindings, body.parseBody)
         [SName("set!"), s, exp] -> SetE(s, exp.parseExpr)
         Cons(SName("begin"), body) -> Begin(body.parseBody)
         Cons(SName("if-zero"), Cons(test, Cons(ifTrue, ifFalse))) -> IfE(App(Ref(SName("eq?")), [test.parseExpr]), ifTrue.parseExpr, ifFalse.parseOptionalExpr)
@@ -95,13 +95,14 @@ fun parseExpr(e: sexpr): pure exp
         Cons(c, s) -> App(c.parseExpr, s.map(parseExpr))
         _ -> SelfLit(e)
 
-fun parseBindings(bds: list<sexpr>): pure list<binding>
-  bds.map(fn(b) b.parseBinding)
+fun parseBindings(bds: sexpr): pure list<binding>
+  // trace("Bindings " ++ bds.show)
+  bds.toList.map(fn(b) b.parseBinding)
 
 fun parseBinding(s: sexpr): pure binding
   match s
     SCons(name, SCons(exp, SNil())) -> (name, exp.parseExpr)
-    _ -> throw("Binding with no expression")
+    _ -> throw("Binding with no expression " ++ s.show)
 
 
 fun listExp(es: list<exp>)
@@ -110,27 +111,31 @@ fun listExp(es: list<exp>)
     Cons(hd, tail) -> consExp(hd, listExp(tail))
 
 fun parseQuasiquote(e: sexpr, depth:int=1)
-  val l = e.toList
+  // trace("QQ " ++ e.show)
+  val l = (fn() e.toList).try.maybe
   match l
-    [c as SName("unquote"), s] -> if depth == 1 then parseExpr(s) else listExp([QuoteLit(c), s.parseQuasiquote(depth - 1)])
-    [c as SName("quasiquote"), s] -> listExp([QuoteLit(c), s.parseQuasiquote(depth + 1)])
+    Just([SName("unquote"), s]) -> if depth == 1 then parseExpr(s) else listExp([QuoteLit(SName("unquote")), s.parseQuasiquote(depth - 1)])
+    Just([SName("quasiquote"), s]) -> listExp([QuoteLit(SName("quasiquote")), s.parseQuasiquote(depth + 1)])
     _ -> match e
       SCons(SCons(c as SName("unquote-splicing"), SCons(exp, SNil())), tl) -> 
         if depth == 1 then App(Ref(sAppend), [exp.parseExpr, tl.parseQuasiquote(depth)]) 
         else consExp(listExp([QuoteLit(c), exp.parseQuasiquote(depth - 1)]), tl.parseQuasiquote(depth))
       SCons(s, tl) -> consExp(s.parseQuasiquote(depth), tl.parseQuasiquote(depth))
+      _ -> QuoteLit(e)
     
 
 fun parseDef(e: sexpr): pure def
+  // trace("Def " ++ e.show)
   match e
     SCons(SName("define"), SCons(SName(name), value)) ->
       VariableDef(SName(name), value.parseExpr)
-    SCons(SCons(SName("define"), SCons(SCons(SName(name), formals), body))) ->
+    SCons(SName("define"), SCons(SCons(SName(name), formals), body)) ->
       FunctionDef(SName(name), formals.parseFormals, body.toList.parseBody)
     _ ->
       ImplicitDef(e.parseExpr)
 
 fun parseFormals(s: sexpr): pure formals
+  // trace("Formals")
   if s.isList then
     (s.toList, Nothing)
   else
@@ -234,10 +239,17 @@ fun show(e: exp): div string
 
 fun main()
   try({
-    list-directory-recursive("higher-order-programs/scheme".path).foreach fn(p)
+    list-directory-recursive("/Users/timwhiting/koka_code/higher-order-programs/scheme".path).foreach fn(p)
       if is-file(p) then // nbody
-        if p.show.ends-with(".scm\"").is-just then
-          val s = parseFile(p.string)
-          val pr = parseProgram(s)
-          println(pr.show)
+        val fName = p.string
+        if fName.ends-with(".scm").is-just then
+          println(fName)
+          if fName.ends-with("nbody.scm").is-just || fName.ends-with("nucleic-2.scm").is-just then
+            ()
+          else // if p.string.ends-with("scheme-to-c.scm").is-just then
+            val s = parseFile(fName) // p.string)
+            val pr = parseProgram(s)
+            ()
+          // else
+          //   () // println(pr.show)
     },fn(e) {println("Error " ++ e.show)})

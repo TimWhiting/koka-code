@@ -1,9 +1,12 @@
 pub value struct linearSet<v,e::E>
-  list: list<v> 
+  pub list: list<v> 
   eq: (v, v) -> e bool
 
 pub fun linearSet(l: list<v>, eq: (v, v) -> e bool): <> linearSet<v,e>
   LinearSet(l, eq)
+
+pub fun foreach(l: linearSet<v,e1>, f: (v) -> e ()): e ()
+  l.list.foreach(f)
 
 pub fun member(l: linearSet<v,e>, a: v): e bool
   any(l.list, fn(x) (l.eq)(x, a))
@@ -19,6 +22,11 @@ pub fun (+)(l1: linearSet<v,e>, l2: linearSet<v,e>): e linearSet<v,e>
 
 pub fun (-)(l: linearSet<v,e>, v: v): e linearSet<v,e>
   l(list=l.list.filter(fn(x) !(l.eq)(x, v)))
+
+pub fun (-)(l: linearSet<v,e>, v: maybe<v>): e linearSet<v,e>
+  match v
+    Just(vv) -> l(list=l.list.filter(fn(x) !(l.eq)(x, vv)))
+    Nothing -> l
 
 pub fun (-)(l: linearSet<v,e>, l2: linearSet<v,e>): e linearSet<v,e>
   l(list=l.list.filter(fn(x) !l2.member(x)))

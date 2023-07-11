@@ -2,46 +2,69 @@ import sexpr
 import newstd/data/linearset
 
 type program
-  Program(defs: list<def>)
-  
+  Program(defs: list<def>, free: vars = defs.map(free).foldl(noFreeVars, fn(a, b) a + b), label:int=getLabel())
+
+pub alias vars = linearSet<sexpr, <>>
+
+val globalLabel = unsafe-total{ref(0)}
+fun getLabel(): int
+  unsafe-total
+    val l = !globalLabel
+    globalLabel.set(l + 1)
+    l
+val sExprEq = analysis/cps/sexpr/(==)
+val noFreeVars = linearSet([], sExprEq)
+
 type def
-  DefImplicit(value: exp)
-  DefVar(name: sexpr, value: exp)
-  DefFun(name: sexpr, formals: formals, body: body)
+  DefImplicit(value: exp, free: vars = value.free, label:int=getLabel())
+  DefVar(name: sexpr, value: exp, free: vars = value.free - name, label:int=getLabel())
+  DefFun(name: sexpr, formals: formals, body: body, free: vars = body.free - formals - name, label:int=getLabel())
 
 alias binding = (sexpr, exp)
 alias formals = (list<sexpr>, maybe<sexpr>)
 
+pub fun free(b: binding): vars
+  b.snd.free - b.fst
+
+pub fun (-)(l: vars, v: formals): e vars
+  l - v.fst - v.snd
+
 type body
-  Body(defs: list<def>, exps: list<exp>)
+  Body(defs: list<def>, exps: list<exp>, free: vars = defs.map(free).foldl(exps.map(free).foldl(noFreeVars, fn(a, b) a + b), fn(a, b) a + b), label:int=getLabel())
 
 type clause
-  SelfClause(test: exp)
-  TestClause(test: exp, exps: list<exp>)
-  ProcClause(test: exp, proc: exp)
-  ElseClause(exps: list<exp>)
+  SelfClause(test: exp, free: vars = test.free, label:int=getLabel())
+  TestClause(test: exp, exps: list<exp>, free: vars = test.free + exps.map(free).foldl(noFreeVars, fn(a, b) a + b), label:int=getLabel())
+  ProcClause(test: exp, proc: exp, free: vars = test.free + proc.free, label:int=getLabel())
+  ElseClause(exps: list<exp>, free: vars = exps.map(free).foldl(noFreeVars, fn(a, b) a + b), label:int=getLabel())
 
 type exp
-  SelfLit(lit: sexpr)
-  QuoteLit(lit: sexpr)
-  Ref(name: sexpr)
-  App(f: exp, args: list<exp>)
-  KLambda(formals: (list<sexpr>, maybe<sexpr>), body: body)
-  ULambda(formals: (list<sexpr>, maybe<sexpr>), body: body)
-  Lambda(formals: (list<sexpr>, maybe<sexpr>), body: body)
-  IfE(test: exp, ifTrue: exp, ifFalse: maybe<exp>)
-  SetE(name: sexpr, value: exp)
-  Values(vals: list<exp>)
-  LetValues(bindings: list<(sexpr, exp)>, body: body)
-  Begin(body: body)
-  And(exps: list<exp>)
-  Or(exps: list<exp>)
-  Cond(clauses: list<clause>)
-  Undefined
-  Void
-  Let(bindings: list<(sexpr, exp)>, body: body)
-  LetStar(bindings: list<(sexpr, exp)>, body: body)
-  LetRec(bindings: list<(sexpr, exp)>, body: body)
+  SelfLit(lit: sexpr, free: vars = noFreeVars, label:int=getLabel())
+  QuoteLit(lit: sexpr, free: vars = noFreeVars, label:int=getLabel())
+  Ref(name: sexpr, free: vars = linearSet([name], sExprEq), label:int=getLabel())
+  App(f: exp, args: list<exp>, free: vars = f.free + args.map(free).foldl(noFreeVars, fn(a, b) a + b), label:int=getLabel())
+  KLambda(formals: (list<sexpr>, maybe<sexpr>), body: body, free: vars = body.free - formals, label:int=getLabel())
+  ULambda(formals: (list<sexpr>, maybe<sexpr>), body: body, free: vars = body.free - formals, label:int=getLabel())
+  Lambda(formals: (list<sexpr>, maybe<sexpr>), body: body, free: vars = body.free - formals, label:int=getLabel())
+  IfE(test: exp, ifTrue: exp, ifFalse: maybe<exp>, free: vars = test.free + ifTrue.free + ifFalse.map(free).default(noFreeVars), label:int=getLabel())
+  SetE(name: sexpr, value: exp, free: vars = linearSet([name], sExprEq) + value.free, label:int=getLabel())
+  Values(vals: list<exp>, free: vars = vals.map(free).foldl(noFreeVars, fn(a, b) a + b), label:int=getLabel())
+  LetValues(bindings: list<(sexpr, exp)>, body: body, free: vars = body.free + bindings.map(free).foldl(noFreeVars, fn(a, b) a + b), label:int=getLabel())
+  Begin(body: body, free: vars = body.free, label:int=getLabel())
+  And(exps: list<exp>, free: vars = exps.map(free).foldl(noFreeVars, fn(a, b) a + b), label:int=getLabel())
+  Or(exps: list<exp>, free: vars = exps.map(free).foldl(noFreeVars, fn(a, b) a + b), label:int=getLabel())
+  Cond(clauses: list<clause>, free: vars = clauses.map(free).foldl(noFreeVars, fn(a, b) a + b), label:int=getLabel())
+  Undefined(free:vars=noFreeVars, label:int=getLabel())
+  Void(free:vars=noFreeVars, label:int=getLabel())
+  Let(bindings: list<(sexpr, exp)>, body: body, free: vars = body.free + bindings.map(free).foldl(noFreeVars, fn(a, b) a + b), label:int=getLabel())
+  // TODO Free for this is a bit more subtle
+  LetStar(bindings: list<(sexpr, exp)>, body: body, free: vars = body.free + bindings.map(free).foldl(noFreeVars, fn(a, b) a + b) - bindings.map(fst), label:int=getLabel()) 
+  LetRec(bindings: list<(sexpr, exp)>, body: body, free: vars = body.free + bindings.map(free).foldl(noFreeVars, fn(a, b) a + b) - bindings.map(fst), label:int=getLabel())
+
+fun asBody(e: exp): body
+  match e
+    Begin(b as Body([], [_])) -> b
+    _ -> Body([], [e]) 
 
 fun consExp(car: exp, cdr: exp): exp
   App(Ref(sCons), [car, cdr])
@@ -73,50 +96,6 @@ fun body(e: exp): exn body
     ULambda(_, body) -> body
     Lambda(_, body) -> body
     _ -> throw("not a lambda")
-
-alias vars = linearSet<sexpr, pure>
-
-val sExprEq = analysis/cps/sexpr/(==)
-val noFreeVars = linearSet([], sExprEq)
-fun free(e: exp): pure vars
-  match e
-    SelfLit() -> noFreeVars
-    QuoteLit() -> noFreeVars
-    Undefined() -> noFreeVars
-    Void() -> noFreeVars
-    Ref(name) -> linearSet([name], (==))
-    App(f, args) -> free(f) + args.map(free).foldl(noFreeVars, fn(a:vars, b:vars) a + b)
-    KLambda(formals, body) -> free(body) - formals.fst
-    ULambda(formals, body) -> free(body) - formals.fst
-    Lambda(formals, body) -> free(body) - formals.fst
-    IfE(test, ifTrue, ifFalse) -> free(test) + free(ifTrue) + ifFalse.map(free).default(noFreeVars)
-    SetE(name, value) -> linearSet([name], sExprEq) + free(value)
-    Values(vals) -> vals.map(free).foldl(noFreeVars, fn(a, b) a + b)
-    LetValues(bindings, body) -> free(body) + bindings.map(fn(b) free(b.snd)).foldl(noFreeVars, fn(a, b) a + b)
-    Begin(body) -> free(body)
-    And(exps) -> exps.map(free).foldl(noFreeVars, fn(a, b) a + b)
-    Or(exps) -> exps.map(free).foldl(noFreeVars, fn(a, b) a + b)
-    Cond(clauses) -> clauses.map(free).foldl(noFreeVars, fn(a, b) a + b)
-    Let(bindings, body) -> free(body) + bindings.map(fn(b) free(b.snd)).foldl(noFreeVars, fn(a, b) a + b)
-    LetStar(bindings, body) -> free(body) + bindings.map(fn(b) free(b.snd)).foldl(noFreeVars, fn(a, b) a + b)
-    LetRec(bindings, body) -> free(body) + bindings.map(fn(b) free(b.snd)).foldl(noFreeVars, fn(a, b) a + b)
-
-fun free(c: clause): pure vars
-  match c
-    SelfClause(test) -> free(test)
-    TestClause(test, exps) -> free(test) + exps.map(free).foldl(noFreeVars, fn(a, b) a + b)
-    ProcClause(test, proc) -> free(test) + free(proc)
-    ElseClause(exps) -> exps.map(free).foldl(noFreeVars, fn(a, b) a + b)
-
-fun free(d: def): pure vars
-  match d
-    DefImplicit(value) -> free(value)
-    DefVar(name, value) -> free(value) - name
-    DefFun(name, formals, body) -> free(body) - formals.fst - name
-
-fun free(bd: body): pure vars
-  match bd
-    Body(defs, exps) -> defs.map(free).foldl(exps.map(free).foldl(noFreeVars, fn(a, b) a + b), fn(a1, b1) a1 + b1)
 
 fun expansion(e: sexpr): exp
   match e

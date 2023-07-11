@@ -1,4 +1,5 @@
 import newstd/text/parse
+import newstd/data/linearmap
 import std/text/regex
 import std/os/path
 import std/os/file
@@ -298,7 +299,14 @@ fun (==)(s1: sexpr, s2: sexpr): bool
     (SCons(h1, t1), SCons(h2, t2)) -> (==)(h1.unsafe-decreasing, h2.unsafe-decreasing) && (==)(t1.unsafe-decreasing, t2.unsafe-decreasing)
     _ -> False
 
-
+alias nameMap = some<e> linearMap<string,int,e>
+val globalNameGen:ref<global,nameMap> = unsafe-total{ref(linearMap([], fn(x1: string, x2: string) x1 == x2))}
+fun genName(n: string): sexpr
+  unsafe-total
+    val m = !globalNameGen
+    val newM = m.update(n, fn(x) x + 1, 0)
+    globalNameGen.set(newM)
+    SName(n ++ newM.getDefault(n, 0).show)
 // fun main()
 //   parseTest(parseNum, "1.53", show)
 //   parseTest(parseChar, r"#\newline", show)

@@ -1,5 +1,6 @@
 import sexpr
 import syntax
+import newstd/data/linearset
 import std/os/path
 import std/os/file
 import std/os/dir
@@ -48,7 +49,7 @@ fun parseBody(l: list<sexpr>): pure body
   Body(defs.reverse, exps.reverse)
 
 
-fun parseQuasiquote(e: sexpr, depth:int=1)
+fun parseQuasiquote(e: sexpr, depth:int=1): pure exp
   // trace("QQ " ++ e.show)
   val l = (fn() e.toList).try.maybe
   match l
@@ -104,23 +105,25 @@ fun parseExpr(e: sexpr): pure exp
         Cons(c, s) -> App(c.parseExpr, s.map(parseExpr))
         _ -> SelfLit(e)
 
-fun main()
-  val dir = run-system-read("pwd").maybe
-  val cwd = dir.map(fn(x) x.split(" ").last.default("").trim()).default("")
-  val searchDir = cwd.path / "higher-order-programs/scheme".path
-  println(searchDir.string)
-  try({
-    list-directory-recursive(searchDir).foreach fn(p)
-      if is-file(p) then // nbody
-        val fName = p.string
-        if fName.ends-with(".scm").is-just then
-          println(fName)
-          if fName.ends-with("nbody.scm").is-just || fName.ends-with("nucleic-2.scm").is-just then
-            ()
-          else // if p.string.ends-with("scheme-to-c.scm").is-just then
-            val s = parseFile(fName) // p.string)
-            val pr = parseProgram(s)
-            ()
-          // else
-          //   () // println(pr.show)
-    },fn(e) {println("Error " ++ e.show)})
+// fun main()
+//   val dir = run-system-read("pwd").maybe
+//   val cwd = dir.map(fn(x) x.split(" ").last.default("").trim()).default("")
+//   val searchDir = cwd.path / "higher-order-programs/scheme".path
+//   println(searchDir.string)
+//   try({
+//     list-directory-recursive(searchDir).foreach fn(p)
+//       if is-file(p) then // nbody
+//         val fName = p.string
+//         if fName.ends-with(".scm").is-just then
+//           println(fName)
+//           if fName.ends-with("nbody.scm").is-just || fName.ends-with("nucleic-2.scm").is-just then
+//             ()
+//           else // if p.string.ends-with("scheme-to-c.scm").is-just then
+//             val s = parseFile(fName) // p.string)
+//             val pr = parseProgram(s)
+//             pr.free.foreach(fn(x) x.show.println)
+//             pr.label.println
+//             ()
+//           // else
+//           //   () // println(pr.show)
+//     },fn(e) {println("Error " ++ e.show)})

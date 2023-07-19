@@ -1,14 +1,17 @@
 import parser
 import sexpr
 import syntax
+import newstd/data/linearset
 import std/os/path
 import std/os/file
 import std/os/dir
 import std/os/process
 
+
 alias ekont = exp -> pure exp
+
 fun toLetRec(b: body): pure exp
-  LetRec(b.defs.map(fn(x) (x.name, x.value)), b.exps)
+  LetRec(b.defs.map(fn(x) (x.name, x.value)), Body([], b.exps))
 
 fun normalize(b: body): pure body
   b.toLetRec.body
@@ -17,7 +20,7 @@ fun normalizeBody(b: body, k: ekont): pure body
   val d = b.defs.map(normalize)
   match b.exps.reverse
     [x] -> Body(d, [x.normalizeExp(k)])
-    Cons(last, front) -> Body(d, front.map(normalize).reversed ++ [last.normalizeExp(k)])
+    Cons(last, front) -> Body(d, front.map(normalize).reverse ++ [last.normalizeExp(k)])
     [] -> throw("empty body")
 
 fun normalize(d: def): pure def
@@ -28,7 +31,8 @@ fun normalize(d: def): pure def
 
 fun let(e: exp, k: ekont): pure exp
   match e
-    ILit() -> k(e)
+    SelfLit() -> k(e)
+    QuoteLit() -> k(e)
     Ref() -> k(e)
     Void() -> k(e)
     Undefined() -> k(e)
@@ -45,15 +49,29 @@ fun normalizeName(e: exp, k: ekont): pure exp
 fun normalizeExp(e: exp, k: ekont): pure exp
   match e
     Ref() -> k(e)
-    ILit() -> k(e)
+    SelfLit() -> k(e)
+    QuoteLit() -> k(e)
     Undefined() -> k(e)
     Void() -> k(e)
     Lambda(formals, body) -> k(Lambda(formals, body.normalize))
-    IfExp(condiiton, ifTrue, ifFalse) -> condition.normalizeName(fn(cond) k(IfExp(cond, ifTrue.normalize, ifFalse.map(normalize))))
+    IfE(condition, ifTrue, ifFalse) -> condition.normalizeName(fn(cond) IfE(cond, ifTrue.normalize, ifFalse.map(normalize)))
     Cond() -> e.toIf.normalizeExp(k)
     Or() -> e.toIf.normalizeExp(k)
     And() -> e.toIf.normalizeExp(k)
     _ -> throw("Unimplemented")
+
+fun toIf(e: exp): pure exp
+  match e
+    IfE() -> e
+    Cond(clauses) -> clauses.toIf
+    _ -> e
+
+fun toIf(l: list<clause>): pure exp
+  match l
+    Cons(SelfClause(test), tail) -> test.let(fn(v) IfE(v, v, Just(tail.toIf)))
+    Cons(ElseClause(exps)) -> Begin(Body([], exps))
+    Cons(TestClause(test, exps), tail) -> IfE(test, Begin(Body([], exps)), Just(tail.toIf))
+    [] -> Void()
 
 fun main()
   val dir = run-system-read("pwd").maybe

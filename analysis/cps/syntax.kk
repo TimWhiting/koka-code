@@ -16,9 +16,15 @@ val sExprEq = analysis/cps/sexpr/(==)
 val noFreeVars = linearSet([], sExprEq)
 
 type def
-  DefImplicit(value: exp, free: vars = value.free, label:int=getLabel())
+  DefImplicit(value: exp, free: vars = value.free, label:int=getLabel(), name: sexpr = genName("_"))
   DefVar(name: sexpr, value: exp, free: vars = value.free - name, label:int=getLabel())
   DefFun(name: sexpr, formals: formals, body: body, free: vars = body.free - formals - name, label:int=getLabel())
+
+fun value(d: def): exp
+  match d
+    DefImplicit(value) -> value
+    DefVar(_, value) -> value
+    DefFun(_, formals, body) -> Lambda(formals, body) 
 
 alias binding = (sexpr, exp)
 alias formals = (list<sexpr>, maybe<sexpr>)
@@ -60,6 +66,54 @@ type exp
   // TODO Free for this is a bit more subtle
   LetStar(bindings: list<(sexpr, exp)>, body: body, free: vars = body.free + bindings.map(free).foldl(noFreeVars, fn(a, b) a + b) - bindings.map(fst), label:int=getLabel()) 
   LetRec(bindings: list<(sexpr, exp)>, body: body, free: vars = body.free + bindings.map(free).foldl(noFreeVars, fn(a, b) a + b) - bindings.map(fst), label:int=getLabel())
+
+fun toExp(p: program): exp
+  match p.defs
+    [] -> Void()
+    [DefImplicit(value)] -> value
+    _ -> LetRec(p.defs.map(fn(d) (d.name, value(d))), Body([], [Ref(p.defs.last(DefImplicit(Void())).name)]))
+
+fun isAtomic(e)
+  e.isPure && e.mustHalt
+
+fun isPure(e: exp): bool
+  match e
+    SelfLit() -> True
+    QuoteLit() -> True
+    Ref() -> True
+    Undefined() -> True
+    Void() -> True
+    Lambda() -> True
+    KLambda() -> True
+    ULambda() -> True
+    _ -> False
+
+fun isDuplicable(e: exp): bool
+  match e
+    SelfLit() -> True
+    QuoteLit(l) -> 
+      match l
+        SName() -> True
+        SNumber() -> True
+        SNil() -> True
+        _ -> False
+    Ref() -> True
+    Undefined() -> True
+    Void() -> True
+    _ -> False
+
+fun mustHalt(e: exp): bool
+  match e
+    SelfLit() -> True
+    QuoteLit() -> True
+    Ref() -> True
+    Undefined() -> True
+    Void() -> True
+    Lambda() -> True
+    KLambda() -> True
+    ULambda() -> True
+    SetE(_, value) -> mustHalt(value)
+    _ -> False
 
 fun asBody(e: exp): body
   match e

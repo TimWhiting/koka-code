@@ -6,8 +6,8 @@ import std/num/float64
 type jsValue
   JsNull
   JsBool(b: bool)
-  JsInt(i: int)
-  JsDouble(d: float64)
+  JsInt(s: string, i:int = s.std/num/parse)
+  JsDouble(s: string, d:float64 = s.std/num/float64/parse)
   JsString(s: string)
   JsArray(l: list<jsValue>)
   JsObject(o: jsObject<jsValue>)
@@ -79,12 +79,12 @@ fun pLit()
 fun pFloat()
   with atomic
   val d = or({decfloat().split("_").join}, {hexfloat().split("_").join})
-  JsDouble(d.parse-float64.default(-1.0))
+  JsDouble(d)
 
 fun pInteger()
   with atomic
   val d = integer().split("_").join
-  JsInt(d.parse-int.default(-1))
+  JsInt(d)
 
 val stringRegex = "^\"[^\\\\\"]*(?:\\\\.[^\"\\\\]*)*\"".regex()
 

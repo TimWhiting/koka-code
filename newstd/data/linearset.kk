@@ -34,3 +34,9 @@ pub fun (-)(l: linearSet<v,e>, l2: linearSet<v,e>): e linearSet<v,e>
 pub fun (-)(l: linearSet<v,e>, l2: list<v>): e linearSet<v,e>
   val lnew = linearSet(l2, l.eq)
   l(list=l.list.filter(fn(x) !lnew.member(x)))
+
+pub fun main()
+  val s = linearSet([1, 2, 3], (==))
+  val s2 = linearSet([2, 3, 4], (==))
+  val s3 = s + s2
+  s3.list.show-list(show).println

@@ -32,11 +32,18 @@ fun getDefault(l: list<(k,v)>, k: k, v: v, eq: (k, k) -> e bool): e v
     Cons((kk, vv), rst) -> if eq(kk, k) then vv else rst.getDefault(k, v, eq)
     Nil -> v
 
+/// Overwrite any existing key with value
 pub fun set(m: linearMap<k,v,e>, k: k, v: v): e linearMap<k,v,e>
-  m(list=m.list.set(k, v, m.eq))
+  m(list=m.list.update(k, fn(_) v, v, m.eq))
 
-fun set(l: list<(k,v)>, k: k, v: v, eq: (k, k) -> e bool): e list<(k,v)>
-  update(l, k, fn(_) v, v, eq)
+/// Add only if key is not present in the map
+pub fun add(m: linearMap<k,v,e>, k: k, b: v): e linearMap<k,v,e>
+  m(list=m.list.update(k, fn(x) x, b, m.eq))
+
+pub fun addAll(m: linearMap<k,v,e>, l: list<(k,v)>): e linearMap<k,v,e>
+  match l
+    Nil -> m
+    Cons((k, v), rst) -> addAll(m.add(k, v), rst)
 
 pub fun foldr(m: linearMap<k,v,e>, acc: a, f: (k, v, a) -> e a): e a
   m.list.foldr(acc, fn((k, v), x) f(k, v, x))

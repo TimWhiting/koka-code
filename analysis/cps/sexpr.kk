@@ -299,7 +299,7 @@ fun (==)(s1: sexpr, s2: sexpr): bool
     (SCons(h1, t1), SCons(h2, t2)) -> (==)(h1.unsafe-decreasing, h2.unsafe-decreasing) && (==)(t1.unsafe-decreasing, t2.unsafe-decreasing)
     _ -> False
 
-alias nameMap = some<e> linearMap<string,int,e>
+alias nameMap = some<e> linearMap<string,int>
 val globalNameGen:ref<global,nameMap> = unsafe-total{ref(linearMap([], fn(x1: string, x2: string) x1 == x2))}
 fun genName(n: string): sexpr
   unsafe-total

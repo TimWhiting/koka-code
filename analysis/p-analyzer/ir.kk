@@ -6,8 +6,11 @@ pub alias symbol = (int, int); // name-interned, disambiguation
 val symbol_table:ref<global,list<(string, int)>> = unsafe-total{ref([])}
 fun to-sexp(s: symbol): sexpr
   unsafe-total
-    val sym = (!symbol_table).find(fn(x) x.snd == s.fst).default(("",0)).fst
-    SName(sym ++ s.snd.show)
+    SName(s.fst.unintern ++ s.snd.show)
+
+fun unintern(i: int): string
+  unsafe-total
+    (!symbol_table).find(fn(x) x.snd == i).default(("not interned",0)).fst
 
 fun intern(s: string): int
   unsafe-total

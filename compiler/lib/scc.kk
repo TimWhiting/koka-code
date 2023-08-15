@@ -1,7 +1,7 @@
 import newstd/data/linearmap
 import newstd/data/linearset
 
-alias graph<v> = linearMap<v, list<v>, <>>;
+alias graph<v> = linearMap<v, list<v>>;
 alias edge<v> = (v,v)
 alias node<v> = (v,list<v>)
 
@@ -43,7 +43,7 @@ fun dfs(g: graph<v>, vs: list<v>): forest<v>
   with unsafe-total
   Forest(vs.map(fn(v) g.tree(v, ref(linearSet([v], g.eq))))).prune(g.eq)
 
-fun tree(g: graph<v>, v: v, visited: ref<h, linearSet<v,<read<h>,write<h>,div>>>): <div,read<h>,write<h>> tree<v>
+fun tree(g: graph<v>, v: v, visited: ref<h, linearSet<v>>): <div,read<h>,write<h>> tree<v>
   val f = g.successors(v).flatmap fn(v')
     if (!visited).member(v') then []
     else
@@ -51,7 +51,7 @@ fun tree(g: graph<v>, v: v, visited: ref<h, linearSet<v,<read<h>,write<h>,div>>>
       [g.tree(v'.unsafe-decreasing, visited)]
   Tree(v, Forest(f))
 
-alias vset<v> = linearSet<v, <>>;
+alias vset<v> = linearSet<v>;
 
 fun prune(fs: forest<v>, eq: (v,v) -> bool): forest<v>
   fun chop(ms: vset<v>, fs1: forest<v>): (vset<v>, forest<v>)

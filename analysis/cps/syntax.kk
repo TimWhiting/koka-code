@@ -4,7 +4,7 @@ import newstd/data/linearset
 type program
   Program(defs: list<def>, free: vars = defs.map(free).foldl(noFreeVars, fn(a, b) a + b), label:int=getLabel())
 
-pub alias vars = linearSet<sexpr, <>>
+pub alias vars = linearSet<sexpr>
 
 val globalLabel = unsafe-total{ref(0)}
 fun getLabel(): int

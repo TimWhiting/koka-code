@@ -54,6 +54,14 @@ val neptune = Body(
 
 val sun = Body(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, solar_mass)
 
+fun updatev(b: body, dx: float64, dy: float64, dz: float64): body
+  match b
+    Body(x, y, z, vx, vy, vz, mass) -> Body(x, y, z, vx + dx, vy + dy, vz + dz, mass)
+
+fun updateloc(b: body, dx: float64, dy: float64, dz: float64): body
+  match b
+    Body(x, y, z, vx, vy, vz, mass) -> Body(x + dx, y + dy, z + dz, vx, vy, vz, mass)
+
 alias nbodysystem = list<body>
 
 fun initSystem()
@@ -61,7 +69,7 @@ fun initSystem()
   val (px, py, pz) = bodies.foldl((0.0, 0.0, 0.0)) fn((accx, accy, accz), b)
     (accx + b.vx * b.mass, accy + b.vy * b.mass, accz + b.vz * b.mass)
   match bodies
-    Cons(s, rst) -> Cons(s.offsetMomentum(px, py, pz), rst)
+    Cons(s, rst) -> Cons(s.updatev(0.0 - px / solar_mass, 0.0 - py / solar_mass, 0.0 - pz / solar_mass), rst)
     x -> x
 
 pub fun foldlmap(xs: list<a>, z: b, acc: ctx<list<a>>, f: (a, b) -> (a, b)): (list<a>, b)
@@ -81,14 +89,14 @@ fun advanceV(bodies: nbodysystem, dt: float64)
         val dz = b1.z - b2.z
         val d2 = dx * dx + dy * dy + dz * dz
         val mag = dt / (d2 * d2.sqrt)
-        val b2' = b2(vx=b2.vx + dx*b1.mass * mag,vy=b2.vy + dy*b1.mass * mag, vz=b2.vz + dz*b1.mass * mag)
-        val acc' = (accx + dx * b2.mass * mag, accy + dy * b2.mass * mag, accz + dz * b2.mass * mag)
+        val b2' = b2.updatev(dx*b1.mass * mag, dy*b1.mass * mag, dz*b1.mass * mag)
+        val acc' = (accx - dx * b2.mass * mag, accy - dy * b2.mass * mag, accz - dz * b2.mass * mag)
         (b2', acc')
-      Cons(b1(vx= b1.vx - dvx, vy= b1.vy - dvy, vz= b1.vz - dvz), l.advanceV(dt))
+      Cons(b1.updatev(dvx, dvy, dvz), l.advanceV(dt))
     Nil -> Nil
 
 inline fun advance(bodies: nbodysystem, dt: float64)
-  bodies.advanceV(dt).map(fn(b) b(x=b.x + dt*b.vx, y=b.y + dt*b.vy, z=b.z + dt*b.vz))
+  bodies.advanceV(dt).map(fn(b) b.updateloc(dt*b.vx, dt*b.vy, dt*b.vz))
 
 fun energy(bodies: nbodysystem)
   match bodies
@@ -103,9 +111,6 @@ fun energy(bodies: nbodysystem)
 
 inline fun negate(f: float64)
   0.0 - f
-
-inline fun offsetMomentum(b: body, px: float64, py: float64, pz: float64)
-  b(vx= px.negate / solar_mass, vy= py.negate / solar_mass, vz= pz.negate / solar_mass)
 
 fun main()
   val n = get-args()[0].default("1000").parse-int.unjust

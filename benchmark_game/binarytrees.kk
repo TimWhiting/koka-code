@@ -18,7 +18,7 @@ fun check(tree: tree): div int32
     Leaf -> 0.int32
 
 fun main()
-  val n = get-args()[0].unjust.parse-int.unjust
+  val n = get-args()[0].default("10").parse-int.unjust
   val minDepth = 4
   val maxDepth = max(minDepth + 2, n)
   val stretchDepth = maxDepth + 1

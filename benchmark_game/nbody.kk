@@ -64,10 +64,10 @@ fun initSystem()
     Cons(s, rst) -> Cons(s.offsetMomentum(px, py, pz), rst)
     x -> x
 
-pub fun foldlmap(xs: list<a>, z: b, acc: ctx<list<a>>, f: (a, b) -> (b, a)): (list<a>, b)
+pub fun foldlmap(xs: list<a>, z: b, acc: ctx<list<a>>, f: (a, b) -> (a, b)): (list<a>, b)
   match xs
     Cons(x,xx) -> 
-      val (res, x') = f(x, z)
+      val (x', res) = f(x, z)
       foldlmap(xx, res, (acc ++ ctx Cons(x', _)), f)
     Nil ->
       ((acc ++. Nil), z)
@@ -81,8 +81,9 @@ fun advanceV(bodies: nbodysystem, dt: float64)
         val dz = b1.z - b2.z
         val d2 = dx * dx + dy * dy + dz * dz
         val mag = dt / (d2 * d2.sqrt)
-        ((accx + dx * b2.mass * mag, accy + dy * b2.mass * mag, accz + dz * b2.mass * mag), 
-         b2(vx=b2.vx + dx*b1.mass * mag,vy=b2.vy + dy*b1.mass * mag, vz=b2.vz + dz*b1.mass * mag ))
+        val b2' = b2(vx=b2.vx + dx*b1.mass * mag,vy=b2.vy + dy*b1.mass * mag, vz=b2.vz + dz*b1.mass * mag)
+        val acc' = (accx + dx * b2.mass * mag, accy + dy * b2.mass * mag, accz + dz * b2.mass * mag)
+        (b2', acc')
       Cons(b1(vx= b1.vx - dvx, vy= b1.vy - dvy, vz= b1.vz - dvz), l.advanceV(dt))
     Nil -> Nil
 

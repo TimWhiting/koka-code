@@ -31,5 +31,4 @@ fun main()
       result := result + bottomUpTree(i.int32).check
     println(iterations.show ++ "\t trees of depth " ++ i.show ++ "\t check: " ++ result.show)
   println("long lived tree of depth " ++ maxDepth.show ++ "\t check: " ++ longLivedTree.check.show)
-
   

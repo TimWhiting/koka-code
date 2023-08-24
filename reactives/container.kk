@@ -1,23 +1,52 @@
+import std/num/int32
+
+alias providerToken = int32
+struct providerBase<t>
+  origin: some<h> ref<h, maybe<providerBase<t>>>
+  over: some<h> ref<h, maybe<providerBase<t>>>
+  token: providerToken
+
+fun providerBase()
+  val p = ProviderBase(ref(Nothing), ref(Nothing), unsafe-total{unique().int32})
+  p.origin.set(Just(p))
+  p.over.set(Just(p))
+  p
+
 rec type pOverride<t>
   Override
-    token: providerToken
-    create: pref<t> -> t
+    origin: providerBase<t>
+    over: providerBase<t>
 
 struct container<h>
-  // At creation time
+  // At creation time provided by users
   parent: some<h1> maybe<container<h1>> = Nothing
   overrides: list<forall<t> pOverride<t>> = []
   observers: list<observer> = []
   scheduler: scheduler<h>
+  // At creation time computed properties
+  depth: int32
+  root: maybe<some<h1> container<h1>>
   // Comes after creation (so needs to be in ref)
   children: ref<h, list<some<h1> container<h1>>>
   stateReaders: ref<h, list<forall<t> (providerToken, stateReader<t>)>>
+  overrideForProvider: ref<h, list<forall<t> pOverride<t>>>
 
-fun createContainer(parent: some<h1> maybe<container<h1>> =Nothing, overrides: list<forall<t> pOverride<t>> = [], observers: list<observer> =[])
-  Container(
-    parent, overrides, observers, 
+fun createContainer(parent: some<h1> maybe<container<h1>> = Nothing, overs: list<forall<t> pOverride<t>> = [], observers: list<observer> =[])
+  val c = Container(
+    parent, overs, observers ++ parent.map(fn(p) container/observers(p)).default([]),
     scheduler=parent.map(fn(p) p.scheduler).default(Scheduler(ref([]), ref([]))), 
-    children=ref([]), stateReaders=ref([]))
+    depth=parent.map(fn(p) p.depth + 1.int32).default(0.int32),
+    root=parent.map(fn(p) p.root).default(Nothing),
+    overrideForProvider=ref(overs), // TODO: Fix
+    children=ref([]), stateReaders=ref(
+      parent.map(fn(p) (!p.stateReaders).filter(fn(e) e.snd.isDynamicallyCreated)).default([])
+    ))
+  match parent
+    Just(p) -> p.children.set(Cons(c,!p.children)) // TODO: Override for family
+    Nothing -> ()
+  // val overrideReaders= overs.map(fn(o:some<t> pOverride<t>) (o.origin.token, StateReader(o.origin, ref(o.over), c, False)))
+  c
+  // c(stateReaders=ref(overrideReaders ++ !c.stateReaders))
 
 
 struct scheduler<h>
@@ -50,7 +79,8 @@ struct subscription<t>
   container: some<h> container<h>
 
 struct stateReader<t>
-  origin: provider<t>
+  origin: providerBase<t>
+  over: some<h> ref<h, providerBase<t>>
   container: some<h> container<h>
   isDynamicallyCreated: bool
 
@@ -59,14 +89,13 @@ struct observer
 
 alias listenable<t> = provider<t>
 
-alias providerToken = string
 fun token(p: provider<t>)
   p.name
 
 // fun read(container: container<h>, listenable: provider<r>): r
 //   listenable.token.read(container)
 
-fun hasState(container: container<h>, listenable: provider<r>): read<h> bool
+fun hasState(container: container<h>, listenable: providerBase<r>): read<h> bool
   hasState(container, listenable.token)
   
 fun hasState(container: container<h>, token: providerToken): read<h> bool
@@ -76,4 +105,6 @@ val cont = unsafe-total({createContainer()})
 val prov = Provider(fn(r) 1, "foo", [])
 
 fun main()
-  cont.hasState(prov).println
+  // cont.hasState(prov).println
+  val p = providerBase()
+  p.token.show.println

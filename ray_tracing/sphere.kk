@@ -4,9 +4,10 @@ import ray
 import std/num/float64
 import interval
 
-value struct sphere
+struct sphere
   center: point
   radius: float64
+  mat: material
 
 fun hit(s: sphere, r: ray, ray_t: interval): maybe<hitRecord>
   val oc = r.origin - s.center
@@ -18,14 +19,14 @@ fun hit(s: sphere, r: ray, ray_t: interval): maybe<hitRecord>
     return Nothing
   
   val sqrtd = sqrt(discriminant)
-  var root := (0.0 - half_b - sqrtd) / a
+  var root := (half_b.neg - sqrtd) / a
   if !ray_t.surrounds(root) then
-    root := (0.0 - half_b + sqrtd) / a
+    root := (half_b.neg + sqrtd) / a
     if !ray_t.surrounds(root) then
       return Nothing
   val p = r.at(root)
   val outward_normal = (p - s.center) / s.radius
-  Just(HitRecord(root, p, outward_normal).set_normal(r))
+  Just(HitRecord(root, p, outward_normal, s.mat).set_normal(r))
   
 
 fun hittable(s: sphere): hittable

@@ -304,7 +304,7 @@ val globalNameGen:ref<global,nameMap> = unsafe-total{ref(linearMap([], fn(x1: st
 fun genName(n: string): sexpr
   unsafe-total
     val m = !globalNameGen
-    val newM = m.update(n, fn(x) x + 1, 0)
+    val newM = m.update(n, 1, fn(x, _) x + 1)
     globalNameGen.set(newM)
     SName(n ++ newM.getDefault(n, 0).show)
 // fun main()

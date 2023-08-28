@@ -5,13 +5,13 @@ pub value struct linearMap<k,v>
 pub fun linearMap(l: list<(k,v)>, eq: (k, k) -> e bool): <> linearMap<k,v>
   LinearMap(l, eq)
 
-pub fun update(m: linearMap<k,v>, k: k, f: (v) -> e v, b: v): e linearMap<k,v>
+pub fun update(m: linearMap<k,v>, k: k, b: v, f: (v, v) -> e v): e linearMap<k,v>
   m(list=m.list.update(k, f, b, m.eq))
 
-fun update(l: list<(k,v)>, k: k, f: (v) -> e v, b: v, eq: (k, k) -> e bool): e list<(k,v)>
+fun update(l: list<(k,v)>, k: k, f: (v, v) -> e v, b: v, eq: (k, k) -> e bool): e list<(k,v)>
   match l
-    Cons((kk, vv), rst) -> if eq(kk, k) then Cons((kk, f(vv)), rst) else Cons((kk, vv), rst.update(k, f, b, eq))
-    Nil -> Cons((k, f(b)), Nil) 
+    Cons((kk, vv), rst) -> if eq(kk, k) then Cons((kk, f(b, vv)), rst) else Cons((kk, vv), rst.update(k, f, b, eq))
+    Nil -> Cons((k, b), Nil) 
 
 pub fun get(m: linearMap<k,v>, k: k): <exn|e> v
   m.list.get(k, m.eq)
@@ -34,11 +34,11 @@ fun getDefault(l: list<(k,v)>, k: k, v: v, eq: (k, k) -> e bool): e v
 
 /// Overwrite any existing key with value
 pub fun set(m: linearMap<k,v>, k: k, v: v): e linearMap<k,v>
-  m(list=m.list.update(k, fn(_) v, v, m.eq))
+  m(list=m.list.update(k, fn(_, v1) v1, v, m.eq))
 
 /// Add only if key is not present in the map
 pub fun add(m: linearMap<k,v>, k: k, b: v): e linearMap<k,v>
-  m(list=m.list.update(k, fn(x) x, b, m.eq))
+  m(list=m.list.update(k, fn(x, _) x, b, m.eq))
 
 pub fun addAll(m: linearMap<k,v>, l: list<(k,v)>): e linearMap<k,v>
   match l

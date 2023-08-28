@@ -35,7 +35,7 @@ type external
   External(name: name, t: userType, params: list<paramInfo>, nameRange: range, range: range, inlineCall: list<(target, externalCall)>, vis: visibility, doc: string)
   ExternalImport(eImport: list<(target,list<(string, string)>)>, range: range)
 
-type externalCall
+value type externalCall
   ExternalInline(content: string)
   ExternalCall(call: string)
 
@@ -55,9 +55,9 @@ struct kimport
   range: range
   vis: visibility
 
-alias typeDefGroups<t,k> = list<typeDefGroup<t,k>>
+alias typeDefGroups<t,k> = list<typeDefGroup<t,k>>;
 
-type typeDefGroup<t,k>
+value type typeDefGroup<t,k>
   TypeDefRec(defs: list<typeDef<t,t,k>>)
   TypeDefNonRec(def: typeDef<t,t,k>)
 

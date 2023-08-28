@@ -19,24 +19,24 @@ type pred
   PredIFace(n: name, tps: list<ktype>)
 
 // Various synonyms of types
-// pub alias scheme = ktype
-// pub alias sigma = ktype // polymorphic type
-// pub alias tau = ktype // monomorphic type
-// pub alias rho = ktype // unqualified type
-// pub alias keffect = tau
+pub alias scheme = ktype
+pub alias sigma = ktype // polymorphic type
+pub alias tau = ktype // monomorphic type
+pub alias rho = ktype // unqualified type
+pub alias keffect = tau
 
 // An inference type can contain type variables of flavour 'Meta' or 'Skolem'
 // pub alias inferType = ktype;
 
 // Variables in a type which have an identifier and kind
 // One can ask for the free type variables in a type, and substitute them with 'Tau' types.
-pub struct typeVar
+pub value struct typeVar
   id: id
   kind: kind
   flavour: flavour;
 
 // Type constants have a name and a kind
-pub struct typeCon
+pub value struct typeCon
   name: name
   kind: kind;
 

@@ -1,4 +1,4 @@
-struct source (pub name: string, pub contents: string)
+value struct source (pub name: string, pub contents: string)
 
 val sourceNull = Source("", "")
 
@@ -55,7 +55,7 @@ fun posMove8(Pos(s, o, l, c), ch: char): pos
 val tabSize = 2 // Always 2 in koka
 
 // source range
-struct range (pub start: pos, pub end: pos)
+value struct range (pub start: pos, pub end: pos)
 
 fun (==)(r1: range, r2: range): bool
   r1.start == r2.start && r1.end == r2.end

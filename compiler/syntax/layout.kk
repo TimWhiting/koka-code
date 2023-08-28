@@ -121,7 +121,7 @@ fun check(prevLine: int, commentRng: range, l: list<lexeme>): list<lexeme>
 fun checkComments(lexs: list<lexeme>): list<lexeme>
   check(0, rangeNull, lexs)
 
-struct layout
+value struct layout
   open: lexeme
   column: int
 

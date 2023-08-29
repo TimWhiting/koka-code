@@ -317,14 +317,14 @@ fun genName(n: string): sexpr
 //   parseTest(parseList, "(+ 3 5)", show)
 //   parseTest(parseProgram, "[+ 3 5]", show)
 //   parseTest(parseList, "{+ 3 5 . (list a b c)}", show)
-  // val p = "/Users/timwhiting/koka_code/higher-order-programs/scheme/r6rs/nbody.scm".path
-  // parseTest(parseProgram, read-text-file(p), show, p.show)
-  // programs.foreach fn(p)
-  //   parseTest(parseProgram, p, show)
-  // list-directory-recursive("/Users/timwhiting/koka_code/higher-order-programs/scheme".path).foreach fn(p)
-  //   if is-file(p) then // nbody
-  //     if p.show.ends-with(".scm\"").is-just then
-  //       parseTest(parseProgram, read-text-file(p), show, p.show)
+//   val p = "/Users/timwhiting/koka_code/higher-order-programs/scheme/r6rs/nbody.scm".path
+//   parseTest(parseProgram, read-text-file(p), show, p.show)
+//   programs.foreach fn(p)
+//     parseTest(parseProgram, p, show)
+//   list-directory-recursive("/Users/timwhiting/koka_code/higher-order-programs/scheme".path).foreach fn(p)
+//     if is-file(p) then // nbody
+//       if p.show.ends-with(".scm\"").is-just then
+//         parseTest(parseProgram, read-text-file(p), show, p.show)
 
 // TODO: Emit tokens including all whitespace etc. Let AST include token references.
 // Really should add macros to Koka so we can dynamically create an AST with tokens for each constructor

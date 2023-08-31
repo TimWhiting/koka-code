@@ -2,6 +2,12 @@ pub value struct linearSet<v>
   pub list: list<v> 
   eq: some<e> (v, v) -> e bool
 
+pub fun show(l: linearSet<v>, showV: (v) -> e string): e string
+  "{" ++ l.list.show-list(showV) ++ "}"
+
+pub fun (==)(l1: linearSet<v>, l2: linearSet<v>): e bool
+  l1.list.length == l2.list.length && l1.list.all(fn(x) l2.member(x))
+
 pub fun linearSet(l: list<v>, eq: (v, v) -> e bool): <> linearSet<v>
   LinearSet(l, eq)
 

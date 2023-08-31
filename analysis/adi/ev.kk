@@ -39,6 +39,58 @@ type evalue<a>
   Clos(e: expr, p: env<a>)
   ErrorV
 
+value type lattice<a>
+  Top
+  Bottom
+  Elem(a: a)
+
+alias abenv<a> = list<(string, a)>;
+
+value struct abclos<a>
+  e: expr
+  p: abenv<a>;
+
+struct abvalue<a>
+  num: maybe<lattice<int>>
+  clos: maybe<linearSet<abclos<a>>>;
+
+fun (==)(e1: evalue<a>, e2: evalue<a>, eqA: (a, a) -> <div|e> bool): <div|e> bool
+  match (e1, e2)
+    (NumV(i1), NumV(i2)) -> i1 == i2
+    (Clos(e1, p1), Clos(e2, p2)) -> e1 == e2 && (==)(p1, p2, eqA)
+    (ErrorV, ErrorV) -> True
+    _ -> False
+
+fun (==)(e1: env<a>, e2: env<a>, eqA: (a, a) -> <div|e> bool): <div|e> bool
+  match (e1, e2)
+    (Nil, Nil) -> True
+    (Cons((x1, a1), p1), Cons((x2, a2), p2)) -> x1 == x2 && eqA(a1, a2) && (==)(p1, p2, eqA)
+    _ -> False
+
+fun (==)(l1: lattice<a>, l2: lattice<a>, eqA: (a, a) -> <div|e> bool): <div|e> bool
+  match (l1, l2)
+    (Top, Top) -> True
+    (Bottom, Bottom) -> True
+    (Elem(a1), Elem(a2)) -> eqA(a1, a2)
+    _ -> False
+
+fun (==)(c1: abclos<a>, c2: abclos<a>, eqA: (a, a) -> <div|e> bool): <div|e> bool
+  c1.e == c2.e && (==)(c1.p, c2.p, eqA)
+
+fun (==)(m1: maybe<a>, m2: maybe<a>, eqA: (a, a) -> <div|e> bool): <div|e> bool
+  match (m1, m2)
+    (Just(a1), Just(a2)) -> eqA(a1, a2)
+    (Nothing, Nothing) -> True
+    _ -> False
+
+fun (==)(s1: linearSet<a>, s2: linearSet<a>, eqA: (a, a) -> <div|e> bool): <div|e> bool
+  s1.list.length == s2.list.length && s1.list.all(fn(a) s2.list.any(fn(b) eqA(a, b)))
+
+fun (==)(v1: abvalue<a>, v2: abvalue<a>, eqA: (a, a) -> <div|e> bool): <div|e> bool
+  val numEq = (==)(v1.num, v2.num, fn(a1, a2) (==)(a1, a2, (==)))
+  if !numEq then return False
+  (==)(v1.clos, v2.clos, fn(a1, a2) (==)(a1, a2, fn(b1, b2) (==)(b1, b2, fn(c1, c2) eqA(c1, c2))))
+
 effect interp<a, s>
   ctl delta(op: string, e0: evalue<a>, e1: evalue<a>): evalue<a>
   fun zero(v: evalue<a>): bool
@@ -49,6 +101,7 @@ effect interp<a, s>
   ctl get(m: maybe<a>): evalue<a>
   fun traceR(r: evalue<a>): evalue<a>
   val show-addr: ((a) -> string)
+  val eq-addr: (some<e> (a,a) -> e bool)
   fun show-store(): ()
   fun get-store(): linearMap<a, s>
 
@@ -67,6 +120,7 @@ fun local-env(env: env<a>, f: () -> <rinterp<a,s>|e> evalue<a>): <rinterp<a,s>|e
     ctl get(m) resume(get(m))
     fun traceR(r) traceR(r)
     val show-addr = show-addr
+    val eq-addr = eq-addr
     fun show-store() show-store()
     fun get-store() get-store()
   f()
@@ -157,7 +211,8 @@ fun test-concrete(f: ((expr) -> <rinterp<int,evalue<int>>|e> evalue<int>), e: ex
   with handler 
     final ctl fail() ErrorV
   var env := []
-  var store := linearMap([], fn(a: int, b: int) a == b)
+  val eq-addr =  fn(a: int, b: int) a == b
+  var store := linearMap([], eq-addr)
   val showA = fn(i: int) show(i)
   with handler
     ctl delta(op, e0, e1)
@@ -194,8 +249,61 @@ fun test-concrete(f: ((expr) -> <rinterp<int,evalue<int>>|e> evalue<int>), e: ex
       store.list.show(showA).trace
     fun get-store()
       store
+    val eq-addr = eq-addr
   mask<local>
     f(e)
+
+fun injectConcrete(c: evalue<a>): interp<a,s> abvalue<a>
+  match c
+    NumV(i) -> Abvalue(Just(Elem(i)), Nothing)
+    Clos(e, p) -> Abvalue(Nothing, Just(linearSet([Abclos(e, p)], fn(a, b) (==)(a, b, eq-addr))))
+    ErrorV -> Abvalue(Nothing, Nothing)
+
+// fun test-abstract(f: ((expr) -> <rinterp<int,abvalue>|e> evalue<e>), e: expr): <exn,div|e> linearSet<abvalue>
+  // val eqV = fn(e1: abvalue, e2: abvalue) (==)(e1, e2, fn(a1, a2) a1 == a2)
+//   with handler 
+//     final ctl fail() linearSet([ErrorV], eqV)
+//   var env := []
+//   var store := linearMap([], fn(a: int, b: int) a == b)
+//   val showA = fn(i: int) show(i)
+//   with handler
+//     return(x) linearSet([x], eqV)
+//     ctl delta(op, e0, e1)
+//       match (op, e0, e1)
+//         ("*", NumV(v0), NumV(v1)) -> linearSet([resume(NumV(v0 * v1))], eqV)
+//         ("+", NumV(v0), NumV(v1)) -> linearSet([resume(NumV(v0 + v1))], eqV)
+//         ("-", NumV(v0), NumV(v1)) -> linearSet([resume(NumV(v0 - v1))], eqV)
+//         ("/", NumV(v0), NumV(v1)) -> if v1 == 0 then fail() else linearSet([resume(NumV(v0 / v1))], eqV)
+//         _ -> throw("Unknown primitive operation " ++ op)
+//     fun zero(v)
+//       match v
+//         NumV(0) -> True
+//         _ -> False
+//     fun ask-env()
+//       env
+//     ctl ret(v)
+//       resume(v)
+//     fun ext(a, v)
+//       store := store.update(a, v, fn(_, n) n)
+//     fun alloc(x)
+//       val a = store.list.length
+//       a
+//     ctl get(m)
+//       match m
+//         Just(a) -> match store.maybeGet(a)
+//           Just(x) -> resume(x)
+//           Nothing -> throw("Variable not in the store")
+//         Nothing -> throw("Unbound variable")
+//     fun traceR(r)
+//       r.show.trace
+//       r
+//     val show-addr = showA
+//     fun show-store()
+//       store.list.show(showA).trace
+//     fun get-store()
+//       store
+//   mask<local>
+//     f(e)
 
 fun test-evtell(e)
   with handler

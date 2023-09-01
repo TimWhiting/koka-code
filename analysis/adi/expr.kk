@@ -43,3 +43,41 @@ fun subexprs(e: expr): div list<expr>
     Lam(_, e0) -> Cons(e, e0.subexprs)
     App(e0, e1) -> Cons(e, e0.subexprs ++ e1.subexprs)
     Let(_, e0, e1) -> Cons(e, e0.subexprs ++ e1.map(subexprs).concat)
+
+effect unique
+  fun uniq(): string
+
+fun handleUnique(f)
+  var u := 0
+  with handler
+    fun uniq()
+      val n = "_" ++ u.show
+      u := u + 1
+      n
+  f()
+
+fun doNormalize(e: expr): div expr
+  with handleUnique
+  normalize(e)
+      
+fun normalize(e: expr): <unique,div> expr
+  match e
+    Num -> e
+    If0(e0, e1, e2) -> If0(normalize(e0), normalize(e1), normalize(e2))
+    Op2(op, Id(u1), Id(u2)) -> 
+      Op2(op, Id(u1), Id(u2))
+    Op2(op, Id(u1), e1) -> 
+      val u2 = uniq()
+      Let(u2, normalize(e1), [Op2(op, Id(u1), Id(u2))])
+    Op2(op, e0, Id(u2)) -> 
+      val u1 = uniq()
+      Let(u1, normalize(e0), [Op2(op, Id(u1), Id(u2))])
+    Op2(op, e0, e1) -> 
+      val u1 = uniq()
+      val u2 = uniq()
+      Let(u1, normalize(e0), [Let(u2, normalize(e1), [Op2(op, Id(u1), Id(u2))])])
+    Id -> e
+    Rec(fname, e0) -> Rec(fname, normalize(e0))
+    Lam(v, e0) -> Lam(v, normalize(e0))
+    App(e0, e1) -> App(normalize(e0), normalize(e1))
+    Let(v, e0, e1) -> Let(v, normalize(e0), e1.map(normalize))

@@ -134,6 +134,7 @@ fun evtell(ev0)
     fn(e)
       tell((e, ask-env(), get-store()))
       ev0(ev)(e)
+      
 
 fun doevtell(e)
   fix(evtell(ev'))(e)
@@ -151,7 +152,7 @@ fun evdead(ev0)
 fun doevdead(e)
   fix(evdead(ev'))(e)
 
-fun test-concrete(f: ((expr) -> <rinterp<int,evalue<int>>|e> evalue<int>), e: expr): <exn,div|e> evalue<int>
+fun test-concrete(f: ((expr) -> <rinterp<int,evalue<int>>|e> evalue<int>), e: expr): <div,exn|e> evalue<int>
   var env := []
   val eq-addr =  fn(a: int, b: int) a == b
   var store := linearMap([], eq-addr)
@@ -196,7 +197,7 @@ fun test-concrete(f: ((expr) -> <rinterp<int,evalue<int>>|e> evalue<int>), e: ex
       match m
         Just(a) -> match store.maybeGet(a)
           Just(x) -> resume(x)
-          Nothing -> throw("Variable not in the store")
+          Nothing -> throw("Variable " ++ a.show ++ " not in the store") 
         Nothing -> throw("Unbound variable")
     fun show-store()
       store.list.show(showA).trace

@@ -11,6 +11,9 @@ pub fun (==)(l1: linearSet<v>, l2: linearSet<v>): e bool
 pub fun linearSet(l: list<v>, eq: (v, v) -> e bool): <> linearSet<v>
   LinearSet(l, eq)
 
+pub fun is-empty(l: linearSet<v>): bool
+  l.list.is-nil
+
 pub fun foreach(l: linearSet<v>, f: (v) -> e ()): e ()
   l.list.foreach(f)
 

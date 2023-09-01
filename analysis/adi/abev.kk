@@ -78,6 +78,7 @@ fun join(e: abvalue<a>, e': abvalue<a>): e abvalue<a>
 val eqAddr = fn(a: int, b: int) a == b
 val showA = fn(i: int) show(i)  
 val eqAbsV = fn(e1: abvalue<int>, e2: abvalue<int>) (==)(e1, e2, fn(a1, a2) a1 == a2)
+val bottom = Abvalue(Nothing, Nothing)
 
 fun handleAbsValue(f)
   handle(f)
@@ -91,7 +92,12 @@ fun handleAbsValue(f)
         ("+", Abvalue(Just(v0), _), Abvalue(Just(v1), _)) | v0.is-top || v1.is-top -> resume(topN)
         ("-", Abvalue(Just(v0), _), Abvalue(Just(v1), _)) | v0.is-top || v1.is-top -> resume(topN)
         ("/", Abvalue(Just(v0), _), Abvalue(Just(v1), _)) | v0.is-top || v1.is-top -> fail().join(resume(topN))
-        _ -> throw("Unknown primitive operation " ++ op)
+        ("-", _, _) -> fail()
+        ("*", _, _) -> fail()
+        ("+", _, _) -> fail()
+        ("/", _, _) -> fail()
+        _ -> 
+          throw("Unknown primitive operation " ++ op ++ " " ++ e0.show(showA) ++ " " ++ e1.show(showA))
     fun zero(v)
       match v
         Abvalue(Just(Elem(0)), _) -> True
@@ -109,13 +115,9 @@ fun handleAbsValue(f)
     val show-addr = showA
     val eq-addr = eqAddr
 
-fun test-abstract(f: ((expr) -> <rinterp<int,abvalue<int>>|e> abvalue<int>), e: expr): <exn,div|e> abvalue<int>
+fun handle-store(f)
   var store: linearMap<int, abvalue<int>> := linearMap([], eqAddr)
   var xmap := linearMap([], fn(s1:string, s2:string) s1 == s2)
-  with handler 
-    final ctl fail() injectConcrete(ErrorV, eqAddr)
-  with handleAbsValue
-  with default-env
   with handler
     fun ext(a, v)
       store := store.update(a, v, fn(o, n) o.join(n))
@@ -124,13 +126,13 @@ fun test-abstract(f: ((expr) -> <rinterp<int,abvalue<int>>|e> abvalue<int>), e: 
         Just(a) -> a
         Nothing ->
           val a = store.list.length
-          xmap := xmap.update(x, a, fn(_, n) n)
+          xmap := xmap.add(x, a)
           a
     ctl get(m)
       match m
         Just(a) -> match store.maybeGet(a)
           Just(x) -> resume(x)
-          Nothing -> throw("Variable not in the store")
+          Nothing -> throw("Variable " ++ showA(a) ++ " not in the store " ++ store.show(showA, fn(v) show(v, showA)))
         Nothing -> throw("Unbound variable")
     fun show-store()
       store.show(showA, fn(v) show(v, show)).trace
@@ -138,6 +140,13 @@ fun test-abstract(f: ((expr) -> <rinterp<int,abvalue<int>>|e> abvalue<int>), e: 
       store
     fun put-store(s)
       store := s
-  mask<local>
-    f(e)
+  f()
+
+fun test-abstract(f, e: expr)
+  with handler 
+    final ctl fail() injectConcrete(ErrorV, eqAddr)
+  with handleAbsValue
+  with default-env
+  with handle-store
+  f(e)
 

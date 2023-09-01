@@ -23,6 +23,6 @@ fun fix3(a, b, c)
   fn(x)
     a(fix3(a, b, c), fix3(a, b, c), fix3(a, b, c))(x)
 
-fun fix(f)
+fun fix(f: ((a -> <div|e> b) -> (a -> <div|e> b))): <div|e> (a -> <div|e> b)
   fn(x)
     f(fix(f))(x)

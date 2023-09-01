@@ -2,15 +2,30 @@ import ev
 import abev
 import expr
 import utils
+import cache
 import newstd/data/linearmap
 import newstd/data/linearset
 
-fun test-evtell-abs(e)
+fun handleTellAbs(f)
   with handler
     fun tell(x)
       val (a:expr, b:env<int>, c:linearMap<int,abvalue<int>>) = x
-      (a.show ++ "," ++ b.show(show) ++ "," ++ c.list.show(show)).println
+      (a.show ++ "," ++ b.show(show) ++ "," ++ c.list.show(show) ++ "\n\n").println
+  f()
+
+fun test-cache-abs(e: expr)
+  fixcache(docacheev, e)
+
+fun test-cachetell-abs(e: expr)
+  with handleTellAbs
+  fixcache(docachetell, e)
+
+fun test-evtell-abs(e)
+  with handleTellAbs
   test-abstract(doevtell, e)
+
+fun test-abs(e)
+  test-abstract(evnormal, e)
 
 fun test-evtell(e)
   with handler
@@ -45,6 +60,15 @@ fun test-concrete-variations()
   test-evdead(If0(Op2("/", Num(1), Num(0)), Num(2), Num(3)))
 
 fun main()
-  test-concrete-variations()
+  // test-concrete-variations()
   // (let ((f (lambda (x) x))) (f 1) (f 2))
-  test-evtell-abs(Let("f", Lam("x", Id("x")), [App(Id("f"), Num(1) ), App(Id("f"), Num(2))])).show(show).println
+  // test-evtell-abs(Let("f", Lam("x", Id("x")), [App(Id("f"), Num(1) ), App(Id("f"), Num(2))])).show(show).println
+  // ((rec f (λ (x) (f x))) 0)
+  // "Should be empty, due to infinite recursion".println
+  // test-cache-abs(App(Rec("f", Lam("x", App(Id("f"), Id("x")))), Num(0))).show(show).println
+  // ((rec f (λ (n) (if0 n 1 (* n (f (- n 1)))))) 5)
+  // test-evtell-abs(App(Rec("f", Lam("n", If0(Id("n"), Num(1), Op2("*", Id("n"), App(Id("f"), Op2("-", Id("n"), Num(1))))))), Num(5))).show(show).println
+  // Should be 'N
+  // ((rec f (λ (x) (if0 x 0 (if0 (f (- x 1)) 2 3)))) (+ 1 0))
+  test-cachetell-abs(doNormalize(App(Rec("f", Lam("x", If0(Id("x"), Num(0), If0(App(Id("f"), Op2("-", Id("x"), Num(1))), Num(2), Num(3)) ))), Op2("+", Num(1), Num(0))))).show(show).println
+  // Should be {2, 0, 3}

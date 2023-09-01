@@ -75,18 +75,12 @@ fun join(e: abvalue<a>, e': abvalue<a>): e abvalue<a>
   val clos = e.clos.join(e'.clos, fn(a, b) a + b)
   Abvalue(num, clos)
 
-fun test-abstract(f: ((expr) -> <rinterp<int,abvalue<int>>|e> abvalue<int>), e: expr): <exn,div|e> abvalue<int>
-  val eqAddr = fn(a: int, b: int) a == b
-  val eqV = fn(e1: abvalue<int>, e2: abvalue<int>) (==)(e1, e2, fn(a1, a2) a1 == a2)
-  with handler 
-    final ctl fail() injectConcrete(ErrorV, eqAddr)
-  var env := []
-  var store:linearMap<int, abvalue<int>> := linearMap([], eqAddr)
-  val showA = fn(i: int) show(i)
-  var xmap := linearMap([], fn(s1:string, s2:string) s1 == s2)
-  var cachein := linearMap([], eqConfig)
-  var cacheout := linearMap([], eqConfig)
-  with handler
+val eqAddr = fn(a: int, b: int) a == b
+val showA = fn(i: int) show(i)  
+val eqAbsV = fn(e1: abvalue<int>, e2: abvalue<int>) (==)(e1, e2, fn(a1, a2) a1 == a2)
+
+fun handleAbsValue(f)
+  handle(f)
     ctl delta(op, e0, e1)
       match (op, e0, e1)
         ("*", Abvalue(Just(Elem(v0)), _), Abvalue(Just(Elem(v1)), _)) -> resume(injectConcrete(NumV(v0 * v1), eqAddr))
@@ -102,15 +96,27 @@ fun test-abstract(f: ((expr) -> <rinterp<int,abvalue<int>>|e> abvalue<int>), e: 
       match v
         Abvalue(Just(Elem(0)), _) -> True
         _ -> False
-    fun ask-env()
-      env
     ctl closures(c)
       match c
         Abvalue(_, Just(c')) -> c'.list.foldl(injectConcrete(ErrorV, eqAddr)) fn(acc:abvalue<int>, c2: clos<env<int>>) 
           acc.join(resume(c2))
         _ -> injectConcrete(ErrorV, eqAddr)
-    ctl ret(v)
-      resume(v)
+    fun inj(e1)
+      injectConcrete(e1, eqAddr)
+    fun traceR(r: abvalue<int>)
+      r.show(showA).trace
+      r
+    val show-addr = showA
+    val eq-addr = eqAddr
+
+fun test-abstract(f: ((expr) -> <rinterp<int,abvalue<int>>|e> abvalue<int>), e: expr): <exn,div|e> abvalue<int>
+  var store: linearMap<int, abvalue<int>> := linearMap([], eqAddr)
+  var xmap := linearMap([], fn(s1:string, s2:string) s1 == s2)
+  with handler 
+    final ctl fail() injectConcrete(ErrorV, eqAddr)
+  with handleAbsValue
+  with default-env
+  with handler
     fun ext(a, v)
       store := store.update(a, v, fn(o, n) o.join(n))
     fun alloc(x)
@@ -126,31 +132,12 @@ fun test-abstract(f: ((expr) -> <rinterp<int,abvalue<int>>|e> abvalue<int>), e: 
           Just(x) -> resume(x)
           Nothing -> throw("Variable not in the store")
         Nothing -> throw("Unbound variable")
-    fun traceR(r: abvalue<int>)
-      r.show(showA).trace
-      r
-    val show-addr = showA
-    val eq-addr = fn(a: int, b: int) a == b
     fun show-store()
       store.show(showA, fn(v) show(v, show)).trace
     fun get-store()
       store
-    fun find-env(s)
-      Nothing
-    fun inj(e1)
-      injectConcrete(e1, eqAddr)
     fun put-store(s)
       store := s
-    // val eq-v-store = fn(a, b) False
-    // fun get-cache-in() cachein
-    // fun get-cache-out() cacheout
-    // fun put-cache-out(c, s)
-    //   cacheout := cacheout.update(c, s, fn(_, n) n)
-    // ctl visit-cache(c) c.list.foldl(injectConcrete(ErrorV, eqAddr)) fn(acc: abvalue<int>, c2: cacheval)
-    //   val (v, s) = c2
-    //   acc.join(resume((v, s)))
-    // fun update-cache(c, v, s)
-    //   cacheout := cacheout.update(c, emptyCacheValStore.add((v, s)), fn(o, n) o.add((v, s)))
   mask<local>
     f(e)
 

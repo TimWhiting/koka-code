@@ -50,15 +50,19 @@ fun evcache(ev0)
         ret(v)
 
 // fun fixcache(eval)
+//   var cachein := linearMap([], eqConfig)
+//   var cacheout := linearMap([], eqConfig)
 //   with handler
-//     fun get-cache-out() get-cache-out()
-//     fun set-cache-out(c) set-cache-out(c)
-//     fun get-cache-in() get-cache-in()
-//     fun set-cache-in(s) set-cache-in(s)
-//     ctl visit-cache(c) resume(visit-cache(c))
-//     fun put-cache-out(c,s) put-cache-out(c,s)
-//     fun update-cache(c, v, s) update-cache(c, v, s)
-//     val eq-v-store = eq-v-store
+//     val eq-v-store = fn(a, b) False
+//     fun get-cache-in() cachein
+//     fun get-cache-out() cacheout
+//     fun put-cache-out(c, s)
+//       cacheout := cacheout.update(c, s, fn(_, n) n)
+//     ctl visit-cache(c) c.list.foldl(injectConcrete(ErrorV, eqAddr)) fn(acc: abvalue<int>, c2: cacheval)
+//       val (v, s) = c2
+//       acc.join(resume((v, s)))
+//     fun update-cache(c, v, s)
+//       cacheout := cacheout.update(c, emptyCacheValStore.add((v, s)), fn(o, n) o.add((v, s)))
 //   fn(e)
 //     val p = ask-env()
 //     val s = get-store()

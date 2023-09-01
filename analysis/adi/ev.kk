@@ -42,46 +42,45 @@ fun show(e: evalue<a>): string
 fun show(s: list<(a, evalue<a>)>, showA: (a) -> e string): e string
   s.show-list(fn(t) t.show-tuple(showA, show))
 
-effect interp<a, s, p>
+effect primop<a, s, p>
   ctl delta(op: string, e0: s, e1: s): s
   fun zero(v: s): bool
-  fun ask-env(): p 
   fun inj(v: evalue<a>): s 
-  ctl ret(v: s): s
   ctl closures(v: s): clos<p>
-  fun ext(a: a, v: s): ()
-  fun alloc(x: string): a
-  ctl get(m: maybe<a>): s
-  fun traceR(r: s): s
   val show-addr: ((a) -> string)
   val eq-addr: (some<e> (a,a) -> e bool)
+  fun traceR(r: s): s
+
+effect eenv<a, p>
+  fun ask-env(): p 
+  fun find-env(s: string): maybe<a>
+
+effect estore<a, s, p>
+  fun alloc(x: string): a
+  fun ext(a: a, v: s): ()
+  ctl get(m: maybe<a>): s
   fun show-store(): ()
   fun get-store(): linearMap<a, s>
   fun put-store(s: linearMap<a, s>): ()
-  fun find-env(s: string): maybe<a>
 
 effect fail<s>
   ctl fail(): s
 
-alias rinterp<a,s> = <exn,div,fail<s>,interp<a,s,env<a>>>
+alias rinterp<a,s> = <exn,div,fail<s>,primop<a,s,env<a>>,eenv<a,env<a>>,estore<a,s,env<a>>>
+
 fun local-env(env: env<a>, f: () -> <rinterp<a,s>|e> s): <rinterp<a,s>|e> s
   with override
-    ctl delta(op, e0, e1) resume(delta(op, e0, e1))
-    fun zero(v) zero(v)
     fun ask-env() env
-    fun inj(v) inj(v)
-    ctl ret(v) resume(ret(v))
-    ctl closures(v) resume(closures(v))
-    fun ext(a, v) ext(a, v)
-    fun alloc(x) alloc(x)
-    ctl get(m) resume(get(m))
-    fun traceR(r) traceR(r)
-    val show-addr = show-addr
-    val eq-addr = eq-addr
-    fun show-store() show-store()
-    fun get-store() get-store()
-    fun put-store(s) put-store(s)
     fun find-env(s) env.find(fn(t) t.fst == s).map(fn(t) t.snd)
+  f()
+
+fun default-env(f)
+  val env = []
+  with handler
+    fun ask-env()
+      env
+    fun find-env(s)
+      Nothing
   f()
 
 fun ev(ev: (expr) -> <rinterp<a,s>|e> s, e: expr): <rinterp<a,s>|e> s
@@ -111,7 +110,7 @@ fun ev(ev: (expr) -> <rinterp<a,s>|e> s, e: expr): <rinterp<a,s>|e> s
         val a = alloc(fname)
         val v = local-env(Cons((fname, a), p), fn() ev(e0))
         ext(a, v)
-        ret(v)
+        v
       Lam(_, _) ->
         val p = ask-env()
         inj(ClosV(Clos(e, p)))
@@ -153,12 +152,12 @@ fun doevdead(e)
   fix(evdead(ev'))(e)
 
 fun test-concrete(f: ((expr) -> <rinterp<int,evalue<int>>|e> evalue<int>), e: expr): <exn,div|e> evalue<int>
-  with handler 
-    final ctl fail() ErrorV
   var env := []
   val eq-addr =  fn(a: int, b: int) a == b
   var store := linearMap([], eq-addr)
   val showA = fn(i: int) show(i)
+  with handler 
+    final ctl fail() ErrorV
   with handler
     ctl delta(op, e0, e1)
       match (op, e0, e1)
@@ -171,39 +170,39 @@ fun test-concrete(f: ((expr) -> <rinterp<int,evalue<int>>|e> evalue<int>), e: ex
       match v
         NumV(0) -> True
         _ -> False
-    fun ask-env()
-      env
-    ctl ret(v)
-      resume(v)
-    fun ext(a, v)
-      store := store.update(a, v, fn(_, n) n)
-    fun alloc(x)
-      val a = store.list.length
-      a
-    ctl get(m)
-      match m
-        Just(a) -> match store.maybeGet(a)
-          Just(x) -> resume(x)
-          Nothing -> throw("Variable not in the store")
-        Nothing -> throw("Unbound variable")
-    fun traceR(r:evalue<int>)
-      r.show.trace
-      r
-    val show-addr = showA
-    fun show-store()
-      store.list.show(showA).trace
-    fun get-store()
-      store
     ctl closures(c)
       match c
         ClosV(c') -> resume(c')
         _ -> fail()
     fun inj(e1)
       e1
+    fun traceR(r:evalue<int>)
+      r.show.trace
+      r
+    val show-addr = showA
+    val eq-addr = eq-addr
+  with handler
+    fun ask-env()
+      env
     fun find-env(s)
       Nothing
+  with handler
+    fun alloc(x)
+      val a = store.list.length
+      a
+    fun ext(a, v)
+      store := store.update(a, v, fn(_, n) n)
+    ctl get(m)
+      match m
+        Just(a) -> match store.maybeGet(a)
+          Just(x) -> resume(x)
+          Nothing -> throw("Variable not in the store")
+        Nothing -> throw("Unbound variable")
+    fun show-store()
+      store.list.show(showA).trace
+    fun get-store()
+      store
     fun put-store(s)
       store := s
-    val eq-addr = eq-addr
   mask<local>
     f(e)

@@ -15,19 +15,21 @@ value struct clos<p>
   p: p
 
 fun (==)(e1: env<int>, e2: env<int>): div bool
-  (==)(e1, e2, fn(i1:int, i2: int) i1 == i2)
+  (==)(e1, e2, fn(i1:int, i2: int) i1 == i2, show)
 
-fun (==)(e1: evalue<a>, e2: evalue<a>, eqA: (a, a) -> <div|e> bool): <div|e> bool
+fun (==)(e1: evalue<a>, e2: evalue<a>, eqA: (a, a) -> <div|e> bool, showA: (a) -> <div|e> string): <div|e> bool
+  with traceEq(e1, e2, fn(e:some<a> evalue<a>) e.show)
   match (e1, e2)
     (NumV(i1), NumV(i2)) -> i1 == i2
-    (ClosV(c1), ClosV(c2)) -> (==)(c1, c2, fn(p1, p2) (==)(p1, p2, eqA))
+    (ClosV(c1), ClosV(c2)) -> (==)(c1, c2, fn(p1, p2) (==)(p1, p2, eqA, showA))
     (ErrorV, ErrorV) -> True
     _ -> False
 
-fun (==)(e1: env<a>, e2: env<a>, eqA: (a, a) -> <div|e> bool): <div|e> bool
+fun (==)(e1: env<a>, e2: env<a>, eqA: (a, a) -> <div|e> bool, showA: (a) -> <div|e> string): <div|e> bool
+  with traceEq(e1, e2, fn(e:some<a> env<a>) e.show-list(fn(t1) t1.show-tuple(show, showA)))
   match (e1, e2)
     (Nil, Nil) -> True
-    (Cons((x1, a1), p1), Cons((x2, a2), p2)) -> x1 == x2 && eqA(a1, a2) && (==)(p1, p2, eqA)
+    (Cons((x1, a1), p1), Cons((x2, a2), p2)) -> x1 == x2 && eqA(a1, a2) && (==)(p1, p2, eqA, showA)
     _ -> False
 
 fun (==)(c1: clos<p>, c2: clos<p>, eqEnv: (p, p) -> <div|e> bool): <div|e> bool
@@ -38,6 +40,9 @@ fun show(e: evalue<a>): string
     NumV(n) -> n.show
     ClosV(_) -> "<closure>"
     ErrorV -> "<error>"
+
+fun show(c: clos<p>, showP: (p) -> <div|e> string): <div|e> string
+  c.e.show ++ " " ++ showP(c.p)
 
 fun show(s: list<(a, evalue<a>)>, showA: (a) -> e string): e string
   s.show-list(fn(t) t.show-tuple(showA, show))
@@ -59,7 +64,6 @@ effect estore<a, s, p>
   fun alloc(x: string): a
   fun ext(a: a, v: s): ()
   ctl get(m: maybe<a>): s
-  fun show-store(): ()
   fun get-store(): linearMap<a, s>
   fun put-store(s: linearMap<a, s>): ()
 
@@ -152,11 +156,12 @@ fun evdead(ev0)
 fun doevdead(e)
   fix(evdead(ev'))(e)
 
+val eqAddr = fn(a: int, b: int) a == b
+val showA = fn(i: int) show(i)
+
 fun test-concrete(f: ((expr) -> <rinterp<int,evalue<int>>|e> evalue<int>), e: expr): <div,exn|e> evalue<int>
   var env := []
-  val eq-addr =  fn(a: int, b: int) a == b
-  var store := linearMap([], eq-addr)
-  val showA = fn(i: int) show(i)
+  var store := linearMap([], eqAddr, fn(a:evalue<int>, b:evalue<int>) (==)(a, b, eqAddr, showA), showA, show)
   with handler 
     final ctl fail() ErrorV
   with handler
@@ -181,7 +186,7 @@ fun test-concrete(f: ((expr) -> <rinterp<int,evalue<int>>|e> evalue<int>), e: ex
       r.show.trace
       r
     val show-addr = showA
-    val eq-addr = eq-addr
+    val eq-addr = eqAddr
   with handler
     fun ask-env()
       env
@@ -199,8 +204,6 @@ fun test-concrete(f: ((expr) -> <rinterp<int,evalue<int>>|e> evalue<int>), e: ex
           Just(x) -> resume(x)
           Nothing -> throw("Variable " ++ a.show ++ " not in the store") 
         Nothing -> throw("Unbound variable")
-    fun show-store()
-      store.list.show(showA).trace
     fun get-store()
       store
     fun put-store(s)

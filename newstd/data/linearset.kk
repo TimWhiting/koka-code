@@ -1,15 +1,16 @@
 pub value struct linearSet<v>
   pub list: list<v> 
   eq: some<e> (v, v) -> e bool
+  showE: some<e> (v) -> e string
 
-pub fun show(l: linearSet<v>, showV: (v) -> e string): e string
-  "{" ++ l.list.show-list(showV) ++ "}"
+pub fun show(l: linearSet<v>): e string
+  "{" ++ l.list.show-list(l.showE) ++ "}"
 
 pub fun (==)(l1: linearSet<v>, l2: linearSet<v>): e bool
   l1.list.length == l2.list.length && l1.list.all(fn(x) l2.member(x))
 
-pub fun linearSet(l: list<v>, eq: (v, v) -> e bool): <> linearSet<v>
-  LinearSet(l, eq)
+pub fun linearSet(l: list<v>, eq: (v, v) -> e bool, show: (v) -> e string): <> linearSet<v>
+  LinearSet(l, eq, show)
 
 pub fun is-empty(l: linearSet<v>): bool
   l.list.is-nil
@@ -41,7 +42,7 @@ pub fun (-)(l: linearSet<v>, l2: linearSet<v>): e linearSet<v>
   l(list=l.list.filter(fn(x) !l2.member(x)))
 
 pub fun (-)(l: linearSet<v>, l2: list<v>): e linearSet<v>
-  val lnew = linearSet(l2, l.eq)
+  val lnew = linearSet(l2, l.eq, l.showE)
   l(list=l.list.filter(fn(x) !lnew.member(x)))
 // pub fun main()
 //   val s = linearSet([1, 2, 3], (==))

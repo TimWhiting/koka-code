@@ -35,7 +35,7 @@ fun test-evtell(e)
   test-concrete(doevtell, e)
 
 fun test-evdead(e)
-  var dead := linearSet(e.subexprs, fn(a: expr, b: expr) a == b)
+  var dead := linearSet(e.subexprs, fn(a: expr, b: expr) a == b, fn(a: expr) a.show)
   with handler
     fun get-dead()
       dead
@@ -65,9 +65,9 @@ fun main()
   // test-evtell-abs(Let("f", Lam("x", Id("x")), [App(Id("f"), Num(1) ), App(Id("f"), Num(2))])).show(show).println
   // ((rec f (λ (x) (f x))) 0)
   // "Should be empty, due to infinite recursion".println
-  // test-cache-abs(App(Rec("f", Lam("x", App(Id("f"), Id("x")))), Num(0))).show(show).println
+  test-cachetell-abs(App(Rec("f", Lam("x", App(Id("f"), Id("x")))), Num(0))).show(show).println
   // ((rec f (λ (n) (if0 n 1 (* n (f (- n 1)))))) 5)
-  // test-evtell-abs(App(Rec("f", Lam("n", If0(Id("n"), Num(1), Op2("*", Id("n"), App(Id("f"), Op2("-", Id("n"), Num(1))))))), Num(5))).show(show).println
+  test-cachetell-abs(doNormalize(App(Rec("f", Lam("n", If0(Id("n"), Num(1), Op2("*", Id("n"), App(Id("f"), Op2("-", Id("n"), Num(1))))))), Num(5)))).show(show).println
   // Should be 'N
   // ((rec f (λ (x) (if0 x 0 (if0 (f (- x 1)) 2 3)))) (+ 1 0))
   test-cachetell-abs(doNormalize(App(Rec("f", Lam("x", If0(Id("x"), Num(0), If0(App(Id("f"), Op2("-", Id("x"), Num(1))), Num(2), Num(3)) ))), Op2("+", Num(1), Num(0))))).show(show).println

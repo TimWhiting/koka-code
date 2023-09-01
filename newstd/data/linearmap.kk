@@ -1,18 +1,21 @@
-pub value struct linearMap<k,v>
+pub struct linearMap<k,v>
   pub list: list<(k,v)> 
   pub eq: some<e> (k, k) -> e bool
+  pub eqV: some<e> (v, v) -> e bool
+  pub showK: some<e> (k) -> e string
+  pub showV: some<e> (v) -> e string
 
-pub fun show(l: linearMap<k,v>, showK: (k) -> e string, showV: (v) -> e string): e string
-  "{" ++ l.list.show-list(fn(e) e.fst.showK ++ ": " ++ e.snd.showV) ++ "}"
+pub fun show(l: linearMap<k,v>): e string
+  "{" ++ l.list.show-list(fn(e) (l.showK)(e.fst) ++ ": " ++ (l.showV)(e.snd)) ++ "}"
 
-pub fun (==)(l1: linearMap<k,v>, l2: linearMap<k,v>, eqV: (v, v) -> e bool): e bool
+pub fun (==)(l1: linearMap<k,v>, l2: linearMap<k,v>): e bool
   l1.list.length == l2.list.length && l1.list.all fn(x) 
     match l2.maybeGet(x.fst)
-      Just(v') -> eqV(v', x.snd)
+      Just(v') -> (l1.eqV)(v', x.snd)
       Nothing -> False
 
-pub fun linearMap(l: list<(k,v)>, eq: (k, k) -> e bool): <> linearMap<k,v>
-  LinearMap(l, eq)
+pub fun linearMap(l: list<(k,v)>, eq: (k, k) -> e bool, eqV: (v, v) -> e bool, showK: (k) -> e string, showV: (v) -> e string): <> linearMap<k,v>
+  LinearMap(l, eq, eqV, showK, showV)
 
 pub fun containsKey(l: linearMap<k,v>, k: k): e bool
   l.list.any(fn((kk, _)) (l.eq)(kk, k))

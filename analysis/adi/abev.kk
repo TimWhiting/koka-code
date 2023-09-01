@@ -24,10 +24,10 @@ fun show(l: lattice<a>, showA: (a) -> e string): e string
     Bottom -> "⊥"
     Elem(a) -> showA(a)
 
-fun show(a: abvalue<a>, showA: (a) -> e string): <div|e> string
+fun show(a: abvalue<a>, showA: (a) -> <div|e> string): <div|e> string
   a.num.show(fn(s) s.show(show)) ++ " {" ++ a.clos.show(fn(s) s.list.show-list(fn(c) c.e.show)) ++ "}"
 
-fun show(s: list<(a, abvalue<a>)>, showA: (a) -> <> string): div string
+fun show(s: list<(a, abvalue<a>)>, showA: (a) -> <div|e> string): <div|e> string
   s.show-list(fn(t) t.show-tuple(showA, fn(s') s'.show(showA)))
 
 fun (==)(l1: lattice<a>, l2: lattice<a>, eqA: (a, a) -> <div|e> bool): <div|e> bool
@@ -37,21 +37,17 @@ fun (==)(l1: lattice<a>, l2: lattice<a>, eqA: (a, a) -> <div|e> bool): <div|e> b
     (Elem(a1), Elem(a2)) -> eqA(a1, a2)
     _ -> False
 
-fun (==)(v1: abvalue<a>, v2: abvalue<a>, eqA: (a, a) -> <div|e> bool): <div|e> bool
-  val numEq = (==)(v1.num, v2.num, fn(a1, a2) (==)(a1, a2, (==)))
-  if !numEq then return False
-  (==)(v1.clos, v2.clos, fn(m1, m2) m1 == m2)
-
-fun eqStore(s1: linearMap<int, abvalue<int>>, s2: linearMap<int, abvalue<int>>)
-  (==)(s1, s2, fn(av1, av2) (==)(av1, av2, (==)))
+fun (==)(v1: abvalue<a>, v2: abvalue<a>, eqA: (a, a) -> <div|e> bool, showA: (a) -> <div|e> string): <div|e> bool
+  with traceEq(v1, v2, fn(v: some<a> abvalue<a>) v.show(showA))
+  (==)(v1.num, v2.num, fn(a1, a2) (==)(a1, a2, (==)), fn(l) l.show(show)) && (==)(v1.clos, v2.clos, fn(m1, m2) m1 == m2, fn(m) m.show)
 
 fun eqConfig(c1: config, c2: config): div bool
-  c1.fst == c2.fst && c1.snd == c2.snd && eqStore(c1.thd, c2.thd)
+  c1.fst == c2.fst && c1.snd == c2.snd && c1.thd == c2.thd
 
-fun injectConcrete(c: evalue<a>, eqA: some<e> (a, a) -> e bool): abvalue<a>
+fun injectConcrete(c: evalue<a>, eqA: some<e> (a, a) -> <div|e> bool, showA: some<e> (a) -> <div|e> string): abvalue<a>
   match c
     NumV(i) -> Abvalue(Just(Elem(i)), Nothing)
-    ClosV(c) -> Abvalue(Nothing, Just(linearSet([c], fn(a, b) (==)(a, b, fn(p1, p2) (==)(p1, p2, eqA)))))
+    ClosV(c) -> Abvalue(Nothing, Just(linearSet([c], fn(a, b) (==)(a, b, fn(p1, p2) (==)(p1, p2, eqA, showA)), fn(s) s.show(fn(e) e.show(showA)))))
     ErrorV -> Abvalue(Nothing, Nothing)
 
 fun join(m1: maybe<a>, m2: maybe<a>, joinA: (a, a) -> e a): e maybe<a>
@@ -75,19 +71,20 @@ fun join(e: abvalue<a>, e': abvalue<a>): e abvalue<a>
   val clos = e.clos.join(e'.clos, fn(a, b) a + b)
   Abvalue(num, clos)
 
-val eqAddr = fn(a: int, b: int) a == b
-val showA = fn(i: int) show(i)  
-val eqAbsV = fn(e1: abvalue<int>, e2: abvalue<int>) (==)(e1, e2, fn(a1, a2) a1 == a2)
+val eqAbsV = fn(e1: abvalue<int>, e2: abvalue<int>) (==)(e1, e2, fn(a1, a2) a1 == a2, showA)
 val bottom = Abvalue(Nothing, Nothing)
+
+fun injC(c: evalue<int>): abvalue<int>
+  injectConcrete(c, eqAddr, showA)
 
 fun handleAbsValue(f)
   handle(f)
     ctl delta(op, e0, e1)
       match (op, e0, e1)
-        ("*", Abvalue(Just(Elem(v0)), _), Abvalue(Just(Elem(v1)), _)) -> resume(injectConcrete(NumV(v0 * v1), eqAddr))
-        ("+", Abvalue(Just(Elem(v0)), _), Abvalue(Just(Elem(v1)), _)) -> resume(injectConcrete(NumV(v0 + v1), eqAddr))
-        ("-", Abvalue(Just(Elem(v0)), _), Abvalue(Just(Elem(v1)), _)) -> resume(injectConcrete(NumV(v0 - v1), eqAddr))
-        ("/", Abvalue(Just(Elem(v0)), _), Abvalue(Just(Elem(v1)), _)) -> if v1 == 0 then fail() else resume(injectConcrete(NumV(v0 / v1), eqAddr))
+        ("*", Abvalue(Just(Elem(v0)), _), Abvalue(Just(Elem(v1)), _)) -> resume(injC(NumV(v0 * v1)))
+        ("+", Abvalue(Just(Elem(v0)), _), Abvalue(Just(Elem(v1)), _)) -> resume(injC(NumV(v0 + v1)))
+        ("-", Abvalue(Just(Elem(v0)), _), Abvalue(Just(Elem(v1)), _)) -> resume(injC(NumV(v0 - v1)))
+        ("/", Abvalue(Just(Elem(v0)), _), Abvalue(Just(Elem(v1)), _)) -> if v1 == 0 then fail() else resume(injC(NumV(v0 / v1)))
         ("*", Abvalue(Just(v0), _), Abvalue(Just(v1), _)) | v0.is-top || v1.is-top -> resume(topN)
         ("+", Abvalue(Just(v0), _), Abvalue(Just(v1), _)) | v0.is-top || v1.is-top -> resume(topN)
         ("-", Abvalue(Just(v0), _), Abvalue(Just(v1), _)) | v0.is-top || v1.is-top -> resume(topN)
@@ -104,11 +101,11 @@ fun handleAbsValue(f)
         _ -> False
     ctl closures(c)
       match c
-        Abvalue(_, Just(c')) -> c'.list.foldl(injectConcrete(ErrorV, eqAddr)) fn(acc:abvalue<int>, c2: clos<env<int>>) 
+        Abvalue(_, Just(c')) -> c'.list.foldl(injC(ErrorV)) fn(acc:abvalue<int>, c2: clos<env<int>>) 
           acc.join(resume(c2))
-        _ -> injectConcrete(ErrorV, eqAddr)
+        _ -> injC(ErrorV)
     fun inj(e1)
-      injectConcrete(e1, eqAddr)
+      injC(e1)
     fun traceR(r: abvalue<int>)
       r.show(showA).trace
       r
@@ -116,8 +113,8 @@ fun handleAbsValue(f)
     val eq-addr = eqAddr
 
 fun handle-store(f)
-  var store: linearMap<int, abvalue<int>> := linearMap([], eqAddr)
-  var xmap := linearMap([], fn(s1:string, s2:string) s1 == s2)
+  var store := linearMap([], eqAddr, fn(a:abvalue<int>, b:abvalue<int>) (==)(a, b, eqAddr, showA), showA, fn(v) v.show(showA))
+  var xmap: linearMap<string, int> := linearMap([], fn(s1:string, s2:string) s1 == s2, fn(i1:int, i2:int) i1 == i2, show, show)
   with handler
     fun ext(a, v)
       store := store.update(a, v, fn(o, n) o.join(n))
@@ -132,10 +129,8 @@ fun handle-store(f)
       match m
         Just(a) -> match store.maybeGet(a)
           Just(x) -> resume(x)
-          Nothing -> throw("Variable " ++ showA(a) ++ " not in the store " ++ store.show(showA, fn(v) show(v, showA)))
+          Nothing -> throw("Variable " ++ showA(a) ++ " not in the store " ++ store.show)
         Nothing -> throw("Unbound variable")
-    fun show-store()
-      store.show(showA, fn(v) show(v, show)).trace
     fun get-store()
       store
     fun put-store(s)
@@ -144,7 +139,7 @@ fun handle-store(f)
 
 fun test-abstract(f, e: expr)
   with handler 
-    final ctl fail() injectConcrete(ErrorV, eqAddr)
+    final ctl fail() injC(ErrorV)
   with handleAbsValue
   with default-env
   with handle-store

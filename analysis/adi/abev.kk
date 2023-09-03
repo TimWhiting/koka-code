@@ -71,49 +71,65 @@ fun join(e: abvalue<a>, e': abvalue<a>): e abvalue<a>
   val clos = e.clos.join(e'.clos, fn(a, b) a + b)
   Abvalue(num, clos)
 
+fun join(e: linearMap<int, abvalue<int>>, e': linearMap<int, abvalue<int>>): e linearMap<int,abvalue<int>>
+  e'.list.foldl(e) fn(acc, (k1, v1))
+    acc.set(k1, v1)
+
 val eqAbsV = fn(e1: abvalue<int>, e2: abvalue<int>) (==)(e1, e2, fn(a1, a2) a1 == a2, showA)
 val bottom = Abvalue(Nothing, Nothing)
 
 fun injC(c: evalue<int>): abvalue<int>
   injectConcrete(c, eqAddr, showA)
 
-fun handleAbsValue(f)
+fun handleAbsNdet(f)
   handle(f)
     ctl delta(op, e0, e1)
       match (op, e0, e1)
         ("*", Abvalue(Just(Elem(v0)), _), Abvalue(Just(Elem(v1)), _)) -> resume(injC(NumV(v0 * v1)))
         ("+", Abvalue(Just(Elem(v0)), _), Abvalue(Just(Elem(v1)), _)) -> resume(injC(NumV(v0 + v1)))
         ("-", Abvalue(Just(Elem(v0)), _), Abvalue(Just(Elem(v1)), _)) -> resume(injC(NumV(v0 - v1)))
-        ("/", Abvalue(Just(Elem(v0)), _), Abvalue(Just(Elem(v1)), _)) -> if v1 == 0 then fail() else resume(injC(NumV(v0 / v1)))
+        ("/", Abvalue(Just(Elem(v0)), _), Abvalue(Just(Elem(v1)), _)) -> if v1 == 0 then injC(ErrorV) else resume(injC(NumV(v0 / v1)))
         ("*", Abvalue(Just(v0), _), Abvalue(Just(v1), _)) | v0.is-top || v1.is-top -> resume(topN)
         ("+", Abvalue(Just(v0), _), Abvalue(Just(v1), _)) | v0.is-top || v1.is-top -> resume(topN)
         ("-", Abvalue(Just(v0), _), Abvalue(Just(v1), _)) | v0.is-top || v1.is-top -> resume(topN)
-        ("/", Abvalue(Just(v0), _), Abvalue(Just(v1), _)) | v0.is-top || v1.is-top -> fail().join(resume(topN))
-        ("-", _, _) -> fail()
-        ("*", _, _) -> fail()
-        ("+", _, _) -> fail()
-        ("/", _, _) -> fail()
+        ("/", Abvalue(Just(v0), _), Abvalue(Just(v1), _)) | v0.is-top || v1.is-top -> resume(topN)
+        ("-", _, _) -> injC(ErrorV)
+        ("*", _, _) -> injC(ErrorV)
+        ("+", _, _) -> injC(ErrorV)
+        ("/", _, _) -> injC(ErrorV)
         _ -> 
           throw("Unknown primitive operation " ++ op ++ " " ++ e0.show(showA) ++ " " ++ e1.show(showA))
-    fun zero(v)
+    ctl zero(v)
       match v
-        Abvalue(Just(Elem(0)), _) -> True
-        _ -> False
+        Abvalue(Just(Elem(0)), _) -> resume(True)
+        Abvalue(Just(_), _) -> resume(True).join(resume(False))
+        _ -> resume(False)
     ctl closures(c)
       match c
         Abvalue(_, Just(c')) -> c'.list.foldl(injC(ErrorV)) fn(acc:abvalue<int>, c2: clos<env<int>>) 
           acc.join(resume(c2))
         _ -> injC(ErrorV)
+    ctl get(m)
+      match m
+        Just(a) -> match get-store().maybeGet(a)
+          Just(x) -> resume(x)
+          Nothing -> throw("Variable " ++ showA(a) ++ " not in the store " ++ get-store().show)
+        Nothing -> throw("Unbound variable")
+
+fun handleAbsValue(f)
+  handle(f)
     fun inj(e1)
       injC(e1)
     fun traceR(r: abvalue<int>)
-      r.show(showA).trace
+      ("Result: " ++ r.show(showA)).trace
       r
     val show-addr = showA
     val eq-addr = eqAddr
 
+val emptyAbsStore = linearMap([], eqAddr, fn(a:abvalue<int>, b:abvalue<int>) (==)(a, b, eqAddr, showA), showA, fn(v) v.show(showA))
+
 fun handle-store(f)
-  var store := linearMap([], eqAddr, fn(a:abvalue<int>, b:abvalue<int>) (==)(a, b, eqAddr, showA), showA, fn(v) v.show(showA))
+  var store := emptyAbsStore
   var xmap: linearMap<string, int> := linearMap([], fn(s1:string, s2:string) s1 == s2, fn(i1:int, i2:int) i1 == i2, show, show)
   with handler
     fun ext(a, v)
@@ -125,23 +141,36 @@ fun handle-store(f)
           val a = store.list.length
           xmap := xmap.add(x, a)
           a
-    ctl get(m)
-      match m
-        Just(a) -> match store.maybeGet(a)
-          Just(x) -> resume(x)
-          Nothing -> throw("Variable " ++ showA(a) ++ " not in the store " ++ store.show)
-        Nothing -> throw("Unbound variable")
     fun get-store()
       store
     fun put-store(s)
       store := s
   f()
 
+fun evabs'(evx: (expr) -> <rinterp<int,abvalue<int>>|e> abvalue<int>): ((expr) -> <rinterp<int,abvalue<int>>|e> abvalue<int>)
+    fn(e:expr) 
+      with handleAbsNdet
+      with handler 
+        final ctl fail() injC(ErrorV)
+      mask behind<endet>
+        mask behind<fail>
+          ev(evx, e)
+
+fun evnormalabs(e)
+  fix(evabs')(e)
+
+fun doevtellabs(e)
+  fix(evtell(evabs'))(e)
+
+fun doevdeadabs(e)
+  fix(evdead(evabs'))(e)
+
 fun test-abstract(f, e: expr)
-  with handler 
-    final ctl fail() injC(ErrorV)
   with handleAbsValue
   with default-env
   with handle-store
+  with handler 
+    final ctl fail() injC(ErrorV)
+  with handleAbsNdet
   f(e)
 

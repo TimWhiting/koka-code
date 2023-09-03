@@ -47,11 +47,17 @@ fun show(c: clos<p>, showP: (p) -> <div|e> string): <div|e> string
 fun show(s: list<(a, evalue<a>)>, showA: (a) -> e string): e string
   s.show-list(fn(t) t.show-tuple(showA, show))
 
-effect primop<a, s, p>
+effect endet<a, s, p>
   ctl delta(op: string, e0: s, e1: s): s
-  fun zero(v: s): bool
-  fun inj(v: evalue<a>): s 
+  ctl zero(v: s): bool
   ctl closures(v: s): clos<p>
+  ctl get(m: maybe<a>): s
+
+effect fail<s>
+  ctl fail(): s
+
+effect primop<a, s>
+  fun inj(v: evalue<a>): s 
   val show-addr: ((a) -> string)
   val eq-addr: (some<e> (a,a) -> e bool)
   fun traceR(r: s): s
@@ -60,17 +66,13 @@ effect eenv<a, p>
   fun ask-env(): p 
   fun find-env(s: string): maybe<a>
 
-effect estore<a, s, p>
+effect estore<a, s>
   fun alloc(x: string): a
   fun ext(a: a, v: s): ()
-  ctl get(m: maybe<a>): s
   fun get-store(): linearMap<a, s>
   fun put-store(s: linearMap<a, s>): ()
 
-effect fail<s>
-  ctl fail(): s
-
-alias rinterp<a,s> = <exn,div,fail<s>,primop<a,s,env<a>>,eenv<a,env<a>>,estore<a,s,env<a>>>
+alias rinterp<a,s> = <exn,div,primop<a,s>,eenv<a,env<a>>,estore<a,s>,endet<a,s,env<a>>,fail<s>>
 
 fun local-env(env: env<a>, f: () -> <rinterp<a,s>|e> s): <rinterp<a,s>|e> s
   with override
@@ -124,8 +126,11 @@ fun ev(ev: (expr) -> <rinterp<a,s>|e> s, e: expr): <rinterp<a,s>|e> s
         ext(a, v0)
         e1.map(fn(e') local-env(Cons((x, a), ask-env()), fn() ev(e'))).last.unjust
 
-fun ev'(evx: (expr) -> <rinterp<a,s>|e> s): ((expr) -> <rinterp<a,s>|e> s)
-  fn(e:expr) ev(evx, e)
+fun ev'(evx: (expr) -> <rinterp<a,evalue<a>>|e> evalue<a>): ((expr) -> <rinterp<a,evalue<a>>|e> evalue<a>)
+    fn(e:expr) 
+      with handleNdet
+      mask behind<endet>
+        ev(evx, e)
 
 fun evnormal(e)
   fix(ev')(e)
@@ -138,7 +143,6 @@ fun evtell(ev0)
     fn(e)
       tell((e, ask-env(), get-store()))
       ev0(ev)(e)
-      
 
 fun doevtell(e)
   fix(evtell(ev'))(e)
@@ -159,11 +163,7 @@ fun doevdead(e)
 val eqAddr = fn(a: int, b: int) a == b
 val showA = fn(i: int) show(i)
 
-fun test-concrete(f: ((expr) -> <rinterp<int,evalue<int>>|e> evalue<int>), e: expr): <div,exn|e> evalue<int>
-  var env := []
-  var store := linearMap([], eqAddr, fn(a:evalue<int>, b:evalue<int>) (==)(a, b, eqAddr, showA), showA, show)
-  with handler 
-    final ctl fail() ErrorV
+fun handleNdet(f)
   with handler
     ctl delta(op, e0, e1)
       match (op, e0, e1)
@@ -172,14 +172,26 @@ fun test-concrete(f: ((expr) -> <rinterp<int,evalue<int>>|e> evalue<int>), e: ex
         ("-", NumV(v0), NumV(v1)) -> resume(NumV(v0 - v1))
         ("/", NumV(v0), NumV(v1)) -> if v1 == 0 then fail() else resume(NumV(v0 / v1))
         _ -> throw("Unknown primitive operation " ++ op)
-    fun zero(v)
-      match v
-        NumV(0) -> True
-        _ -> False
     ctl closures(c)
       match c
         ClosV(c') -> resume(c')
         _ -> fail()
+    fun zero(v)
+      match v
+        NumV(0) -> True
+        _ -> False
+    fun get(m)
+      match m
+        Just(a) -> match get-store().maybeGet(a)
+          Just(x) -> x
+          Nothing -> throw("Variable " ++ show-addr(a) ++ " not in the store") 
+        Nothing -> throw("Unbound variable")
+  f()
+
+fun test-concrete(f: ((expr) -> <rinterp<int,evalue<int>>|e> evalue<int>), e: expr): <div,exn|e> evalue<int>
+  var env := []
+  var store := linearMap([], eqAddr, fn(a:evalue<int>, b:evalue<int>) (==)(a, b, eqAddr, showA), showA, show)
+  with handler
     fun inj(e1)
       e1
     fun traceR(r:evalue<int>)
@@ -198,15 +210,11 @@ fun test-concrete(f: ((expr) -> <rinterp<int,evalue<int>>|e> evalue<int>), e: ex
       a
     fun ext(a, v)
       store := store.update(a, v, fn(_, n) n)
-    ctl get(m)
-      match m
-        Just(a) -> match store.maybeGet(a)
-          Just(x) -> resume(x)
-          Nothing -> throw("Variable " ++ a.show ++ " not in the store") 
-        Nothing -> throw("Unbound variable")
     fun get-store()
       store
     fun put-store(s)
       store := s
-  mask<local>
-    f(e)
+  with handler
+    final ctl fail() ErrorV
+  with handleNdet
+  f(e)

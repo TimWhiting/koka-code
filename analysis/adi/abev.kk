@@ -147,23 +147,24 @@ fun handle-store(f)
       store := s
   f()
 
-fun evabs'(evx: (expr) -> <rinterp<int,abvalue<int>>|e> abvalue<int>): ((expr) -> <rinterp<int,abvalue<int>>|e> abvalue<int>)
-    fn(e:expr) 
+fun evabs(ev0)
+  fn (ev)
+    fn(e)
       with handleAbsNdet
       with handler 
         final ctl fail() injC(ErrorV)
       mask behind<endet>
         mask behind<fail>
-          ev(evx, e)
+          ev0(ev)(e)
 
 fun evnormalabs(e)
-  fix(evabs')(e)
+  fix(evabs(ev'))(e)
 
 fun doevtellabs(e)
-  fix(evtell(evabs'))(e)
+  fix(evtell(evabs(ev')))(e)
 
 fun doevdeadabs(e)
-  fix(evdead(evabs'))(e)
+  fix(evdead(evabs(ev')))(e)
 
 fun test-abstract(f, e: expr)
   with handleAbsValue
@@ -171,6 +172,6 @@ fun test-abstract(f, e: expr)
   with handle-store
   with handler 
     final ctl fail() injC(ErrorV)
-  with handleAbsNdet
+  with defaultNdet
   f(e)
 

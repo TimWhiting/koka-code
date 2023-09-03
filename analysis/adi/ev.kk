@@ -126,14 +126,22 @@ fun ev(ev: (expr) -> <rinterp<a,s>|e> s, e: expr): <rinterp<a,s>|e> s
         ext(a, v0)
         e1.map(fn(e') local-env(Cons((x, a), ask-env()), fn() ev(e'))).last.unjust
 
-fun ev'(evx: (expr) -> <rinterp<a,evalue<a>>|e> evalue<a>): ((expr) -> <rinterp<a,evalue<a>>|e> evalue<a>)
-    fn(e:expr) 
-      with handleNdet
-      mask behind<endet>
-        ev(evx, e)
+fun ev'(evx: (expr) -> <rinterp<a,s>|e> s): ((expr) -> <rinterp<a,s>|e> s)
+  fn(e:expr) 
+    ev(evx, e)
 
-fun evnormal(e)
-  fix(ev')(e)
+fun evnormal(ev0)
+  fn (ev)
+    fn(e)
+      with handleNdet
+      with handler final ctl fail()
+        ErrorV
+      mask behind<endet>
+        mask behind<fail>
+          ev0(ev)(e)
+
+fun doevnormal(e)
+  fix(evnormal(ev'))(e)
 
 effect tell<a>
   fun tell(e: a): ()
@@ -145,7 +153,7 @@ fun evtell(ev0)
       ev0(ev)(e)
 
 fun doevtell(e)
-  fix(evtell(ev'))(e)
+  fix(evtell(evnormal(ev')))(e)
 
 effect evdead
   fun get-dead(): linearSet<expr>
@@ -158,10 +166,22 @@ fun evdead(ev0)
       ev0(ev)(e)
 
 fun doevdead(e)
-  fix(evdead(ev'))(e)
+  fix(evdead(evnormal(ev')))(e)
 
 val eqAddr = fn(a: int, b: int) a == b
 val showA = fn(i: int) show(i)
+
+fun defaultNdet(f)
+  with handler
+    fun delta(op, e0, e1)
+      throw("Unhandled")
+    fun closures(s)
+      throw("Unhandled")
+    fun zero(v)
+      throw("Unhandled")
+    fun get(a)
+      throw("Unhandled")
+  f()
 
 fun handleNdet(f)
   with handler
@@ -216,5 +236,5 @@ fun test-concrete(f: ((expr) -> <rinterp<int,evalue<int>>|e> evalue<int>), e: ex
       store := s
   with handler
     final ctl fail() ErrorV
-  with handleNdet
+  with defaultNdet
   f(e)

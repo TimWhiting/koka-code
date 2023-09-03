@@ -132,10 +132,10 @@ fun mlfp(f: (abcache) -> <div|e> abcache, x:abcache = emptyCache): <div|e> abcac
     mlfp(f, x')
 
 fun docacheev(e)
-  fix(evcache(evabs'))(e)
+  fix(evcache(evabs(ev')))(e)
 
 fun docachetell(e)
-  fix(evtell2(evcache(evabs')))(e)
+  fix(evtell2(evcache(evabs(ev'))))(e)
 
 fun evtell2(ev0)
   fn(ev)

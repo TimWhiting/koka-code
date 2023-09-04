@@ -151,9 +151,11 @@ fun evabs(ev0)
   fn (ev)
     fn(e)
       with handleAbsNdet
+      // with handle-store
       with handler 
         final ctl fail() injC(ErrorV)
       mask behind<endet>
+        // mask behind<estore>
         mask behind<fail>
           ev0(ev)(e)
 

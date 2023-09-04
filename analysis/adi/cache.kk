@@ -140,6 +140,12 @@ fun docachetell(e)
 fun evtell2(ev0)
   fn(ev)
     fn(e)
-      tell((e, ask-env(), get-store()))
-      traceR(ev0(ev)(e))
+      with override
+        fun tell(e', d)
+          tell(e', d)
+        fun tellResult(e', d)
+          tellResult(e', d)
+        val expressionDepth = expressionDepth + 1
+      tell((e, ask-env(), get-store()), expressionDepth)
+      tellResult(ev0(ev)(e), expressionDepth)
       

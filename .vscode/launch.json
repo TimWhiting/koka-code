@@ -6,10 +6,11 @@
   "configurations": [
     {
       "name": "Debug",
-      "type": "gdb",
+      "type": "lldb-mi",
       "request": "launch",
-      "target": "./.koka/v2.4.2/gcc-debug/scratch_testbroken",
+      "target": "./.koka/v2.4.3/clang-debug/scratch_testh",
       "cwd": "${workspaceRoot}",
+      "lldbmipath": "/Users/timwhiting/.vscode/extensions/ms-vscode.cpptools-1.17.5-darwin-x64/debugAdapters/lldb-mi/bin/lldb-mi",
       "valuesFormatting": "parseText",
       "stopAtEntry": true
     }

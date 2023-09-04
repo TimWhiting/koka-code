@@ -143,14 +143,22 @@ fun evnormal(ev0)
 fun doevnormal(e)
   fix(evnormal(ev'))(e)
 
-effect tell<a>
-  fun tell(e: a): ()
+effect tell<a,s>
+  fun tell(e: a, indent: int): ()
+  fun tellResult(e: s, indent: int): s
+  val expressionDepth: int
 
 fun evtell(ev0)
   fn(ev)
     fn(e)
-      tell((e, ask-env(), get-store()))
-      ev0(ev)(e)
+      with override
+        fun tell(e', d)
+          tell(e', d)
+        fun tellResult(e', d)
+          tellResult(e', d)
+        val expressionDepth = expressionDepth + 1
+      tell((e, ask-env(), get-store()), expressionDepth)
+      tellResult(ev0(ev)(e), expressionDepth)
 
 fun doevtell(e)
   fix(evtell(evnormal(ev')))(e)

@@ -147,11 +147,32 @@ fun handle-store(f)
       store := s
   f()
 
+fun handle-store2(f)
+  var store: linearMap<int, abvalue<int>> := get-store()
+  var xmap: linearMap<string, int> := linearMap([], fn(s1:string, s2:string) s1 == s2, fn(i1:int, i2:int) i1 == i2, show, show)
+  val x = handle({mask behind<estore>{f()}})
+    fun ext(a, v)
+      store := store.update(a, v, fn(o, n) o.join(n))
+    fun alloc(x)
+      match xmap.maybeGet(x)
+        Just(a) -> a
+        Nothing ->
+          val a = store.list.length
+          xmap := xmap.add(x, a)
+          a
+    fun get-store() 
+      store
+    fun put-store(s)
+      store := s
+  put-store(store)
+  x
+  
+
 fun evabs(ev0)
   fn (ev)
     fn(e)
       with handleAbsNdet
-      // with handle-store
+      with handle-store2
       with handler 
         final ctl fail() injC(ErrorV)
       mask behind<endet>

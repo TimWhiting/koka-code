@@ -13,6 +13,18 @@
       "lldbmipath": "/Users/timwhiting/.vscode/extensions/ms-vscode.cpptools-1.17.5-darwin-x64/debugAdapters/lldb-mi/bin/lldb-mi",
       "valuesFormatting": "parseText",
       "stopAtEntry": true
+    },
+    {
+      "type": "koka",
+      "request": "launch",
+      "program": "${workspaceRoot}/analysis/adi/main",
+      "name": "Analysis"
+    },
+    {
+      "type": "koka",
+      "request": "launch",
+      "program": "${workspaceRoot}/teststd/data/linearset",
+      "name": "StdData Tests"
     }
   ]
 }

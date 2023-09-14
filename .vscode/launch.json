@@ -18,7 +18,8 @@
       "type": "koka",
       "request": "launch",
       "program": "${workspaceRoot}/analysis/adi/main",
-      "name": "Analysis"
+      "name": "Analysis",
+      "args": "-O2"
     },
     {
       "type": "koka",

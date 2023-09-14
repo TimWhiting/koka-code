@@ -25,6 +25,13 @@
       "request": "launch",
       "program": "${workspaceRoot}/teststd/data/linearset",
       "name": "StdData Tests"
+    },
+    {
+      "type": "koka",
+      "request": "launch",
+      "program": "scratch/test2",
+      "name": "scratch/test2",
+      "args": "-O2"
     }
   ]
 }

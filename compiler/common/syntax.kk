@@ -50,7 +50,7 @@ fun (==)(j1: jsTarget, j2: jsTarget): bool
     (JsWeb, JsWeb) -> True
     _ -> False
 
-fun (==)(t1: target, t2: target): bool
+pub fun (==)(t1: target, t2: target): bool
   match (t1, t2)
     (CS, CS) -> True
     (JS(j1), JS(j2)) -> j1 == j2

@@ -6,6 +6,7 @@ import compiler/common/range
 import compiler/type/type
 import compiler/type/kind
 import compiler/kind/kind
+import newstd/data/linearset
 
 fun isUnit(e: expr): bool
   match e
@@ -569,7 +570,41 @@ fun getEffect(e: expr): keffect
     Lam(_, eff, _) -> eff
     TypeLam(_, Lam(_, eff, _)) -> eff
     _ -> effectEmpty
+
+// Generic traversals
+
+fun foldMap(e: expr, acc: expr -> e ctx<a>): e ctx<a>
+  match e
+    Lam(_, _, b) -> acc(e) ++ foldMap(b, acc)
+    Var -> acc(e)
+    App(f, args) -> args.foldl(acc(e) ++ foldMap(f, acc), fn(s, a) s ++ acc(a))
+    TypeLam(_, b) -> acc(e) ++ foldMap(b, acc)
+    TypeApp(f, _) -> acc(e) ++ foldMap(f, acc)
+    Con -> acc(e)
+    ELit -> acc(e)
+    Let(binders, body) -> binders.flatten.foldl(acc(e), fn(s, a) s ++ acc(a.expr)) ++ foldMap(body, acc)
+    Case(cases, branches) -> branches.foldl(cases.foldl(acc(e), fn(s, a) s ++ acc(a)), fn(s, b) b.guards.foldl(s, fn(s', g) s' ++ acc(g.test) ++ acc(g.expr)))
+
+effect efind
+  final ctl found(e: expr): a
+
+fun anySubExpr(e, f)
+  with handler 
+    final ctl found(ex) Just(ex)
+    return(x) Nothing
+  val c = ctx _
+  e.foldMap(fn(a) if f(a) then found(e) else c)
+
+
 // TODO: More here
+
+// Type variables
+val tnamesEmpty = linearSet([], fn(a, b) a.getName == b.getName, fn(a) a.show)
+fun tnames(l: list<tName>): linearSet<tName>
+  linearSet(l, fn(a, b) a.getName == b.getName, fn(a) a.show)
+
+fun (>)(t1: tName, t2: tName): bool
+  name/compare(t1.getName, t2.getName) == Gt
 
 fun makeLet(defs: list<defGroup>, expr: expr): expr
   match defs
@@ -578,6 +613,56 @@ fun makeLet(defs: list<defGroup>, expr: expr): expr
       Let(defs', body) -> Let(defs ++ defs', body)
       _ -> Let(defs, expr)
 
+fun makeTypeApp(e: expr, l: list<ktype>): expr
+  match l
+    Nil -> e
+    _ -> match e
+      TypeApp(e, l') -> TypeApp(e, l ++ l')
+      _ -> TypeApp(e, l)
+
+fun addApps(l: list<expr>, e: expr)
+  match l
+    Nil -> e
+    _ -> match e
+      App(e, l') -> App(e, l ++ l')
+      _ -> App(e, l)
+
+fun addTypeApps(l: list<typeVar>, e: expr)
+  match l
+    Nil -> e
+    _ -> match e
+      TypeApp(e', l') -> TypeApp(e', l' ++ l.map(TVar))
+      _ -> TypeApp(e, l.map(TVar))
+
+fun addTypeLambdas(l: list<typeVar>, e: expr)
+  match l
+    Nil -> e
+    _ -> match e
+      TypeLam(l', e') -> TypeLam(l ++ l', e')
+      _ -> TypeLam(l, e)
+
+fun addLambdas(l: list<(name, ktype)>, effT: ktype, e: expr)
+  match l
+    Nil -> e
+    _ -> match e
+      Lam(l', _, e') -> Lam(l.map(fn((n, t)) TName(n, t)) ++ l', effT, e')
+      _ -> Lam(l.map(fn((n, t)) TName(n, t)), effT, e)
+
+fun addLambdas(l: list<tName>, effT: ktype, e: expr)
+  match l
+    Nil -> e
+    _ -> match e
+      Lam(l', _, e') -> Lam(l ++ l', effT, e')
+      _ -> Lam(l, effT, e)
+
+fun addNonRec(x: name, tp: ktype, e: expr, e': expr)
+  Let([DefNonRec(Def(x, tp, e, Private, if e.isValue then DefVal else DefFun([]), InlineAuto, rangeNull, ""))], e')
+
+fun isValue(e: expr): bool
+  match e
+    TypeLam(_, Lam) -> False
+    Lam -> False
+    _ -> True
 // TODO: More here
 
 

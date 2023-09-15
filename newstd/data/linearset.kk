@@ -44,6 +44,12 @@ pub fun (-)(l: linearSet<v>, l2: linearSet<v>): e linearSet<v>
 pub fun (-)(l: linearSet<v>, l2: list<v>): e linearSet<v>
   val lnew = linearSet(l2, l.eq, l.showE)
   l(list=l.list.filter(fn(x) !lnew.member(x)))
+
+pub fun intersection(l1: linearSet<v>, l2: linearSet<v>): e linearSet<v>
+  l1(list=l1.list.filter(fn(x) l2.member(x)))
+
+pub fun disjoint(l1: linearSet<v>, l2: linearSet<v>): bool
+  l1.intersection(l2).list.is-nil
 // pub fun main()
 //   val s = linearSet([1, 2, 3], (==))
 //   val s2 = linearSet([2, 3, 4], (==))

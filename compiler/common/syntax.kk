@@ -192,7 +192,7 @@ fun valueReprScan(n: int)
   ValueRepr(0,n,0)
 
 type defSort
-  DefFun(param: list<paramInfo>, fip: fipT)
+  DefFun(param: list<paramInfo>, fip: fipT=noFip)
   DefVal
   DefVar
 

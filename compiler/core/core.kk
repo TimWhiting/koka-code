@@ -1,8 +1,10 @@
 import std/num/float64
 import compiler/common/syntax
 import compiler/common/name
+import compiler/common/name-prim
 import compiler/common/range
 import compiler/type/type
+import compiler/kind/kind
 
 fun isUnit(e: expr): bool
   match e
@@ -19,7 +21,7 @@ fun isFalse(e: expr): bool
     Con(name) | name.getName == nameFalse -> True
     _ -> False
 
-val exprUnit = Con(TName(nameUnit, typeUnit), ConEnum(nameTpUnit, DataEnum, valueRepZero, 0))
+val exprUnit = Con(TName(nameUnit, typeUnit), ConEnum(nameTpUnit, DataEnum, valueReprZero, 0))
 
 val pEFalse = patExprBool(nameFalse, 0)
 val patFalse = pEFalse.fst
@@ -30,15 +32,35 @@ val patTrue = pETrue.fst
 val exprTrue = pETrue.snd
 
 fun patExprBool(n: name, t: int): (pattern, expr)
-  val name = TName(n, typeBool)
-  val conEnum = ConEnum(nameTpBool, DataEnum, valueRepZero, t)
-  val conInfo = ConInfo(name, nameTpBool, [], [], [], TFun([], typeTotal, typeBool), Inductive, rangeNull, [], [], False)
-  val pat = PCon(name, [], conEnum, [], [], typeBool, conInfo, False)
-  val expr = Con(name, conEnum)
+  val tname = TName(n, typeBool)
+  val conEnum = ConEnum(nameTpBool, DataEnum, valueReprZero, t)
+  val conInfo = ConInfo(n, nameTpBool, [], [], [], TFun([], typeTotal, typeBool), Inductive, rangeNull, [], [], False, [], valueReprZero, Public, "")
+  val pat = PatCon(tname, [], conEnum, [], [], typeBool, conInfo, False)
+  val expr = Con(tname, conEnum)
   (pat, expr)
 
 fun makeIfExpr(p: expr, t: expr, f: expr): expr
   Case([p], [Branch([patTrue], [Guard(exprTrue, t)]), Branch([patFalse], [Guard(exprFalse, f)])])
+
+fun makeVector(tp: ktype, exprs: list<expr>): expr
+  val a = TypeVar(0, kindStar, Bound)
+  val vectorFromList = Var(TName(nameVector, TForAll([a], [], TFun([(nameNil, TApp(typeList, [TVar(a)]))], typeTotal, TApp(typeVector, [TVar(a)])))), InfoArity(1, 1))
+  App(TypeApp(vectorFromList, [tp]), [makeList(tp, exprs)])
+
+fun makeList(tp: ktype, exprs: list<expr>): expr
+  val a = TypeVar(0, kindStar, Bound)
+  val nilTp = TForAll([a], [], TApp(typeList, [TVar(a)]))
+  val nilCon = Con(TName(nameNull, nilTp), ConSingleton(nameTpList, DataAsList, valueReprZero, 0))
+  val nil = TypeApp(nilCon, [tp])
+  val consTp = TForAll([a], [], TFun([(nameNil, TVar(a)), (nameNil, TApp(typeList, [TVar(a)]))], typeTotal, TApp(typeList, [TVar(a)])))
+  val consCon = Con(TName(nameCons, consTp), ConAsCons(nameTpList, DataAsList, valueReprScan(2), nameNil, CtxNone, 2))
+  fun cons(expr, xs)
+    App(TypeApp(consCon, [tp]), [expr, xs])
+  exprs.foldr(nil, cons)
+
+// fun makeDef(name: name, expr: expr): def
+//   Def(name, typeOf(expr), expr, Private, DefVal, InlineNever, rangeNull, "")
+
 
 struct core
   name: name
@@ -149,12 +171,16 @@ type conRepr
   ConIso(name: name, repr: dataRepr, valueRepr: valueRepr, tag: int) // one constructor with one field
   ConSingleton(name: name, repr: dataRepr, valueRepr: valueRepr, tag: int) // constructor without fields (and not part of an enum)
   ConSingle(name: name, repr: dataRepr, valueRepr: valueRepr, tag: int) // there is only one constructor and it is not iso or singleton (and this is it)
-  ConAsJust(name: name, repr: dataRepr, valueRepr: valueRepr, asNothing: name, tag: int) // constructor is the just node of a maybe-like datatype  (only use for DataAsMaybe, not for DataStructAsMaybe)
+  ConAsJust(name: name, repr: dataRepr, valueRepr: valueRepr, ctxPath: ctxPath, asNothing: name, tag: int) // constructor is the just node of a maybe-like datatype  (only use for DataAsMaybe, not for DataStructAsMaybe)
   ConStruct(name: name, repr: dataRepr, valueRepr: valueRepr, tag: int) // constructor as value type
-  ConAsCons(name: name, repr: dataRepr, valueRepr: valueRepr, asNil: name, tag: int) // constructor is the cons node of a list-like datatype  (may have one or more fields)
-  ConOpen(name: name, repr: dataRepr, valueRepr: valueRepr) // constructor of open data type
-  ConNormal(name: name, repr: dataRepr, valueRepr: valueRepr, tag: int); // a regular constructor
-  
+  ConAsCons(name: name, repr: dataRepr, valueRepr: valueRepr, asNil: name, ctxPath: ctxPath, tag: int) // constructor is the cons node of a list-like datatype  (may have one or more fields)
+  ConOpen(name: name, repr: dataRepr, valueRepr: valueRepr, ctxPath: ctxPath) // constructor of open data type
+  ConNormal(name: name, repr: dataRepr, valueRepr: valueRepr, ctxPath: ctxPath, tag: int); // a regular constructor
+
+type ctxPath
+  CtxNone
+  CtxField(name: tName)
+
 // Value data is not heap allocated and needs no header
 fun isValue(d: dataRepr): bool
   match d
@@ -256,3 +282,40 @@ value struct tName
   tNameType: ktype
 
 
+fun typeOf(tname: tName): ktype
+  tname.tNameType
+
+fun typeOf(expr: expr): pure ktype
+  match expr
+    Lam(pars, eff, expr) -> TFun(pars.map(fn((TName(name, tp))) (name, tp)), eff, expr.typeOf)
+    Var(tname) -> typeOf(tname)
+    Con(tname) -> typeOf(tname)
+    App(f, args) -> match f.typeOf.splitFunScheme
+      Just((_, _, targs, eff, tres)) 
+        | args.length == targs.length || targs.length == 0 -> tres
+        | args.length > targs.length -> typeOf(App(Var(TName("tmp".newName, tres), InfoNone), args.drop(targs.length)))
+        | True -> TFun(targs.drop(args.length), eff, tres)
+      _ -> throw("core/core typeOf(App..) Expected function TODO: Show real type")
+    TypeLam(xs, expr) -> TForAll(xs, [], expr.typeOf)
+    TypeApp(expr, []) -> expr.typeOf
+    // TypeApp(expr, tps) ->
+    //   val (tvs, tp1) = expr.typeOf.splitTForall
+    //   tvs.zip(tps).subNew(tp1)
+    ELit(l) -> l.typeOf
+    Let(_, expr) -> expr.typeOf
+    Case(_, branches) -> branches.head.unjust.typeOf
+
+fun typeOf(Branch(_, guards): branch): pure ktype
+    match guards
+      Cons(g, _) -> g.typeOf
+      _ -> throw("core/core typeOf(Branch..) branch with no guards")
+
+fun typeOf(Guard(_, expr): guard): pure ktype
+  expr.typeOf
+
+fun typeOf(l: lit): ktype
+  match l
+    LitInt(_) -> typeInt
+    LitFloat(_) -> typeFloat
+    LitChar(_) -> typeChar
+    LitString(_) -> typeString

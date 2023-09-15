@@ -164,7 +164,7 @@ fun isMixed(v: valueRepr): bool
 fun isRaw(v: valueRepr): bool
   v.rawSize > 0 && v.scanCount == 0
 
-val valueReprZero = ValueRepr(0,0,0)
+pub val valueReprZero = ValueRepr(0,0,0)
 fun valueReprRaw(m: int)
   ValueRepr(m,0,m)
 fun valueReprScan(n: int)

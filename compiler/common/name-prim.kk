@@ -110,17 +110,22 @@ val nameTpMDict     = nameDict.qualify("mdict".newName)
 val nameTpDict      = nameDict.qualify("dict".newName)
 val nameTpBuilder   = ("std/text/string").newName.qualify("builder".newName)
 
-val nameTpCTailAcc    = "ctail".cfieldName
-val nameTpCField      = "cfield".cfieldName
-val nameCFieldHole    = ".cfield-hole".cfieldName
-val nameCFieldOf      = ".cfield-of".cfieldName
-val nameCTailUnit     = ".ctail-unit".cfieldName
-val nameCTailCompose  = ".ctail-compose".cfieldName
-val nameCTailApply    = ".ctail-apply".cfieldName
-val nameCTailSetCtxPath=".ctail-set-context-path".cfieldName
-
 fun cfieldName(n: string): name
   n.coreTypesName()
+
+val nameTpCCtxx    = "cctx".cfieldName
+val nameTpCCtx      = "ctx".cfieldName
+val nameCCtxCreate    = ".cctx-create".cfieldName
+val nameCCtxHoleCreate      = ".cctx-hole-create".cfieldName
+val nameCCtxExtend = ".cctx-extend".cfieldName
+val nameCCtxComposeExtend = ".cctx-compose-extend".cfieldName
+val nameCCtxEmpty = ".cctx-empty".cfieldName
+val nameCCtxSetCtxPath = ".cctx-setcp".cfieldName
+val nameCCtxApply = "([])".cfieldName
+val nameCCtxCompose = "(++)".cfieldName
+val nameTpFieldAddr = "field-addr".cfieldName
+val nameTpFieldAddrOf = ".field-addr-of".cfieldName
+
 
 // std/core/hnd
 val nameTpHTag      = "htag".coreHndName

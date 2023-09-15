@@ -1,4 +1,4 @@
-fun sortBy(l: list<a>, comp: (a, a) -> order): list<a>
+fun sortBy(l: list<a>, comp: (a, a) -> e order): e list<a>
   match l
     Nil -> Nil
     Cons(h, Nil) -> Cons(h, Nil)

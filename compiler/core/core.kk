@@ -50,7 +50,7 @@ struct core
   doc: string;
 
 alias fixDefs = list<fixDef>;
-type fixDef
+value type fixDef
   FixDef(name: name, fixity: fixity);
 
 alias kimports = list<kimport>;
@@ -130,7 +130,7 @@ pub fun vis(t: typeDef): visibility
 
 // TODO: Flatten ?? Is this needed
 
-type dataRepr
+value type dataRepr
   DataEnum // only singletons (as an enumeration)
   DataIso // only one constructor with one field  (isomorpic)
   DataSingleStruct // only one constructor (no tag needed)
@@ -251,7 +251,7 @@ type varInfo
   InfoReuse(p: pattern) 
   InfoConField(cName: tName, fName: tName) // constructor name, field name
 
-struct tName
+value struct tName
   getName: name
   tNameType: ktype
 

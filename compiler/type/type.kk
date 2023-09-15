@@ -157,7 +157,7 @@ fun isSkolem(t: typeVar): bool
 
 fun predType(p: pred): compilerEff ktype
   match p
-    PredSub(t1, t2) -> typeFun([("sub".newName, t1)], typeTotal, t2)
+    PredSub(t1, t2) -> TFun([("sub".newName, t1)], typeTotal, t2)
     PredIFace(_, _) -> todo("type.kk: predType")
 
 fun mustSplit(tp)
@@ -186,7 +186,7 @@ fun expandSyn(tp: ktype): ktype
     TSyn(_, _, t) -> expandSyn(t)
     _ -> tp
 
-fun canonicalForm(tp: ktype): ktype
+fun canonicalForm(tp: ktype): pure ktype
   match tp
     TSyn(_, _, t) -> canonicalForm(t)
     TForAll(vars, preds, t) -> TForAll(vars, preds, canonicalForm(t))
@@ -195,28 +195,174 @@ fun canonicalForm(tp: ktype): ktype
     _ -> tp
 
 // Removes names from function arguments
-fun minimalForm(tp: ktype): ktype
+fun minimalForm(tp: ktype): pure ktype
   match tp
-    TSyn -> t.canonicalForm
+    TSyn -> tp.canonicalForm
     TForAll(vars, preds, t) -> TForAll(vars, preds, t.canonicalForm)
     TApp(t, ts) -> TApp(t.canonicalForm, ts.map(canonicalForm))
-    TFun(args, eff, res) -> TFun(args.map(fn((name, t)) (nameNull, t.canonicalForm)), orderEffect(eff.canonicalForm), res.canonicalForm)
+    TFun(args, eff, res) -> TFun(args.map(fn((_, t)) (nameNull, t.canonicalForm)), orderEffect(eff.canonicalForm), res.canonicalForm)
 
-// TODO:
+// Create a type scheme from a list of quantifiers
+fun makeScheme(vars: list<typeVar>, rho: rho): scheme
+  val (vars0, preds, t) = rho.splitPredType
+  TForAll(vars ++ vars0, preds, rho)
 
-fun typeFun(args: list<(name, ktype)>, eff: ktype, res: ktype): ktype
-  TFun(args, eff, res)
+fun quantifyType(vars: list<typeVar>, tp: scheme): scheme
+  val (vars0, preds, rho) = tp.splitPredType
+  TForAll(vars ++ vars0, preds, rho)
 
+fun qualifyType(preds: list<pred>, tp: scheme): scheme
+  val (vars, preds0, rho) = tp.splitPredType
+  TForAll(vars, preds ++ preds0, rho)
 
-val typeTotal = TCon(tconTotal)
-val tconTotal = TypeCon(nameEffectEmpty, kindEffect)
+fun applyType(tp1: ktype, tp2: ktype): ktype
+  match tp1
+    TApp(tp, tps) -> TApp(tp, tps ++ [tp2])
+    TSyn(_, _, tp) | tp.mustSplit -> applyType(tp, tp2)
+    _ -> TApp(tp1, [tp2])
 
-fun isTypeTotal(t: tau): bool
-  match t
-    TCon(c) -> c == tconTotal
+fun getTypeArities(tp: ktype): (int, int)
+  match tp.splitFunScheme
+    Just((tvars, _, pars, _, _)) -> (tvars.length, pars.length)
+    Nothing -> (0, 0)
+
+fun splitFunScheme(tp: scheme): maybe<(list<typeVar>, list<pred>, list<(name, tau)>, keffect, tau)>
+  val (tvars, preds, rho) = tp.splitPredType
+  match rho.splitFunType
+    Just((pars, eff, res)) -> Just((tvars, preds, pars, eff, res))
+    Nothing -> Nothing
+
+fun isTVar(tp: ktype): bool
+  match tp
+    TVar -> True
+    TSyn(_, _, t) -> t.isTVar
     _ -> False
 
-// val typePure = effectFixed([typePartial, typeDivergent])
+fun isTCon(tp: ktype): bool
+  match tp
+    TCon -> True
+    TSyn(_, _, t) -> t.isTCon
+    _ -> False
+
+fun isRho(tp: ktype): bool
+  match tp
+    TForAll -> False
+    TSyn(_, _, t) -> t.isRho
+    _ -> True
+
+fun isTau(tp: ktype): bool
+  match tp
+    TForAll -> False
+    TFun(xs, e, r) -> xs.all(fn(x) x.snd.unsafe-decreasing.isTau) && e.isTau && r.isTau
+    TCon -> True
+    TVar -> True
+    TApp(a, b) -> a.isTau && b.all(fn(x) x.unsafe-decreasing.isTau)
+    TSyn(_, _, t) -> t.isTau
+
+fun splitFunType(tp: ktype): maybe<(list<(name, ktype)>, ktype, ktype)>
+  match tp
+    TFun(args, eff, res) -> Just((args, eff, res))
+    TSyn(_, _, t) -> t.splitFunType
+    _ -> Nothing
+
+// Primitive types
+val typeInt = TCon(tconInt)
+val tconInt = TypeCon(nameTpInt, kindStar)
+fun isTypeInt(t: ktype): bool
+  match t
+    TCon(c) -> c == tconInt
+    _ -> False
+
+val typeInt32 = TCon(TypeCon(nameTpInt32, kindStar))
+val typeEvIndex = TSyn(TypeSyn(nameTpEvIndex, kindStar, 0, Nothing), [], typeSSizeT)
+val typeSSizeT = TCon(TypeCon(nameTpSSizeT, kindStar))
+val typeFloat = TCon(TypeCon(nameTpFloat, kindStar))
+val typeChar = TCon(tconChar)
+val tconChar = TypeCon(nameTpChar, kindStar)
+fun isTypeChar(t: ktype): bool
+  match t
+    TCon(c) -> c == tconChar
+    _ -> False
+
+val typeString = TCon(tconString)
+val tconString = TypeCon(nameTpString, kindStar)
+fun isTypeString(t: ktype): bool
+  match t
+    TCon(c) -> c == tconString
+    _ -> False
+
+fun typeResumeContext(b: tau, e: keffect, e0: keffect, r: tau): tau
+  val tcon = TypeCon(nameTpResumeContext, kindFun(kindStar, kindFun(kindEffect, kindFun(kindEffect, kindFun(kindStar, kindStar)))))
+  TApp(TCon(tcon), [b, e, e0, r])
+
+val typeRef = TCon(TypeCon(nameTpRef, kindFun(kindHeap, kindFun(kindStar, kindStar))))
+val tconLocalVar = TypeCon(nameTpLocalVar, kindFun(kindHeap, kindFun(kindStar, kindStar)))
+fun isTypeLocalVar(tp: ktype): bool
+  match tp.expandSyn
+    TApp(TCon(TypeCon(name)), [_, _]) -> name == nameTpLocalVar
+    _ -> False
+
+fun isValueOperation(tp: ktype): bool
+  match tp.splitPredType.thd
+    TSyn(syn, [_]) -> syn.name == nameTpValueOp
+    _ -> False
+
+
+fun orderEffect(tp: tau): exn tau
+  val (ls, tl) = extractOrderedEffect(tp)
+  unsafe-no-div
+    ls.foldr(tl, effectExtend)
+
+fun extractOrderedEffect(tp: tau): exn (list<tau>, tau)
+  val (labs, tl) = extractEffectExtend(tp)
+  fun expand(l)
+    val (ls, tl') = extractEffectExtend(l)
+    if tl'.isEffectEmpty && !ls.is-nil then ls else [l]
+  val labss = labs.map(expand).concat
+  val slabs = labss.sortBy(fn(l1: tau, l2: tau) -> labelNameCompare(l1.labelName, l2.labelName))
+  (slabs, tl)
+
+fun labelName(tp: tau): exn name
+  tp.labelNameEx.fst
+
+fun labelNameFull(tp: tau): pure name
+  val (name, i, _) = tp.labelNameEx
+  postpend("$" ++ i.show, name)
+
+fun labelNameEx(tp: tau): exn (name, int, list<tau>)
+  match tp.expandSyn
+    TCon(tc) -> (tc.name, 0, [])
+    TApp(TCon(TypeCon(name)), [htp]) | name == nameTpHandled || name == nameTpHandled1 -> htp.unsafe-decreasing.labelNameEx
+    TApp(TCon(tc), targs as Cons(TVar(TypeVar(id, kind, Skolem)), _)) | kind == kindScope -> (tc.name, id, targs)
+    TApp(TCon(tc), targs) -> if (tc.name == nameEffectExtend) then throw("non-expanded type sysnonym used as label") else (tc.name, 0, targs)
+    _ -> throw("type/type labelNameEx: label is not a constant")
+
+val typePartial = TApp(tconHandled, [TCon(TypeCon(nameTpPartial, kindHandled))])
+val typeLocal = TCon(TypeCon(nameTpLocal, kindLocal))
+val typeCps = TApp(tconHandled, [TCon(TypeCon(nameTpCps, kindHandled))])
+val tconHandled = TCon(TypeCon(nameTpHandled, kindFun(kindHandled, kindLabel)))
+val tconHandled1 = TCon(TypeCon(nameTpHandled1, kindFun(kindHandled1, kindLabel)))
+
+fun isAsyncFunction(tp: ktype): pure bool
+  val rho = tp.splitPredType.thd
+  match rho.splitFunType
+    Just((_, eff, _)) ->
+      val (ls, _) = eff.extractEffectExtend
+      ls.any(isEffectAsync)
+    _ -> False
+
+fun isEffectAsync(tp: tau): div bool
+  match tp.expandSyn
+    TForAll(_, _, rho) -> rho.isEffectAsync
+    TFun(_, eff) -> eff.isEffectAsync
+    TApp(TCon(TypeCon(name)), [t]) | name == nameTpHandled -> t.isEffectAsync
+    TCon(TypeCon(hxName)) -> hxName == nameTpAsync
+    _ -> False
+
+fun isEffectTyVar(tp: tau): bool
+  match tp
+    TVar(v) -> v.kind == kindEffect
+    _ -> False
 
 val effectEmpty = TCon(TypeCon(nameEffectEmpty, kindEffect))
 fun isEffectEmpty(tp: tau): bool
@@ -224,35 +370,36 @@ fun isEffectEmpty(tp: tau): bool
     TCon(tc) -> tc.name == nameEffectEmpty
     _ -> False
 
-// TODO
+fun effectExtendNoDup(label: tau, eff: tau): pure tau
+  val (ls, _) = label.extractEffectExtend
+  match ls
+    Nil ->
+      val (els, _) = eff.extractEffectExtend
+      if els.any(fn(l) l == label) then eff
+      else TApp(TCon(tconEffectExtend), [label, eff])
+    _ -> ls.effectExtendNoDups(eff)
 
-fun orderEffect(tp: tau): tau
-  val (ls, tl) = extractOrderedEffect(tp)
-  foldr(effectExtend, tl, ls)
+fun effectExtendNoDups(labels: list<tau>, eff: tau): pure tau
+  labels.foldr(eff, effectExtendNoDup)
 
-fun extractOrderedEffect(tp: tau): (list<tau>, tau)
-  val (labs, tl) = extractEffectExtend(tp)
-  fun expand(l)
-    val (ls, tl') = extractEffectExtend(l)
-    if tl'.isEffectEmpty && !ls.is-nil then ls else [l]
-  val labss = labs.map(expand).concat
-  val slabs = labss.sortBy(fn(l1: tau, l2: tau) -> labelNameCompare(l1.name, l2.name))
-  (slabs, tl)
+fun effectExtend(label: tau, eff: tau): pure tau
+  val (ls, _) = label.extractEffectExtend
+  match ls
+    Nil -> TApp(TCon(tconEffectExtend), [label, eff])
+    _ -> effectExtends(ls, eff)
 
-fun labelName(tp: tau): name
-  tp.labelNameEx.fst
+val tconEffectExtend = TypeCon(nameEffectExtend, kindFun(kindLabel, kindFun(kindEffect, kindEffect)))
 
-fun labelNameFull(tp: tau): name
-  val (name, i, _) = tp.labelNameEx
-  postpend("$" ++ i.show, name)
+fun effectExtends(labels: list<tau>, eff: tau): pure tau
+  match labels
+    Cons(lab as TSyn(TypeSyn(_, kind)), _) | eff.isEffectEmpty && kind == kindEffect -> lab
+    Nil -> labels.foldr(eff, effectExtend)
 
-fun labelNameEx(tp: tau): (name, int, list<tau>)
-  match tp.expandSyn
-    TCon(tc) -> (tc.name, 0, [])
-    TApp(TCon(TypeCon(name)), [htp]) | name == nameTpHandled || name == nameTpHandled1 -> htp.labelNameEx
-    TApp(TCon(tc), Cons(TVar(TypeVar(id, kind, Skolem)), _)) -> 
-// TODO:
+fun effectFixed(labels: list<tau>): pure tau
+  effectExtends(labels, effectEmpty)
 
+fun isEffectFixed(tp: tau): bool
+  tp.extractEffectExtend.snd.isEffectEmpty
 
 fun extractEffectExtend(t: tau): (list<tau>, tau)
   fun extractLabel(l: tau): list<tau>
@@ -268,6 +415,139 @@ fun extractEffectExtend(t: tau): (list<tau>, tau)
       (l.extractLabel ++ ls, tl)
     _ -> ([], t)
 
-    
+fun shallowExtractEffectExtend(t: tau): (list<tau>, tau)
+  match t
+    TApp(TCon(tc), [l,e]) | tc.name == nameEffectExtend ->
+      val (ls, tl) = e.shallowExtractEffectExtend
+      (Cons(l, ls), tl)
+    _ -> ([], t)
 
+fun shallowEffextExtend(label: tau, eff: tau): pure tau
+  // We do not expand type synonyms in the label here by using the 'shallow' version of extract
+  // this means that type synonyms of kind E (ie. a fixed effect row) could stay around in
+  // the label (which should have kind X).
+  // We use this to keep type synonyms around longer -- but during unification we got to be
+  // careful to expand such synonyms
+  val (ls, _) = label.shallowExtractEffectExtend
+  match ls
+    Nil -> TApp(TCon(tconEffectExtend), [label, eff])
+    _ -> effectExtends(ls, eff)
 
+val typeDivergent = unsafe-total{singleEff(nameTpDiv)}
+fun singleEff(name:name)
+  effectExtend(TCon(TypeCon(name, kindEffect)), effectEmpty)
+val typeTotal = TCon(tconTotal)
+val tconTotal = TypeCon(nameEffectEmpty, kindEffect)
+
+fun isTypeTotal(t: tau): bool
+  match t
+    TCon(c) -> c == tconTotal
+    _ -> False
+
+val typePure = unsafe-total{effectFixed([typePartial, typeDivergent])}
+val typeBool = TCon(tconBool)
+fun isTypeBool(t: tau): bool
+  match t
+    TCon(c) -> c == tconBool
+    _ -> False
+val tconBool = TypeCon(nameTpBool, kindStar)
+fun isTypeUnit(t: tau): bool
+  match t
+    TCon(c) -> c == tconUnit
+    _ -> False
+fun typeCCtx(tp: tau)
+  TSyn(tsynCCtx, [tp], TApp(typeCCtxx, [tp, tp]))
+val tsynCCtx = TypeSyn(nameTpCCtx, kindFun(kindStar, kindStar), 0, Nothing)
+val typeCCtxx = TCon(tconCCtxx)
+val tconCCtxx = TypeCon(nameTpCCtxx, kindFun(kindStar, kindFun(kindStar, kindStar)))
+val typeFieldAddr = TCon(tconFieldAddr)
+val tconFieldAddr = TypeCon(nameTpFieldAddr, kindFun(kindStar, kindStar))
+val typeVector = TCon(TypeCon(nameTpVector, kindFun(kindStar, kindStar)))
+val typeList = TCon(tconList)
+val tconList = TypeCon(nameTpList, kindFun(kindStar, kindStar))
+fun typeNull(tp: tau): tau
+  typeApp(TCon(TypeCon(nameTpNull, kindStar)), [tp])
+
+val typeEv = TCon(tconEv)
+val tconEv = TypeCon(nameTpEv, kindFun(kindStar, kindStar))
+fun isEvType(tp: tau): bool
+  match tp
+    TCon(c) -> c == tconEv
+    _ -> False
+fun makeEvType(arg: tau): tau
+  typeApp(typeEv, [arg])
+fun typeApp(t: tau, args: list<tau>): tau
+  match args
+    Nil -> t
+    _ -> match t
+      TApp(t, ts0) -> TApp(t, ts0 ++ args)
+      _ -> TApp(t, args)
+
+val typeUnit = TCon(tconUnit)
+val tconUnit = TypeCon(nameTpUnit, kindStar)
+val typeVoid = TCon(TypeCon(nameTpVoid, kindStar))
+val typeReuse = TCon(TypeCon(nameTpReuse, kindStar))
+val typeAny = TCon(TypeCon(nameTpAny, kindStar))
+fun typeMakeTuple(tps)
+  match tps
+    Nil -> typeUnit
+    [tp] -> tp
+    _ -> typeApp(typeTuple(tps.length), tps)
+
+fun typeTuple(n: int)
+  TCon(TypeCon(nameTuple(n), kindFunN(kindStar.replicate(n), kindStar)))
+val typeOptional = TCon(tconOptional)
+val tconOptional = TypeCon(nameTpOptional, kindFun(kindStar, kindStar))
+fun isOptional(tp: ktype): bool
+  match tp.expandSyn
+    TApp(TCon(tc), [_]) -> tc == tconOptional
+    _ -> False
+fun makeOptional(tp: ktype): ktype
+  TApp(typeOptional, [tp])
+
+fun unOptional(tp: ktype): ktype
+  match tp.expandSyn
+    TApp(TCon(tc), [t]) | tc == tconOptional -> t
+    _ -> tp
+
+fun pruneSyn(rho: rho): rho
+  match rho
+    TSyn(_, _, t) -> t.pruneSyn
+    TApp(t1, ts) -> TApp(t1.pruneSyn, ts.map(fn(x) x.unsafe-decreasing.pruneSyn))
+    _ -> rho
+
+fun toType(v: typeVar)
+  TVar(v)
+
+fun toType(c: typeCon)
+  TCon(c)
+
+fun (==)(t1: ktype, t2: ktype): pure bool
+  matchType(t1, t2)
+
+fun (==)(p1: pred, p2: pred): pure bool
+  matchPred(p1, p2)
+
+fun matchType(tp1: ktype, tp2: ktype)
+  match (tp1.expandSyn, tp2.expandSyn)
+    (TForAll(vs1, ps1, t1), TForAll(vs2, ps2, t2)) -> vs1.zipwith(vs2, (==)).all(id) && matchPreds(ps1, ps2) && matchType(t1, t2)
+    (TFun(pars1, eff1, res1), TFun(pars2, eff2, res2)) -> pars1.zipwith(pars2, fn(a, b) a.fst == b.fst && a.snd == b.snd).all(id) && eff1 == eff2 && res1 == res2
+    (TCon(c1), TCon(c2)) -> c1 == c2
+    (TVar(v1), TVar(v2)) -> v1 == v2
+    (TApp(t1, ts1), TApp(t2, ts2)) -> t1 == t2 && ts1 == ts2
+    _ -> False
+
+fun matchEffect(eff1: tau, eff2: tau): pure bool
+  matchType(eff1.orderEffect, eff2.orderEffect)
+
+fun (==)(l1: list<ktype>, l2: list<ktype>): pure bool
+  l1.zipwith(l2, matchType).all(id)
+
+fun matchPreds(l1: list<pred>, l2: list<pred>): pure bool
+  l1.zipwith(l2, matchPred).all(id)
+
+fun matchPred(p1: pred, p2: pred): pure bool
+  match (p1, p2)
+    (PredSub(sub1, sup1), PredSub(sub2, sup2)) -> matchType(sub1, sub2) && matchType(sup1, sup2)
+    (PredIFace(n1, tps1), PredIFace(n2, tps2)) -> n1 == n2 && tps1 == tps2
+    _ -> False

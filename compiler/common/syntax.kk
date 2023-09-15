@@ -147,7 +147,7 @@ fun isValue(d: dataDef): bool
     _ -> False
 
 type valueRepr
-  ValueRepr(rawSize: int, scanCount: int, alignment: int);
+  ValueRepr(pub rawSize: int, pub scanCount: int, pub alignment: int);
 
 fun show(v: valueRepr): string
   "ValueRepr(rawSize: {" ++ v.rawSize.show ++ "}, scanCount: {" ++ v.scanCount.show ++ "}, alignment: {" ++ v.alignment.show ++ "})"

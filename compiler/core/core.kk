@@ -37,6 +37,9 @@ fun patExprBool(n: name, t: int): (pattern, expr)
   val expr = Con(name, conEnum)
   (pat, expr)
 
+fun makeIfExpr(p: expr, t: expr, f: expr): expr
+  Case([p], [Branch([patTrue], [Guard(exprTrue, t)]), Branch([patFalse], [Guard(exprFalse, f)])])
+
 struct core
   name: name
   imports: kimports

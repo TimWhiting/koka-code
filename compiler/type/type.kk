@@ -204,7 +204,7 @@ fun minimalForm(tp: ktype): pure ktype
 
 // Create a type scheme from a list of quantifiers
 fun makeScheme(vars: list<typeVar>, rho: rho): scheme
-  val (vars0, preds, t) = rho.splitPredType
+  val (vars0, preds, _) = rho.splitPredType
   TForAll(vars ++ vars0, preds, rho)
 
 fun quantifyType(vars: list<typeVar>, tp: scheme): scheme
@@ -221,7 +221,7 @@ fun applyType(tp1: ktype, tp2: ktype): ktype
     TSyn(_, _, tp) | tp.mustSplit -> applyType(tp, tp2)
     _ -> TApp(tp1, [tp2])
 
-fun getTypeArities(tp: ktype): (int, int)
+fun typeArities(tp: ktype): (int, int)
   match tp.splitFunScheme
     Just((tvars, _, pars, _, _)) -> (tvars.length, pars.length)
     Nothing -> (0, 0)

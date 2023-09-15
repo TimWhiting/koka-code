@@ -58,6 +58,27 @@ pub fun (==)(t1: target, t2: target): bool
     (Default, Default) -> True
     _ -> False
 
+fun show(t: target): string
+  match t
+    CS -> "CS"
+    JS(j) -> "JS(" ++ j.show ++ ")"
+    C(c) -> "C(" ++ c.show ++ ")"
+    Default -> "Default"
+
+fun show(t: jsTarget): string
+  match t
+    JsDefault -> "JsDefault"
+    JsNode -> "JsNode"
+    JsWeb -> "JsWeb"
+
+fun show(t: cTarget): string
+  match t
+    CDefault -> "CDefault"
+    LibC -> "LibC"
+    Wasm -> "Wasm"
+    WasmJs -> "WasmJs"
+    WasmWeb -> "WasmWeb"
+
 type buildType
   DebugFull
   Debug

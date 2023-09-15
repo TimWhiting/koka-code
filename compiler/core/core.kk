@@ -4,6 +4,7 @@ import compiler/common/name
 import compiler/common/name-prim
 import compiler/common/range
 import compiler/type/type
+import compiler/type/kind
 import compiler/kind/kind
 
 fun isUnit(e: expr): bool
@@ -354,6 +355,15 @@ fun paramInfos(d: def)
 fun isSpecialize(inl: inlineDef)
   inl.paramSpecialize.is-cons
 
+effect corePhase
+  fun getUnique(): int
+  fun setUnique(i: int): ()
+  fun updateUnique(f: (int) -> e int): ()
+  fun getCoreDefs(): defGroups
+  fun setCoreDefs(): defGroups
+  fun phaseError(s: string): a
+
+
 // Expressions
 // Since this is System-F, all binding sites are annotated with their type.
 type expr
@@ -404,13 +414,161 @@ type varInfo
   InfoArity(t: int, p: int) // type parameters, parameters
   InfoExternal(b: list<(target, string)>) // inline body
   InfoReuse(p: pattern) 
-  InfoConField(cName: tName, fName: tName) // constructor name, field name
+  InfoConField(cName: tName, repr: conRepr, fName: tName) // constructor name, field name
 
 value struct tName
   getName: name
   tNameType: ktype
 
+fun show(name: tName): string
+  name.getName.show
 
+fun defTName(def: def): tName
+  TName(def.name, def.t)
+
+fun defsTNames(defs: list<def>): list<tName>
+  defs.map(defTName)
+
+fun defGroupTNames(dg: defGroup): list<tName>
+  match dg
+    DefRec(defs) -> defsTNames(defs)
+    DefNonRec(def) -> [defTName(def)]
+
+fun defGroupsTNames(dgs: list<defGroup>): list<tName>
+  dgs.map(defGroupTNames).concat()
+
+fun show(v: varInfo): string
+  match v
+    InfoNone -> ""
+    InfoReuse -> "reuse:<pat>"
+    InfoConField(n, _, fName) -> "field: " ++ n.show ++ "." ++ fName.show
+    InfoArity(m, n) -> "arity:" ++ m.show ++ "," ++ n.show
+    InfoExternal(b) -> "external:" ++ b.show-list(fn((t, s)) t.show ++ ":" ++ s)
+
+fun airity(v: varInfo): int
+  match v
+    InfoArity(_, n) -> n
+    _ -> 0
+
+fun typeAirity(v: varInfo): int
+  match v
+    InfoArity(n, _) -> n
+    _ -> 0
+
+fun isLocal(i: varInfo): bool
+  match i
+    InfoNone -> True
+    InfoReuse -> True
+    _ -> False
+
+fun isRefCounted(i: varInfo)
+  i.isLocal
+
+fun isTotal(e: expr): div bool
+  match e
+    Lam -> True
+    Var -> True
+    TypeLam(_, ex) -> ex.isTotal
+    TypeApp(ex, _) -> ex.isTotal
+    Con -> True
+    ELit -> True
+    Let(dgs, ex) -> dgs.flatten.all(isTotal) && ex.isTotal
+    Case(exps, brnchs) -> exps.all(isTotal) && brnchs.all(isTotal)
+    App(f, args) -> f.isTotal && args.all(isTotal)
+
+fun isTotal(b: branch): div bool
+  b.guards.all(isTotal)
+
+fun isTotal(g: guard): div bool
+  g.expr.isTotal
+
+fun isTotalFun(e: expr): pure bool
+  match e
+    Lam(_, _, b) -> b.isTotal
+    TypeLam(_, ex) -> ex.isTotalFun
+    TypeApp(ex, _) -> ex.isTotalFun
+    Con -> True
+    ELit -> True
+    Let(dgs, e) -> dgs.flatten.all(isTotal) && e.isTotalFun
+    Case(exps, brnchs) -> exps.all(isTotalFun) && brnchs.all(isTotalFun)
+    App(f, args) -> e.typeOf.hasTotalEffect && f.isTotalFun && args.all(isTotal)
+    Var(v) -> v.getName == nameBox || v.getName == nameUnbox
+
+fun isTotalFun(b: branch): pure bool
+  b.guards.all(isTotalFun)
+
+fun isTotalFun(g: guard): pure bool
+  g.expr.isTotalFun
+
+fun isTotal(d: def): div bool
+  d.expr.isTotal
+
+fun hasTotalEffect(tp: ktype): bool
+  match tp.splitFunScheme
+    Nothing -> False
+    Just((_, _, _, eff, _)) -> eff.isTypeTotal
+
+fun isMonType(tp: ktype): pure bool
+  if tp.kind == kindEffect then tp.isMonEffect
+  else match tp.expandSyn
+    TForAll(_, _, t) -> t.isMonType
+    TFun(_, eff, _) -> eff.isMonEffect
+    _ -> False
+
+fun isMonEffect(eff: ktype): pure bool
+  val (ls, tl) = eff.extractEffectExtend
+  !tl.isEffectEmpty || ls.any(fn(l) match l.getHandledEffect([]) {Just((ResumeMany, _)) -> True; _ -> False})
+
+fun isInlineable(max: int, def: def): div bool
+  match def.kinline
+    InlineAlways -> True
+    InlineNever -> False
+    _ -> def.cost <= max
+
+val costInf = 1000
+
+fun cost(d: def): div int
+  val n = d.costLocal
+  if d.isVal then if n == 0 then 0 else costInf else n
+
+fun costLocal(d: def): div int
+  d.expr.cost
+
+fun cost(dg: defGroup): div int
+  match dg
+    DefRec(defs) -> defs.map(cost).sum
+    DefNonRec(def) -> cost(def)
+
+fun cost(expr: expr): div int
+  match expr
+    Var(tname) | tname.getName.isHiddenExternalName -> costInf
+    Lam(_, _, b) -> 0 + b.cost
+    Var -> 0
+    App(e, args) -> 1 + e.cost + args.map(cost).sum
+    TypeLam(_, e) -> e.cost
+    TypeApp(e, _) -> e.cost
+    Con -> 0
+    ELit -> 0
+    Let(dgs, b) -> dgs.map(cost).sum + b.cost
+    Case(exprs, branches) -> (branches.length - 1) + exprs.map(cost).sum + branches.map(cost).sum
+
+fun cost(b: branch): div int
+  b.guards.map(cost).sum
+
+fun cost(g: guard): div int
+  g.expr.cost
+
+fun typeArity(e: expr): pure int
+  e.typeOf.typeArities.fst
+
+fun paramArity(e: expr): pure int
+  e.typeOf.typeArities.snd
+
+fun getEffect(e: expr): keffect
+  match e
+    Lam(_, eff, _) -> eff
+    TypeLam(_, Lam(_, eff, _)) -> eff
+    _ -> effectEmpty
 // TODO: More here
 
 fun makeLet(defs: list<defGroup>, expr: expr): expr

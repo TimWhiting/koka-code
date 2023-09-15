@@ -54,7 +54,6 @@ pub fun extractKindFun(k: kind): (list<kind>, kind)
         ([], k)
     _ -> ([], k)
 
-
 fun isKindAnyLabel(k: kind): bool
   k == kindHandled || k == kindHandled1 || k == kindLabel
 

@@ -95,12 +95,12 @@ fun makeDropSpecial(y: tName, xUnique: expr, xShared: expr, xDecRef: expr)
 
 struct core
   name: name
-  imports: kimports
-  fixDefs: fixDefs
-  typeDefs: typeDefGroups
-  defs: defGroups
-  externals: externals
-  doc: string;
+  imports: kimports = []
+  fixDefs: fixDefs = []
+  typeDefs: typeDefGroups = []
+  defs: defGroups = []
+  externals: externals = []
+  doc: string = ""
 
 alias fixDefs = list<fixDef>;
 value type fixDef
@@ -663,6 +663,39 @@ fun isValue(e: expr): bool
     TypeLam(_, Lam) -> False
     Lam -> False
     _ -> True
+
+fun addCoreDef(c: core, d: def): core
+  c(defs = c.defs ++ [DefNonRec(d)])
+
+fun coreNull(n: name)
+  Core(n)
+
+fun freshName(pfx: string)
+  newName(pfx ++ "." ++ getUnique().show)
+
+fun hasNoEffect(e: expr)
+  match e
+    TypeApp(e) -> e.hasNoEffect
+    ELit -> True
+    Con -> True
+    _ -> False
+
+fun openEffect(effFrom: keffect, effTo: keffect, tpFrom: ktype, tpTo: ktype, expr: expr)
+  if expr.hasNoEffect then expr
+  else
+    val a = TypeVar(-1, kindStar, Bound)
+    val b = TypeVar(-2, kindStar, Bound)
+    val e1 = TypeVar(-3, kindEffect, Bound)
+    val e2 = TypeVar(-4, kindEffect, Bound)
+    val tpOpen = TForAll([e1, e2, a, b], [], TFun([(newName("x"), tpFrom)], typeTotal, tpTo))
+    val varOpen = Var(TName(nameEffectOpen, tpOpen), InfoExternal([(Default, "#1")]))
+    App(TypeApp(varOpen, [effFrom, effTo, tpFrom, tpTo]), expr)
+
+fun makeInt32(i: int): expr
+  val int32 = Var(TName(nameInt32, TFun([(nameNil, typeInt)], typeTotal, typeInt32)), InfoArity(1, 0))
+  App(int32, ELit(LitInt(i)))
+
+
 // TODO: More here
 
 

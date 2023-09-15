@@ -58,9 +58,22 @@ fun makeList(tp: ktype, exprs: list<expr>): expr
     App(TypeApp(consCon, [tp]), [expr, xs])
   exprs.foldr(nil, cons)
 
-// fun makeDef(name: name, expr: expr): def
-//   Def(name, typeOf(expr), expr, Private, DefVal, InlineNever, rangeNull, "")
+fun makeDef(name: name, expr: expr): pure def
+  Def(name, typeOf(expr), expr, Private, DefVal, InlineNever, rangeNull, "")
 
+fun makeTDef(TName(name, tp): tName, expr: expr): pure def
+  Def(name, tp, expr, Private, DefVal, InlineNever, rangeNull, "")
+
+fun makeDefExpr(expr: expr)
+  makeDef(nameNil, expr)
+
+fun makeStats(l: list<expr>): pure expr
+  match l
+    Nil -> throw("core/core makeStats: no expression")
+    Cons(e, Nil) -> e
+    _ -> makeLet(l.init.map(fn(expr) DefNonRec(makeDef(nameNil, expr))), l.last.unjust)
+
+// TODO: More here
 
 struct core
   name: name
@@ -280,6 +293,19 @@ type varInfo
 value struct tName
   getName: name
   tNameType: ktype
+
+
+// TODO: More here
+
+fun makeLet(defs: list<defGroup>, expr: expr): expr
+  match defs
+    Nil -> expr
+    _ -> match expr
+      Let(defs', body) -> Let(defs ++ defs', body)
+      _ -> Let(defs, expr)
+
+// TODO: More here
+
 
 
 fun typeOf(tname: tName): ktype

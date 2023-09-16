@@ -196,12 +196,3 @@ type userKind
   KindArrow(from: userKind, to: userKind)
   KindParens(kind: userKind, range: range)
   KindNone // Flags no explicit kind annotation
-
-
-fun main()
-  val s = Source("name.kk", "Contents")
-  val pos = Pos(s, 0, 0, 0)
-  val p = PatLit(LitFloat(10.0, Range(pos, pos)))
-  match p
-    PatLit(v) -> v.show.println
-    _ -> "Not Found".println

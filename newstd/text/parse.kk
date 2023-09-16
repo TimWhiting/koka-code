@@ -272,7 +272,7 @@ pub fun token(p: parser<r,a,e>): <parse<r>|e> a
   res
 
 pub fun tokenize(p: parser<r,a,e>): <parse<r>,div|e> list<string>
-  sep1(skipWhitespace,nonWhitespace)
+  sep1(skipWhitespace, nonWhitespace)
 
 pub fun tryParse(p: parser<r,a,e>): <parse<r>|e> either<perror<r>,a>
   with override

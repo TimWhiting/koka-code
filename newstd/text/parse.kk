@@ -121,7 +121,7 @@ pub fun startsWith(s: sslice, cs: list<char>): (bool, sslice, int)
         _ -> 
           (False, s, 0)
 
-pub fun run(parser: parser<r,a,<exn|e>>, s: string): <exn|e> either<perror<r>, a>
+pub fun run(s: string, parser: parser<r,a,<exn|e>>): <exn|e> either<perror<r>, a>
   var offset := 0
   var rem := s.slice
   var marks := []

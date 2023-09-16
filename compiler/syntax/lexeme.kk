@@ -72,6 +72,12 @@ pub fun lexIsWhite(l: lex): <> bool
     LexWhite(_) -> True
     _ -> False
 
+pub fun is-semicolon(l: lexeme): bool
+  match l.lex
+    LexInsSemi -> True
+    LexSpecial(";") -> True
+    _ -> False
+
 pub fun sameLexeme(l1: lexeme, l2: lexeme): <> bool
   match (l1.lex, l2.lex)
     (LexKeyword(n1, _), LexKeyword(n2, _)) -> n1 == n2 

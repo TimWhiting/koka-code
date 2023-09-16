@@ -343,7 +343,3 @@ val nameKindHeap    = "H".newName
 val nameKindScope   = "S".newName
 val nameKindHandled = "HX".newName
 val nameKindHandled1 = "HX1".newName
-
-fun main()
-  nameTpValueOp.show.println
-  nameKindHeap.show.println

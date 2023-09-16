@@ -276,9 +276,9 @@ fun lex-stringbegin()
   text("\"")
   match err
     Cons(e, _) -> e
-    Nil -> LexString(inner)
+    Nil -> LexString(inner) // TODO: Consider ending with an error
 
-fun illegal-str()
+fun illegal-str() // TODO: This needs to be fixed
   with atomic
   val res = many1(graphic-stringraw).join
   LexError(res)
@@ -441,19 +441,6 @@ fun isMalformed(name: list<char>)
 val messageMalformed
   = "malformed identifier: a dash must be preceded by a letter or digit, and followed by a letter"
 
-// Lexer state and actions
-struct lex-state
-  pos: pos
-  startPos: pos
-  retained: list<list<char>>
-  previous: char
-  current: list<char>
-  previousLex: lex
-  rawEnd: list<char>
-
-linear effect lexE
-  fun curr-state(): lex-state
-
 type lex-part
   Default
   StringLit
@@ -467,35 +454,36 @@ fun lexer(sourceName: string, lineNo: int, input: string)
 
 fun lex(source: source, lineNo: int, input: string): <console,div,exn> list<lexeme>
   match lexing(source, lineNo, input)
-    Right(u) -> u.map(fn(x) Lexeme(rangeNull, x))
+    Right(u) -> u
     _ -> Cons(Lexeme(rangeNull, LexError("Unexpected end of input")), Nil)
-
-fun lexEHandler(initialState:lex-state, action: () -> <lexE| e> a): e a
-  var state := initialState
-  with handler
-    fun curr-state()
-      state
-  action()
 
 fun lexing(source: source, lineNo: int, input: string)
   // with parse(input.slice)
-  run(fn (){
-    var initPos := Pos(source, 0, lineNo, 1)
-    with lexEHandler(Lex-state(initPos, initPos, [], '\n', input.list, LexWhite(""), "\"".list))
+  run(input)
+    var pos := Pos(source, 0, lineNo, 1)
     var result := Nil
     var cont := True
+    var mode := Default
     while { cont }
       match tryParse(parseEndOfInput)
         Left ->
+          val start = pos
+          val startOff = offset()
           match tryParse(lex-default)
             Right(e) -> 
               // trace(e.show)
-              result := Cons(e, result)
+              val nlines = match e
+                LexWhite(w) -> w.count("\n")
+                _ -> 0
+              val ncols = match e
+                LexWhite(w) -> w.list.reverse.take-while(fn(c) c == '\n').length
+                _ -> offset() - startOff
+              pos := pos(line=pos.line + nlines, col=pos.col+ncols)
+              result := Cons(Lexeme(Range(start, pos), e), result)
             Left(e) ->
               cont := False
               println(e.show(fn(s:string) s, input))
         Right ->
           cont := False
     result.reverse
-  }, input)
 

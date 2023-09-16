@@ -522,14 +522,6 @@ fun lexing(source: source, lineNo: int, input: string): <div> parse-error<list<l
     result := Cons(lex-default(), result)
   result.reverse
 
-fun main()
-  // Make sure to set $ulimit -s unlimited$ to allow more stack space
-  val r = read-text-file("/Users/timwhiting/koka_code/compiler/syntax/lexer.kk".path)
-  val x = lexer("test", 0, r)
-  match x
-    ParseOk(u, _) -> u.map(show).join(",").println
-    ParseError(msg, _) -> msg.println
-
 pub fun parseGreedy(input0 : sslice, action : () -> <parse|e> a ) : e parse-error<a> 
   var input := input0
   with handler

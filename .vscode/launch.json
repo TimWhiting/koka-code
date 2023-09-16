@@ -33,6 +33,13 @@
       "program": "scratch/test2",
       "name": "scratch/test2",
       "args": "-O2"
+    },
+    {
+      "type": "koka",
+      "request": "launch",
+      "program": "${workspaceRoot}/testcompiler/syntax/lexer",
+      "name": "lexer",
+      "args": "-O2"
     }
   ]
 }

@@ -9,12 +9,32 @@ import compiler/common/syntax
 import compiler/common/name
 import compiler/common/range
 
+effect astError
+  final ctl astError(e: string, r: range): a
+
 effect astParse
   val sourceInfo: source
   fun addWarning(w: string, r: range): ()
-  final ctl astError(e: string, r: range): a
-  fun currentInput(): list<lexeme>
-  fun setCurrentInput(l: list<lexeme>): ()
+  fun ppeek(): maybe<lexeme>
+  fun commit(): ()
+  fun reset(): ()
+  fun delimit(msg: string): ()
+  fun pnext(): maybe<lexeme>
+  fun peof(): ()
+
+fun peek(): ast lexeme
+  val p = ppeek()
+  match p
+    Just(l) -> l
+    Nothing -> astError("unexpected end of file", rangeNull)
+
+fun next(): ast lexeme
+  val p = pnext()
+  match p
+    Just(l) -> l
+    Nothing -> astError("unexpected end of file", rangeNull)
+
+alias ast = <astParse, astError, pure>
 
 fun parseProgramFromFile(semiInsert: bool, fname: path)
   val r = read-text-file(fname)
@@ -23,73 +43,91 @@ fun parseProgramFromFile(semiInsert: bool, fname: path)
 fun parseProgramFromString(semiInsert: bool, input: string, fname: path)
   lexParse(semiInsert, fn(x) x, parseProgram, fname.string, input)
 
-fun lexParse(insSemi: bool, preprocess: list<lexeme> -> list<lexeme>, p: () -> <console,pure,astParse|e> a, sourceName: string, input: string): <console,pure|e> maybe<a>
+fun lexParse(insSemi: bool, preprocess: list<lexeme> -> list<lexeme>, p: () -> <console,ast|e> a, sourceName: string, input: string): <console,astError,pure|e> a
   val src = Source(sourceName, input)
-  val l = lex(src, 0, input)
-  var lexemes := preprocess(layout(insSemi, l))
+  var lexemes := preprocess(layout(insSemi, lex(src, 0, input)))
+  var history := Cons((ctx _, "top"), Nil)
+  with override
+    final ctl astError(e: string, r: range)
+      astError("Got error: " ++ e ++ "\n" ++ history.map(fn(x) "\tWhen parsing " ++ x.snd).join("\n"), r)
   with handler
-    return(r) Just(r)
     val sourceInfo = src
     fun addWarning(w: string, r: range)
       ()
-    final ctl astError(e, r)
-      Nothing
-    fun currentInput() lexemes
-    fun setCurrentInput(lexs)
-      lexemes := lexs
+    fun pnext()
+      match lexemes
+        Cons(l, rst) ->
+          lexemes := rst
+          match history
+            Cons((h, msg), tl) ->
+              history := Cons((h ++ ctx Cons(l, _), msg), tl)
+            Nil -> 
+              astError("unexpected top of context", rangeNull)
+          Just(l)
+        Nil -> Nothing
+    fun reset()
+      match history
+        Cons((h, _), rst) -> 
+          lexemes := h ++. lexemes
+          history := rst
+        Nil ->
+          astError("mismatched reset", rangeNull)
+    fun delimit(msg)
+      history := Cons((ctx _, msg), history)
+    fun commit()
+      history := history.tail
+    fun ppeek()
+      match lexemes
+        Cons(l, _) -> Just(l)
+        Nil -> Nothing
+    fun peof()
+      match lexemes
+        Cons(l, _) ->
+          astError("peof expected end of file", l.range)
+        Nil ->
+          ()
   mask<local>{p()}
 
-fun interactive(f: () -> <pure,astParse> a): <pure,astParse> a
+fun interactive(f: () -> <ast> a): <ast> a
   val x = f()
-  pmany(pSemicolon)
+  pmany("semicolons", pSemicolon)
   x
 
-fun pmany(l: () -> <pure,astParse> a): <pure,astParse> list<a>
-  val r = maybe(l)
+fun pmany(kind: string, l: () -> <ast> a): <ast> list<a>
+  val r = maybe("many " ++ kind, l)
   match r
-    Just(r) -> Cons(r, l.pmany)
+    Just(r) -> Cons(r, pmany(kind, l))
     Nothing -> Nil
 
-fun maybe(p: () -> <pure,astParse> a): <pure,astParse> maybe<a>
+fun maybe(str: string, p: () -> <ast> a): <ast> maybe<a>
   with override
-    return(r) Just(r)
-    val sourceInfo = sourceInfo
-    fun addWarning(w: string, r: range)
-      addWarning(w, r)
-    final ctl astError(e, r)
+    return(r) 
+      Just(r)
+    final ctl astError(e, r) 
+      reset()
       Nothing
-    fun currentInput() currentInput()
-    fun setCurrentInput(lexs)
-      setCurrentInput(lexs)
-  p()
+  delimit(str)
+  val x = p()
+  commit()
+  x
 
 fun pSemicolon()
-  match currentInput()
-    Cons(l, tl) -> if l.is-semicolon then setCurrentInput(tl) else astError("expected semicolon", l.range)
-    _ -> ()
+  val l = next()
+  if l.is-semicolon then l else astError("expected semicolon", l.range)
 
 fun makeParseError(r: range, e: string)
   astError("invalid syntax" ++ e.list.drop-while(fn(x) x != ':').string, r)
 
 fun parseProgram()
-  pmany(pSemicolon)
+  pmany("semicolons", pSemicolon)
   val p = pModule()
   peof()
   p
 
-fun ptry(p: () -> <pure,astParse> a): <pure,astParse> maybe<a>
-  val curr-input = currentInput()
-  val res = maybe(p)
-  match res
-    Just(r) -> Just(r)
-    Nothing -> 
-      setCurrentInput(curr-input);
-      Nothing
-
 fun pModule()
-  val res = ptry
+  val res = maybe("module name")
     val vis = pVisibility().snd
-    val (_, doc) = pDocKeyword("module")
+    val doc = pDocKeyword("module").snd
     val (name, rng) = pModulePath() 
     pBody(vis, name, rng, doc)
   match res
@@ -100,40 +138,30 @@ fun pBody(vis, name, rng, doc)
   ()
 
 fun pModulePath()
-  match currentInput()
-    Cons(Lexeme(rng, LexId(id)), tl) -> 
-      setCurrentInput(tl)
+  match next()
+    Lexeme(rng, LexId(id)) -> 
       (id.showPlain.newName, rng)
     _ -> astError("expected module path", rangeNull)
 
 fun pVisibility(vis=Private)
-  match maybe({pKeyword("pub", ["public"])})
+  match maybe("public", {pKeyword("pub", ["public"])})
     Just(t) -> (Public, t.range)
     Nothing ->
-      match maybe({pKeyword("private")})
+      match maybe("private", {pKeyword("private")})
         Just(t) -> 
           addWarning("using private is deprecated, only use pub to make declarations public", t.range)
           (Private, t.range)
         Nothing -> (vis, rangeNull)
 
 fun pKeyword(s: string, alternates: list<string> = [])
-  match currentInput()
-    Cons(l, tl) ->
-      if l.lex.is-lexKeyword then
-        setCurrentInput(tl)
-        l
-      else
-        astError("expected keyword " ++ s ++ " or " ++ alternates.join(","), l.range)
-    _ -> astError("expected keyword " ++ s ++ " or " ++ alternates.join(","), rangeNull)
+  match next()
+    l as Lexeme(lex=LexKeyword(s', _)) | s == s' || alternates.any(fn(x) x == s') ->
+      l
+    x -> 
+      astError("expected keyword " ++ s ++ " or " ++ alternates.join(","), x.range)
 
 fun pDocKeyword(s: string)
-  match currentInput()
-    Cons(Lexeme(rng, LexKeyword(s', doc)), tl) | s == s' -> 
-      setCurrentInput(tl)
+  match next()
+    Lexeme(rng, LexKeyword(s', doc)) | s == s' -> 
       (rng, doc)
     _ -> astError("expected keyword " ++ s, rangeNull)
-
-fun peof()
-  match currentInput()
-    Cons(l, _) -> astError("expected end of file", l.range)
-    _ -> ()

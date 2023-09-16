@@ -472,13 +472,14 @@ fun lexing(source: source, lineNo: int, input: string)
           match tryParse(lex-default)
             Right(e) -> 
               // trace(e.show)
+              val finalOffset = offset()
               val nlines = match e
                 LexWhite(w) -> w.count("\n")
                 _ -> 0
               val ncols = match e
                 LexWhite(w) -> w.list.reverse.take-while(fn(c) c == '\n').length
-                _ -> offset() - startOff
-              pos := pos(line=pos.line + nlines, col=pos.col+ncols)
+                _ -> finalOffset - startOff
+              pos := Pos(source, finalOffset, pos.line + nlines, col=pos.col+ncols)
               result := Cons(Lexeme(Range(start, pos), e), result)
             Left(e) ->
               cont := False

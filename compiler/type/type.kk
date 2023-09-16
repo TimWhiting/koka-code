@@ -141,7 +141,7 @@ pub struct synInfo
   t: ktype // result type
   rank: synonymRank
   range: range
-  vis: visibility
+  pub vis: visibility
   doc: string;
 
 fun isBound(t: typeVar): bool

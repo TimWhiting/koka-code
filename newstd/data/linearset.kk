@@ -30,6 +30,9 @@ pub fun add(l: linearSet<v>, a: v): e linearSet<v>
 pub fun (+)(l1: linearSet<v>, l2: linearSet<v>): e linearSet<v>
   l1.union(l2)
 
+pub fun (+)(l1: linearSet<v>, l2: list<v>): e linearSet<v>
+  l2.foldl(l1, fn(acc, x) acc.add(x))
+
 pub fun (-)(l: linearSet<v>, v: v): e linearSet<v>
   l(list=l.list.filter(fn(x) !(l.eq)(x, v)))
 

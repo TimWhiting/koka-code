@@ -127,7 +127,7 @@ type external
     imports: list<(target,list<(string, string)>)>
     range: range
 
-fun externalVis(e: external)
+fun vis(e: external)
   match e
     External(visibility=v) -> v
     _ -> Private
@@ -182,10 +182,10 @@ pub fun isExtension(t: typeDef): bool
 
 pub fun vis(t: typeDef): visibility
   match t
-    Synonym(info) -> info.vis
-    Data(info, _) -> info.vis
+    Synonym(info) -> compiler/type/type/vis(info)
+    Data(info, _) -> compiler/type/type/vis(info)
 
-fun flattenTypeDefGroups(tdgs:list<typeDefGroup>)
+fun flatten(tdgs:list<typeDefGroup>): list<typeDef>
   tdgs.concat()
 
 // Data representation
@@ -328,7 +328,7 @@ type defGroup
 // A value definition
 struct def
   name: name
-  t: ktype
+  ktype: ktype
   expr: expr
   vis: visibility // private public
   sort: defSort // fun / val / var
@@ -425,7 +425,7 @@ fun show(name: tName): string
   name.getName.show
 
 fun defTName(def: def): tName
-  TName(def.name, def.t)
+  TName(def.name, def.ktype)
 
 fun defsTNames(defs: list<def>): list<tName>
   defs.map(defTName)
@@ -689,16 +689,24 @@ fun openEffect(effFrom: keffect, effTo: keffect, tpFrom: ktype, tpTo: ktype, exp
     val e2 = TypeVar(-4, kindEffect, Bound)
     val tpOpen = TForAll([e1, e2, a, b], [], TFun([(newName("x"), tpFrom)], typeTotal, tpTo))
     val varOpen = Var(TName(nameEffectOpen, tpOpen), InfoExternal([(Default, "#1")]))
-    App(TypeApp(varOpen, [effFrom, effTo, tpFrom, tpTo]), expr)
+    App(TypeApp(varOpen, [effFrom, effTo, tpFrom, tpTo]), [expr])
 
 fun makeInt32(i: int): expr
   val int32 = Var(TName(nameInt32, TFun([(nameNil, typeInt)], typeTotal, typeInt32)), InfoArity(1, 0))
-  App(int32, ELit(LitInt(i)))
+  App(int32, [ELit(LitInt(i))])
 
+fun makeEvIndex(i: int)
+  if i < 0 then throw("core/core makeEvIndex: size_t < 0 " ++ i.show)
+  val sizet = Var(TName(nameSSizeT, TFun([(nameNil, typeInt)], typeTotal, typeEvIndex)), InfoArity(1, 0))
+  App(sizet, [ELit(LitInt(i))])
 
-// TODO: More here
+fun makeSizeT(i: int)
+  if i < 0 then throw("core/core makeSizeT: size_t < 0 " ++ i.show)
+  val sizet = Var(TName(nameSSizeT, TFun([(nameNil, typeInt)], typeTotal, typeSSizeT)), InfoArity(1, 0))
+  App(sizet, [ELit(LitInt(i))])
 
-
+fun typeOf(d: def): ktype
+  d.ktype
 
 fun typeOf(tname: tName): ktype
   tname.tNameType
@@ -737,3 +745,84 @@ fun typeOf(l: lit): ktype
     LitFloat(_) -> typeFloat
     LitChar(_) -> typeChar
     LitString(_) -> typeString
+
+fun extractSignatures(es: externals): list<ktype>
+  match es
+    Cons(External(visibility=Public, typeScheme=t), rst) -> Cons(t, extractSignatures(rst))
+    Cons(_, rst) -> extractSignatures(rst)
+    Nil -> Nil
+
+fun extractSignatures(d: defGroups): list<ktype>
+  d.flatten.map(fn(d') d'.ktype)
+
+fun extractSignatures(c: core): list<ktype>
+  extractSignatures(c.externals) ++ extractSignatures(c.defs)
+
+fun splitFun(tp: ktype): <exn> (list<(name, ktype)>, ktype)
+  match tp.expandSyn
+    TFun(args, _, res) -> (args, res)
+    _ -> throw("core/core splitFun: expected function type")
+
+fun splitTForAll(tp: ktype): <exn> (list<typeVar>, ktype)
+  match tp.expandSyn
+    TForAll(tvs, _, t) -> (tvs, t)
+    _ -> throw("core/core splitTForAll: expected forall type")
+
+alias deps = linearSet<name>
+val namesEmpty = linearSet([], fn(a:name, b:name) a == b, fn(a:name) a.show)
+fun depsUnions(l: list<deps>): deps
+  l.foldl(namesEmpty, fn(s, a) s + a)
+fun dep(t: tName): deps
+  dep(t.getName)
+fun dep(n: name): deps
+  if n.isQualified then namesEmpty.add(n.qualifier) else namesEmpty
+
+fun deps(l: list<inlineDef>, c: core): div deps
+  depsUnions(l.map(fn(i) i.expr.dep)) + c.deps
+
+fun deps(l: list<inlineDef>): div deps
+  depsUnions(l.map(fn(i) i.expr.dep))
+
+fun deps(c: core): div deps
+  (depsUnions(c.defs.flatten.map(dep)) + depsUnions(c.typeDefs.flatten.map(dep)) + c.imports.filter(fn(i) i.visibility.is-public).map(fn(i) i.name)) - c.name
+
+fun dep(td: typeDef): div deps
+  match td
+    Synonym(info) -> info.t.dep
+    Data(info) -> depsUnions(info.constrs.map(fn(c) c.typeScheme.dep))
+
+fun dep(t: ktype): div deps
+  match t
+    TForAll(_, _, rho) -> rho.dep
+    TFun(args, eff, res) -> depsUnions(Cons(eff.dep, args.map(fn((_, t')) t'.dep))) + res.dep
+    TCon(tc) -> tc.name.dep
+    TVar -> namesEmpty
+    TApp(tp, tps) -> tp.dep + depsUnions(tps.map(dep))
+    TSyn(_, args, tp) -> tp.dep + depsUnions(args.map(dep))
+
+fun dep(d: def): div deps
+  depsUnions([d.ktype.dep, d.expr.dep])
+
+fun dep(e: expr): div deps
+  match e
+    Var(tname) -> tname.dep
+    Lam(_, eff, body) -> eff.dep + body.dep
+    App(e, args) -> depsUnions(Cons(e.dep, args.map(dep)))
+    TypeLam(_, body) -> body.dep
+    TypeApp(e, tps) -> e.dep + depsUnions(tps.map(dep))
+    Con(tname) -> tname.dep
+    ELit(_) -> namesEmpty
+    Let(defs, body) -> depsUnions(Cons(body.dep, defs.flatten.map(dep)))
+    Case(exprs, branches) -> depsUnions(exprs.map(dep) ++ branches.map(dep))
+
+fun dep(b: branch): div deps
+  depsUnions(b.patterns.map(dep)) + depsUnions(b.guards.map(dep))
+
+fun dep(g: guard): div deps
+  g.expr.dep
+
+fun dep(p: pattern): div deps
+  match p
+    PatCon(tname, pats) -> tname.dep + depsUnions(pats.map(dep))
+    PatVar(_, p) -> p.dep
+    _ -> namesEmpty

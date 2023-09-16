@@ -40,6 +40,13 @@
       "program": "${workspaceRoot}/testcompiler/syntax/lexer",
       "name": "lexer",
       "args": "-O2"
+    },
+    {
+      "type": "koka",
+      "request": "launch",
+      "program": "${workspaceRoot}/testcompiler/syntax/lexer2",
+      "name": "lexer2",
+      "args": "-O2"
     }
   ]
 }

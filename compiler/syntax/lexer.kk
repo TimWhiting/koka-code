@@ -79,7 +79,7 @@ inline fun finalid()
   char-is("finalid", fn(c) c == '\'')
 
 inline fun char-esc()
-  char-is("escape", fn(c) c != '\\' || c != '\'' || c != '"')
+  char-is("escape", fn(c) c != '\\' && c != '\'' && c != '"')
 
 // Regular expressions
 

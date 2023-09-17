@@ -4,13 +4,13 @@ import compiler/common/name
 import compiler/common/name-prim
 import compiler/common/syntax
 
-struct program<t, k>
+pub struct program<t, k>
   source: source
   name: name
   nameRange: range
   typeDefs: list<typeDefGroup<t,k>>
   defs: defGroups<t>
-  imports: imports
+  pub imports: imports
   externals: externals
   fixDefs: fixDefs
   doc: string

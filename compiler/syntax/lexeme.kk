@@ -32,6 +32,18 @@ pub type lex
   LexInsSemi
   LexError(s: string)
 
+fun is-lcurly(l: lex): bool
+  match l
+    LexInsLCurly -> True
+    LexSpecial("{") -> True
+    _ -> False
+
+fun is-rcurly(l: lex): bool
+  match l
+    LexInsRCurly -> True
+    LexSpecial("}") -> True
+    _ -> False
+
 pub fun (==)(l1: lexeme, l2: lexeme): bool
   l1.range == l2.range && l1.lex == l2.lex
 

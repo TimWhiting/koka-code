@@ -10,5 +10,5 @@ fun main()
     final ctl astError(s: string, r: range)
       println("ast error: " ++ s ++ " at " ++ r.showFullRange)
   val x = parseProgramFromString(True, "public module hello; import hello as hi;", "test.kk".path)
-  println(x.name.show)
+  println(x.show(show, show))
   

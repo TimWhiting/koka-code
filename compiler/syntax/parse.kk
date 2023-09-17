@@ -112,6 +112,10 @@ fun pmanyend(kind: string, l: () -> <ast> a, p: () -> <ast> b): <ast> list<a>
         Nothing -> Cons(r, Nil)
     Nothing -> Nil
 
+fun token(msg: string, f: (lexeme) -> <ast|e> bool): <ast|e> lexeme
+  if f(peek()) then next() else astError("expecting " ++ msg, peek().range)
+
+// Version of maybe that does backtrack
 fun maybe(str: string, p: () -> <ast> a): <ast> maybe<a>
   with override
     return(r) 
@@ -124,10 +128,24 @@ fun maybe(str: string, p: () -> <ast> a): <ast> maybe<a>
   commit()
   x
 
+// Version of maybe that doesn't backtrack
+fun maybenb(str: string, p: () -> <ast> a): <ast> maybe<a>
+  with override
+    return(r) 
+      Just(r)
+    final ctl astError(e, r) 
+      Nothing
+  p()
+
+fun choicesnb(str: string, ps: list<() -> <ast> a>): <ast> a
+  match ps.find-maybe(fn(p) maybenb(str, p))
+    Just(r) -> r
+    Nothing -> astError("expected " ++ str, peek().range)
+
 fun choices(str: string, ps: list<() -> <ast> a>): <ast> a
   match ps.find-maybe(fn(p) maybe(str, p))
     Just(r) -> r
-    Nothing -> astError("expected one of " ++ str, peek().range)
+    Nothing -> astError("expected " ++ str, peek().range)
 
 fun pSemicolon()
   val l = next()
@@ -263,8 +281,7 @@ fun pSemi1()
   pmany1("semicolons", pSemicolon)
 
 fun parseRange(msg: string, f: (lexeme) -> <ast|e> bool): <ast|e> range
-  val l = next()
-  if f(l) then l.range else astError(msg, l.range)
+  token(msg, f).range
 
 fun pLcurly()
   parseRange("expected {", fn(x) x.lex.is-lcurly)
@@ -273,28 +290,32 @@ fun pRcurly()
   parseRange("expected }", fn(x) x.lex.is-rcurly)
 
 fun pModulePath()
-  match next()
+  val x = token("module path", fn(x) x.lex.is-lexId)
+  match x 
     Lexeme(rng, LexId(id)) -> 
       (id.showPlain.newName, rng)
     _ -> astError("expected module path", rangeNull)
 
 fun specialId(s: string)
-  match next()
-    Lexeme(rng, LexId(id)) | id.showPlain == s -> rng 
+  val x = token("special id " ++ s) fn(x)
+    match x.lex
+      LexId(id) | id.showPlain == s -> True
+      _ -> False
+  x.range
+
+fun pKeyword(s: string, alternates: list<string> = []): <ast> lexeme
+  token("keyword " ++ s) fn(x)
+    match x.lex
+      LexKeyword(s', _) | s == s' -> True
+      LexKeyword(s', _) | alternates.any(fn(v) v == s') -> 
+        addWarning("using deprecated keyword " ++ s' ++ ", use " ++ s ++ " instead", x.range)
+        True
+      _ -> False
+
+fun pDocKeyword(s: string, alternates: list<string> = []): <ast> (range, string)
+  match pKeyword(s, alternates)
+    Lexeme(rng, LexKeyword(_, doc)) -> (rng, doc)
     _ -> astError("expected " ++ s, rangeNull)
-
-fun pKeyword(s: string, alternates: list<string> = [])
-  match next()
-    l as Lexeme(lex=LexKeyword(s', _)) | s == s' || alternates.any(fn(x) x == s') ->
-      l
-    x -> 
-      astError("expected keyword " ++ s ++ " or " ++ alternates.join(","), x.range)
-
-fun pDocKeyword(s: string)
-  match next()
-    Lexeme(rng, LexKeyword(s', doc)) | s == s' -> 
-      (rng, doc)
-    _ -> astError("expected keyword " ++ s, rangeNull)
 
 fun unimplemented()
   astError("unimplemented", peek().range)

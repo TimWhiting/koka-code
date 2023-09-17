@@ -114,6 +114,11 @@ type visibility
   Public
   Private
 
+fun show(v: visibility): string
+  match v
+    Public -> "Public"
+    Private -> "Private"
+
 type handlerSort
   HandlerNormal
   HandlerInstance
@@ -140,10 +145,24 @@ type operationSort
   OpControlRaw
   OpControl
 
+fun show(o: operationSort): string
+  match o
+    OpVal -> "OpVal"
+    OpFun -> "OpFun"
+    OpExcept -> "OpExcept"
+    OpControlRaw -> "OpControlRaw"
+    OpControl -> "OpControl"
+
 type dataKind
   Inductive
   CoInductive
   Retractive
+
+fun show(k: dataKind): string
+  match k
+    Inductive -> "Inductive"
+    CoInductive -> "CoInductive"
+    Retractive -> "Retractive"
 
 type dataDef
   DataDefValue(rawFields: int, scanFields: int) // size in bytes and count of scannable fields
@@ -151,6 +170,14 @@ type dataDef
   DataDefAuto
   DataDefRec
   DataDefOpen
+
+fun show(d: dataDef): string
+  match d
+    DataDefValue(r, s) -> "DataDefValue(" ++ r.show ++ ", " ++ s.show ++ ")"
+    DataDefNormal -> "DataDefNormal"
+    DataDefAuto -> "DataDefAuto"
+    DataDefRec -> "DataDefRec"
+    DataDefOpen -> "DataDefOpen"
 
 fun isRec(d: dataDef): bool
   match d
@@ -196,6 +223,12 @@ type defSort
   DefVal
   DefVar
 
+fun show(s: defSort): string
+  match s
+    DefFun(p, f) -> "DefFun(" ++ p.show-list(show) ++ ", " ++ f.show ++ ")"
+    DefVal -> "DefVal"
+    DefVar -> "DefVar"
+
 pub fun isFun(s: defSort): bool
   match s
     DefFun(_) -> True
@@ -205,30 +238,66 @@ type paramInfo
   Borrow
   Own
 
+fun show(p: paramInfo): string
+  match p
+    Borrow -> "Borrow"
+    Own -> "Own"
+
 type defInline
   InlineNever
   InlineAlways
   InlineAuto
+
+fun show(i: defInline): string
+  match i
+    InlineNever -> "InlineNever"
+    InlineAlways -> "InlineAlways"
+    InlineAuto -> "InlineAuto"
 
 type fixity
   FixInfix(prec: int, assoc: assoc)
   FixPrefix
   FixPostfix
 
+fun show(f: fixity): string
+  match f
+    FixInfix(p, a) -> "FixInfix(" ++ p.show ++ ", " ++ a.show ++ ")"
+    FixPrefix -> "FixPrefix"
+    FixPostfix -> "FixPostfix"
+
 type assoc
   AssocNone
   AssocRight
   AssocLeft
+
+fun show(a: assoc): string
+  match a
+    AssocNone -> "AssocNone"
+    AssocRight -> "AssocRight"
+    AssocLeft -> "AssocLeft"
 
 type fipT
   Fip(alloc: fipAlloc)
   Fbip(alloc: fipAlloc, tail: bool)
   NoFip(tail: bool)
 
+fun show(f: fipT): string
+  match f
+    Fip(a) -> "Fip(" ++ a.show ++ ")"
+    Fbip(a, t) -> "Fbip(" ++ a.show ++ ", " ++ t.show ++ ")"
+    NoFip(t) -> "NoFip(" ++ t.show ++ ")"
+
 value type fipAlloc
   AllocAtMost(i: int)
   AllocFinitely
   AllocUnlimited
+
+fun show(a: fipAlloc): string
+  match a
+    AllocAtMost(0) -> "AllocAtMost(0)"
+    AllocAtMost(n) -> "AllocAtMost(" ++ n.show ++ ")"
+    AllocFinitely -> "AllocFinitely"
+    AllocUnlimited -> "AllocUnlimited"
 
 val noFip = NoFip(False)
 

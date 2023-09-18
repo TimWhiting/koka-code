@@ -42,14 +42,14 @@ alias userTypeBinder = typeBinder<userKind>
 alias externals = list<external>;
 
 type external
-  External(name: name, t: userType, params: list<paramInfo>, nameRange: range, range: range, inlineCall: list<(target, externalCall)>, vis: visibility, doc: string)
+  External(name: name, t: userType, params: list<paramInfo>, nameRange: range, range: range, inlineCall: list<(target, externalCall)>, vis: visibility, fipAnnot: fipT, doc: string)
   ExternalImport(eImport: list<(target,list<(string, string)>)>, range: range)
 
 fun show(e: external): div string
   match e
-    External(name, t, params, nameRange, range, inlineCall, vis, doc) -> 
+    External(name, t, params, nameRange, range, inlineCall, vis, fipAnnot, doc) -> 
       "External " ++ name.show ++ " " ++ t.show ++ " " ++ params.show-list(fn(p) p.show) ++ " " ++ nameRange.showFullRange ++ " " ++ range.showFullRange ++ " " ++ 
-      inlineCall.show-list(fn(c) c.fst.show ++ " " ++ c.snd.show) ++ " " ++ vis.show ++ " " ++ doc.show
+      inlineCall.show-list(fn(c) c.fst.show ++ " " ++ c.snd.show) ++ " " ++ vis.show ++ " " ++ fipAnnot.show ++ " " ++ doc.show
     ExternalImport(eImport, range) -> "ExternalImport " ++ eImport.show-list(fn(e') e'.fst.show ++ " " ++ e'.snd.show-list(fn(e1) e1.fst ++ " " ++ e1.snd)) ++ " " ++ range.showFullRange
 
 value type externalCall
@@ -329,7 +329,7 @@ fun show(u: userKind): string
 
 
 
-
+// Range
 
 
 
@@ -354,9 +354,6 @@ fun range(uk: userKind): range
 
 fun range(utp: userType): range
   utp.range(range)
-
-
-
 
 
 

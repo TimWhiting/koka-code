@@ -191,10 +191,6 @@ fun choices(str: string, ps: list<() -> <ast> a>): <ast> a
     Just(r) -> r
     Nothing -> astError("expected " ++ str, peek().range)
 
-fun pSemicolon(): <ast> lexeme
-  token("semicolon") fn(x) 
-    if x.is-semicolon then Just(x) else Nothing
-
 fun makeParseError(r: range, e: string)
   astError("invalid syntax" ++ e.list.drop-while(fn(x) x != ':').string, r)
 
@@ -300,13 +296,11 @@ fun pInline()
     InlineNever
   }, {InlineAuto}])
 
-fun warnDeprecated(o: string, n: string, rng: range): <ast> ()
-  addWarning("using deprecated " ++ o ++ ", use " ++ n ++ " instead", rng)
 
 fun typeFromPars(rng:range, pars: list<valueBinder<userType, maybe<userExpr>>>, teff: userType, tres: userType): div userType
   promoteType(TpFun(pars.map(fn(p) (p.name, p.binderType)), teff, tres, rng))
 
-fun genArgs(pars: list<valueBinder<userType, maybe<userExpr>>>): list<(maybe<userExpr>, userExpr)>
+fun genArgs(pars: list<valueBinder<userType, maybe<userExpr>>>): list<(maybe<(name, range)>, userExpr)>
   pars.map(fn(p) (Nothing, Var(p.name, False, p.range.before)))
 
 fun genParArgs(tp)
@@ -321,13 +315,12 @@ fun genParArgs(tp)
     _ -> astError("external declarations must have a function type", tp.range)
 
 fun genFunParArgs(pars: list<(name, userType)>)
-  pars.map-indexed(fn(i, p) p.genParArg(i))
+  pars.map-indexed(fn(i, p) p.genParArg(i)).unzip
 
 fun genParArg((name:name, _:userType), idx: int)
   val fullName = if name == nameNil then newHiddenName("arg" ++ idx.show) else name
   val rng = rangeNull
-  (ValueBinder(fullName, Nothing, Nothing, rng, rng), Nothing, Var(fullName, False, rng))
-
+  (ValueBinder(fullName, Nothing, Nothing, rng, rng), (Nothing, Var(fullName, False, rng)))
 
 fun pExternDecl(dvis: visibility): <ast> list<topDef>
   choices("externDecl", [{
@@ -345,7 +338,7 @@ fun pExternDecl(dvis: visibility): <ast> list<topDef>
     val fip = pFip()
     val (krng,doc) = pDocKeyword("extern",[])
     val (name, nameRng) = pFunId()
-    val (pars, pinfos, args, tp, annotates) = choices("extern type", [
+    val (pars, pinfos, args, tp, annotate) = choices("extern type", [
       {
         pKeyword(":", [])
         val tp = pType()
@@ -354,22 +347,22 @@ fun pExternDecl(dvis: visibility): <ast> list<topDef>
       },
       {
         val tpPars = pTypeParams()
-        val (pars, pinfos, parRng) = pDeclParams(True, inl != InlineAlways)
+        val (pars, pinfos, _) = pDeclParams(True, !inl.is-inlineAlways)
         val (teff, tres) = pAnnotResult()
         val tp = typeFromPars(nameRng, pars, teff, tres)
-        (pars.map(fn(ValueBinder(name, tp, expr, rng1, rng2)) ValueBinder(name, Just(tp), expr, rng1, rng2)), pinfos, genArgs(pars), tp, fn(body) promote([], tpars, [], Just(Just((teff, tres))), body))
+        (pars.map(fn(ValueBinder(name', tp', expr, rng1, rng2)) ValueBinder(name', Just(tp'), expr, rng1, rng2)), pinfos, genArgs(pars), tp, fn(body) promote([], tpPars, [], Just((Just(teff), tres)), body))
       }
     ])
     val (exprs, rng) = pExternalBody()
-    val fullRng = Range(krng.start, rng.end)
-    if (inl == InlineAlways) then [DefExtern(External(name, tp, pinfos, nameRng, fullRng, exprs, vis, fip, doc))]
+    val fullRng = combine([krng, vrng, rng])
+    if (inl.is-inlineAlways) then [DefExtern(External(name, tp, pinfos, nameRng, fullRng, exprs, vis, fip, doc))]
     else
       val externName = newHiddenExternalName(name)
       val ext = External(externName, tp, pinfos, nameRng.before, fullRng.before, exprs, Private, fip, doc)
       val body = annotate(Lam(pars, App(Var(externName, False, rangeNull), args, fullRng), fullRng))
       val binder = ValueBinder(name, (), body, nameRng, fullRng)
       val extfun = Def(binder, fullRng, vis, defFunEx(pinfos, fip), InlineNever, doc)
-      [DefExtern(ext, extfun)]
+      [DefExtern(ext), DefValue(extfun)]
   }
   ])
   
@@ -395,7 +388,7 @@ fun pDeclParams(allowBorrow: bool, allowDefaults: bool)
     val pinfo = if allowBorrow then pParamInfo() else Own
     val (name, rng, tp) = pParamType()
     val (opt, drng) = if allowDefaults then pDefaultExpr() else (Nothing, rangeNull)
-    ValueBinder(name, tp, opt, rng, combineRanges([rng, tp.range, drng]), pinfo)
+    (ValueBinder(name, tp, opt, rng, combine([rng, tp.range(range), drng])), pinfo)
   val (ipars, rng) = parensCommas(pParamBinder)
   val (pars, pinfos) = ipars.unzip
   (pars, pinfos, rng)
@@ -408,7 +401,6 @@ fun pParamInfo()
 
 fun pPureDecl(vis: visibility)
   unimplemented()
-
 
 fun pFipAlloc()
   parens
@@ -442,10 +434,73 @@ fun pFip()
     }, 
     {NoFip(isTail)}])
 
+fun pExternalBody()
+  unimplemented()
 
+fun pType(): <ast> userType
+  unimplemented()
+
+fun pParamType(): <ast> (name, range, userType)
+  unimplemented()
+
+fun pDefaultExpr()
+  unimplemented()
+
+fun pAnnotResult()
+  unimplemented()
+
+fun pFunId()
+  choicesnb("function id", [
+    {pIdentifier()},
+    {
+      val rng1 = pSpecialId("[")
+      val rng2 = pSpecialId("]")
+      (nameIndex, Range(rng1.start, rng2.end))
+    },
+    {
+      val (s, rng) = pStringLit()
+      (newName(s), rng)
+    }
+    ])
 
 fun pTypeParams()
   maybeList({angles(pTBinders).fst})
+
+
+
+
+// TODO: Here
+
+fun pTBinderDef()
+  val (id, rng) = pTBinderId()
+  fn(k) TypeBinder(id, k, rng, rng)
+
+fun pTBinderId()
+  choicesnb("", [pTypeId, pTList, pTTuple, pTEmptyOrExtend])
+
+fun pTList(): <ast> (name, range)
+  val rng1 = pSpecial("[", [])
+  val rng2 = pSpecial("]", [])
+  (nameTpList.unqualify, rng1.combine(rng2))
+
+fun pTTuple(): <ast> (name, range)
+  val rng1 = pLparen()
+  val cs = pmany("comma", pComma)
+  val rng2 = pRparen()
+  (nameTuple(cs.length + 1).unqualify, rng1.combine(rng2))
+
+fun pTEmptyOrExtend()
+  val rng1 = pLangle()
+  choicesnb("", [
+    {
+      pBar()
+      val rng2 = pRangle()
+      (nameEffectEmpty, rng1.combine(rng2))
+    },{
+      val rng2 = pRangle()
+      (nameEffectEmpty, rng1.combine(rng2))
+    }
+  ])
 
 fun pTBinders()
   pSepBy("type binder", pTBinder, pComma)
@@ -496,22 +551,6 @@ fun pKindAtom()
    { KindCon(nameKindHandled, pSpecialConId("HX1")) }
   ])
 
-fun pFunId()
-  choicesnb("function id", [
-    {pIdentifier()},
-    {
-      val rng1 = pSpecialId("[")
-      val rng2 = pSpecialId("]")
-      (nameIndex, Range(rng1.start, rng2.end))
-    },
-    {
-      val (s, rng) = pStringLit()
-      (newName(s), rng)
-    }
-    ])
-
-
-
 fun semis(kind, p)
   pmanyend(kind, p, pSemi1)
 
@@ -526,9 +565,6 @@ fun parens(p)
   val r = pRparen()
   (x, Range(l.start, r.end))
 
-fun pComma()
-  pSpecial(",")
-
 fun angles(p)
   val l = pLangle()
   val x = p()
@@ -542,11 +578,27 @@ fun parensCommas(p)
 fun parseRange(msg: string, f: (lexeme) -> <ast|e> bool): <ast|e> range
   token(msg, fn(x) if f(x) then Just(x) else Nothing).range
 
-fun pLcurly()
-  parseRange("{", fn(x) x.lex.is-lcurly)
+inline fun pLapp()
+  pLparen()
 
-fun pRcurly()
-  parseRange("}", fn(x) x.lex.is-rcurly)
+inline fun pLidX()
+  pLbracket()
+
+inline fun pBar()
+  pKeyword("|", []).range
+
+inline fun pComma()
+  pSpecial(",", [])
+
+inline fun pSemicolon(): <ast> lexeme
+  token("semicolon") fn(x) 
+    if x.is-semicolon then Just(x) else Nothing
+
+fun pLbracket()
+  parseRange("(", fn(x) x.lex.is-lbracket)
+
+fun pRbracket()
+  parseRange(")", fn(x) x.lex.is-rbracket)
 
 fun pLparen()
   parseRange("(", fn(x) x.lex.is-lparen)
@@ -555,26 +607,50 @@ fun pRparen()
   parseRange(")", fn(x) x.lex.is-rparen)
 
 fun pLangle()
-  parseRange("(", fn(x) x.lex.is-langle)
+  parseRange("<", fn(x) x.lex.is-langle)
 
 fun pRangle()
-  parseRange(")", fn(x) x.lex.is-rangle)
+  parseRange(">", fn(x) x.lex.is-rangle)
+
+fun pLcurly()
+  parseRange("{", fn(x) x.lex.is-lcurly)
+
+fun pRcurly()
+  parseRange("}", fn(x) x.lex.is-rcurly)
 
 fun pIdentifier()
   ensureUnqualified("identifier", pQIdentifier)
 
+inline fun pQIdentifier()
+  choices("qidentifier", [pQVarId, pQIdOp])
+
+inline fun pQConstructor()
+  pQConId()
+
+inline fun pQOperator()
+  pQOp()
+
 fun pVarId()
   ensureUnqualified("variable id", pQVarId)
 
-fun pModulePath(): <ast> (name, range)
-  token("module path") fn(x)
-    match x 
-      Lexeme(rng, LexId(id)) -> 
-        Just((id.showPlain.newName, rng))
-      _ -> Nothing
+fun pIdOp()
+  ensureUnqualified("operator", pQIdOp)
 
-fun pQIdentifier()
-  choices("qidentifier", [pQVarId, pQIdOp])
+fun pConId()
+  choices("Constructor", [
+    { ensureUnqualified("constructor", pQConId) },
+    { val (s, rng) = pStringLit(); (newName(s), rng)}
+  ])
+
+fun pOp()
+  ensureUnqualified("operator", pQOp)
+
+fun pTypeId()
+  val (name, rng) = pQTypeId()
+  if name.isQualified then
+    astError("expected unqualified type name", rng)
+  else
+    (name, rng)
 
 fun ensureUnqualified(str, p)
   val (n, r) = p()
@@ -582,6 +658,34 @@ fun ensureUnqualified(str, p)
     astError("expected unqualified " ++ str, r)
   else
     (n, r)
+
+fun pQTypeId()
+  with override
+    final ctl astError(e, r) 
+      reset()
+      astError(e, r)
+  pdelimit("qualified typeId")
+  val (name, range) = choicesnb("qTypeId", [pQVarId, pTypeIdCtx])
+  if !name.isTypeVar then 
+    commit()
+    (name, range)
+  else astError("type name (and not type variable)", range)
+
+fun pTypeIdCtx()
+  ("ctx".newName, pKeyword("ctx", []).range)
+
+fun pQOp()
+  token("operator") fn(a)
+    match a
+      Lexeme(rng, LexOp(id)) -> 
+        Just((id, rng))
+
+fun pPrefixOp()
+  token("prefix operator") fn(a)
+    match a
+      Lexeme(rng, LexPrefix(id)) -> 
+        Just(Var(id, True, rng))
+      _ -> Nothing
 
 fun pQVarId()
   token("variable id") fn(a)
@@ -604,6 +708,38 @@ fun pQConId()
         Just((id, rng))
       _ -> Nothing
 
+fun pModulePath(): <ast> (name, range)
+  token("module path") fn(x)
+    match x 
+      Lexeme(rng, LexId(id)) -> 
+        Just((id.showPlain.newName, rng))
+      _ -> Nothing
+
+fun pWildcard()
+  token("wildcard") fn(a)
+    match a
+      Lexeme(rng, LexWildCard(id)) -> 
+        Just((if id.showPlain == "_" then uniqueRangeName(rng, "_w") else id, rng))
+      _ -> Nothing
+
+fun pInteger()
+  token("integer") fn(l)
+    match l
+      Lexeme(_, LexInt(i)) -> Just((i, l))
+      _ -> Nothing
+
+fun pFloat()
+  token("float") fn(l)
+    match l
+      Lexeme(_, LexFloat(d)) -> Just((d, l))
+      _ -> Nothing
+
+fun pCharLit()
+  token("char literal") fn(x) 
+    match x
+      Lexeme(rng, LexChar(s)) -> Just((s, rng))
+      _ -> Nothing
+
 fun pStringLit()
   token("string literal") fn(x) 
     match x
@@ -611,15 +747,18 @@ fun pStringLit()
       _ -> Nothing
 
 fun pSpecialId(s: string)
-  token("special id " ++ s) fn(x)
+  token(s) fn(x)
     match x.lex
       LexId(id) | id.showPlain == s -> Just(x.range)
       _ -> Nothing
 
-fun pSpecial(s)
+fun pSpecial(s: string, alternates: list<string>)
   token(s) fn(x)
     match x.lex
       LexSpecial(s') | s == s' -> Just(x.range)
+      LexSpecial(s') | alternates.any(fn(v) v == s') -> 
+        addWarning("using deprecated keyword " ++ s' ++ ", use " ++ s ++ " instead", x.range)
+        Just(x.range)
       _ -> Nothing
 
 fun pSpecialOp(s)
@@ -648,12 +787,26 @@ fun pDocKeyword(s: string, alternates: list<string>): <ast> (range, string)
     Lexeme(rng, LexKeyword(_, doc)) -> (rng, doc)
     _ -> astError("expected " ++ s, rangeNull)
 
-fun pInteger()
-  token("integer") fn(l)
-    match l
-      Lexeme(_, LexInt(i)) -> Just((i, l))
-      _ -> Nothing
+fun warnDeprecated(o: string, n: string, rng: range): <ast> ()
+  addWarning("warning " ++ rng.start.show ++ ": keyword \"" ++ o ++ "\" is deprecated, use \"" ++ n ++ "\" instead", rng)
 
+fun pWarningMessage(msg: string, rng: range)
+  addWarning("warning " ++ rng.start.show ++ ":" ++ msg, rng)
+
+
+fun uniqueRangeHiddenName(rng: range, pre: string): name
+  val pos = rng.start
+  newHiddenName(pre ++ "_" ++ pos.line.show ++ "_" ++ pos.col.show)
+
+fun uniqueRangeName(rng: range, pre: string): name
+  val pos = rng.start
+  newName(pre ++ "-l" ++ pos.line.show ++ "-c" ++ pos.col.show)
+
+fun adjustRange(r: range, ue: userExpr): userExpr
+  Parens(ue, nameNil, r)
+
+fun adjustTpRange(r: range, ut: userType): userType
+  TpParens(ut, r)
 
 fun unimplemented()
   astError("unimplemented", peek().range)

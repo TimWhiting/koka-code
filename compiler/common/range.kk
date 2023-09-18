@@ -25,10 +25,13 @@ fun (<=)(p1: pos, p2: pos): bool
   else
     p1.col <= p2.col
 
-fun showPos(p: pos, alignWidth: int)
+fun show(p: pos): string
+  "(" ++ p.showPos(2) ++ ")"
+
+fun showPos(p: pos, alignWidth: int): string
   p.line.showLine() ++ "," ++ p.col.show.pad-left(alignWidth)
 
-fun showFullPos(p: pos, alignWidth: int)
+fun showFullPos(p: pos, alignWidth: int): string
   "[" ++ p.off.show ++ "] " ++ p.showPos(alignWidth)
 
 // about 67 million lines

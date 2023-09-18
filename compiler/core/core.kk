@@ -7,6 +7,7 @@ import compiler/type/type
 import compiler/type/kind
 import compiler/kind/kind
 import newstd/data/linearset
+import compiler/common/name-collections
 
 fun isUnit(e: expr): bool
   match e
@@ -769,7 +770,6 @@ fun splitTForAll(tp: ktype): <exn> (list<typeVar>, ktype)
     _ -> throw("core/core splitTForAll: expected forall type")
 
 alias deps = linearSet<name>
-val namesEmpty = linearSet([], fn(a:name, b:name) a == b, fn(a:name) a.show)
 fun depsUnions(l: list<deps>): deps
   l.foldl(namesEmpty, fn(s, a) s + a)
 fun dep(t: tName): deps

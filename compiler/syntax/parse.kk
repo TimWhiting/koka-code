@@ -9,6 +9,7 @@ import compiler/common/syntax
 import compiler/common/name
 import compiler/common/name-prim
 import compiler/common/range
+import compiler/syntax/promote
 
 effect astError
   final ctl astError(e: string, r: range): a
@@ -149,6 +150,11 @@ fun maybe(str: string, p: () -> <ast> a): <ast> maybe<a>
   val x = p()
   commit()
   x
+
+fun maybeList(p: () -> <ast> list<a>): <ast> list<a>
+  match maybe("list", p)
+    Just(r) -> r
+    Nothing -> []
 
 // Version of maybe that doesn't backtrack
 fun maybenb(str: string, p: () -> <ast> a): <ast> maybe<a>
@@ -297,6 +303,32 @@ fun pInline()
 fun warnDeprecated(o: string, n: string, rng: range): <ast> ()
   addWarning("using deprecated " ++ o ++ ", use " ++ n ++ " instead", rng)
 
+fun typeFromPars(rng:range, pars: list<valueBinder<userType, maybe<userExpr>>>, teff: userType, tres: userType): div userType
+  promoteType(TpFun(pars.map(fn(p) (p.name, p.binderType)), teff, tres, rng))
+
+fun genArgs(pars: list<valueBinder<userType, maybe<userExpr>>>): list<(maybe<userExpr>, userExpr)>
+  pars.map(fn(p) (Nothing, Var(p.name, False, p.range.before)))
+
+fun genParArgs(tp)
+  match tp
+    TpQuan(QSome) -> astError("external types cannot contain unspecified ('_') types", tp.range)
+    TpQuan(QExists) -> astError("external types cannot contain existential types", tp.range)
+    TpQuan(_, _, t) -> t.genParArgs
+    TpQual(_, t) -> t.genParArgs
+    TpParens(t) -> t.genParArgs
+    TpAnn(t, _) -> t.genParArgs
+    TpFun(pars) -> pars.genFunParArgs
+    _ -> astError("external declarations must have a function type", tp.range)
+
+fun genFunParArgs(pars: list<(name, userType)>)
+  pars.map-indexed(fn(i, p) p.genParArg(i))
+
+fun genParArg((name:name, _:userType), idx: int)
+  val fullName = if name == nameNil then newHiddenName("arg" ++ idx.show) else name
+  val rng = rangeNull
+  (ValueBinder(fullName, Nothing, Nothing, rng, rng), Nothing, Var(fullName, False, rng))
+
+
 fun pExternDecl(dvis: visibility): <ast> list<topDef>
   choices("externDecl", [{
     val krng = pDocKeyword("extern", []).fst
@@ -313,8 +345,31 @@ fun pExternDecl(dvis: visibility): <ast> list<topDef>
     val fip = pFip()
     val (krng,doc) = pDocKeyword("extern",[])
     val (name, nameRng) = pFunId()
-    // TODO: 
-    [DefExtern(unimplemented())]
+    val (pars, pinfos, args, tp, annotates) = choices("extern type", [
+      {
+        pKeyword(":", [])
+        val tp = pType()
+        val (pars, args) = genParArgs(promoteType(tp))
+        (pars, [], args, tp, fn(body) Ann(body, tp, tp.range))
+      },
+      {
+        val tpPars = pTypeParams()
+        val (pars, pinfos, parRng) = pDeclParams(True, inl != InlineAlways)
+        val (teff, tres) = pAnnotResult()
+        val tp = typeFromPars(nameRng, pars, teff, tres)
+        (pars.map(fn(ValueBinder(name, tp, expr, rng1, rng2)) ValueBinder(name, Just(tp), expr, rng1, rng2)), pinfos, genArgs(pars), tp, fn(body) promote([], tpars, [], Just(Just((teff, tres))), body))
+      }
+    ])
+    val (exprs, rng) = pExternalBody()
+    val fullRng = Range(krng.start, rng.end)
+    if (inl == InlineAlways) then [DefExtern(External(name, tp, pinfos, nameRng, fullRng, exprs, vis, fip, doc))]
+    else
+      val externName = newHiddenExternalName(name)
+      val ext = External(externName, tp, pinfos, nameRng.before, fullRng.before, exprs, Private, fip, doc)
+      val body = annotate(Lam(pars, App(Var(externName, False, rangeNull), args, fullRng), fullRng))
+      val binder = ValueBinder(name, (), body, nameRng, fullRng)
+      val extfun = Def(binder, fullRng, vis, defFunEx(pinfos, fip), InlineNever, doc)
+      [DefExtern(ext, extfun)]
   }
   ])
   
@@ -334,42 +389,26 @@ fun pTypeDecl(vis: visibility)
 fun pEffectDecl(vis: visibility)
   unimplemented()
 
+
+fun pDeclParams(allowBorrow: bool, allowDefaults: bool)
+  fun pParamBinder() 
+    val pinfo = if allowBorrow then pParamInfo() else Own
+    val (name, rng, tp) = pParamType()
+    val (opt, drng) = if allowDefaults then pDefaultExpr() else (Nothing, rangeNull)
+    ValueBinder(name, tp, opt, rng, combineRanges([rng, tp.range, drng]), pinfo)
+  val (ipars, rng) = parensCommas(pParamBinder)
+  val (pars, pinfos) = ipars.unzip
+  (pars, pinfos, rng)
+
+fun pParamInfo()
+  choices("param info", [{
+    pSpecialOp("^")
+    Borrow
+  }, {Own}])
+
 fun pPureDecl(vis: visibility)
   unimplemented()
 
-fun semis(kind, p)
-  pmanyend(kind, p, pSemi1)
-
-fun pSemi1()
-  pmany1("semicolons", pSemicolon)
-
-fun parseRange(msg: string, f: (lexeme) -> <ast|e> bool): <ast|e> range
-  token(msg, fn(x) if f(x) then Just(x) else Nothing).range
-
-fun pLcurly()
-  parseRange("{", fn(x) x.lex.is-lcurly)
-
-fun pRcurly()
-  parseRange("}", fn(x) x.lex.is-rcurly)
-
-fun pLparen()
-  parseRange("(", fn(x) x.lex.is-lparen)
-
-fun pRparen()
-  parseRange(")", fn(x) x.lex.is-rparen)
-
-fun pModulePath(): <ast> (name, range)
-  token("module path") fn(x)
-    match x 
-      Lexeme(rng, LexId(id)) -> 
-        Just((id.showPlain.newName, rng))
-      _ -> Nothing
-
-fun parens(p)
-  val l = pLparen()
-  val x = p()
-  val r = pRparen()
-  (x, Range(l.start, r.end))
 
 fun pFipAlloc()
   parens
@@ -404,8 +443,61 @@ fun pFip()
     {NoFip(isTail)}])
 
 
+
+fun pTypeParams()
+  maybeList({angles(pTBinders).fst})
+
+fun pTBinders()
+  pSepBy("type binder", pTBinder, pComma)
+
+fun pTBinder()
+  val (id, rng) = pVarId()
+  val kind = pKindAnnotation()
+  return TypeBinder(id, kind, rng, rng)
+
+fun pKindAnnotation()
+  choices("kind", [{
+    pSpecialId("::")
+    pKind()
+  },
+  {KindNone}])
+
+fun pKind()
+  choices("kind", [
+   {
+    val (params, _) = parensCommas(pKind)
+    pKeyword("->", [])
+    val res = pKind()
+    params.foldr(res, fn(a, acc) KindArrow(a, acc))
+   },
+   {
+    val k = pKindAtom()
+    choices("kind", [{
+      pKeyword("->", [])
+      val k2 = pKind()
+      KindArrow(k, k2)
+    }, {k}])
+   }
+  ])
+
+fun pKindAtom()
+  choicesnb("kind constant (V,E,H,S,X,HX,HX1, or P)", [
+   {
+    val (k, rng) = parens(pKind)
+    KindParens(k, rng)
+   },
+   { KindCon(nameKindStar, pSpecialConId("V")) },
+   { KindCon(nameKindLabel, pSpecialConId("X")) },
+   { KindCon(nameKindEffect, pSpecialConId("E")) },
+   { KindCon(nameKindHeap, pSpecialConId("H")) },
+   { KindCon(nameKindScope, pSpecialConId("S")) },
+   { KindCon(nameKindPred, pSpecialConId("P")) },
+   { KindCon(nameKindHandled, pSpecialConId("HX")) },
+   { KindCon(nameKindHandled, pSpecialConId("HX1")) }
+  ])
+
 fun pFunId()
-  choices("function id", [
+  choicesnb("function id", [
     {pIdentifier()},
     {
       val rng1 = pSpecialId("[")
@@ -418,12 +510,71 @@ fun pFunId()
     }
     ])
 
+
+
+fun semis(kind, p)
+  pmanyend(kind, p, pSemi1)
+
+val pSepBy = pmanyend
+
+fun pSemi1()
+  pmany1("semicolons", pSemicolon)
+
+fun parens(p)
+  val l = pLparen()
+  val x = p()
+  val r = pRparen()
+  (x, Range(l.start, r.end))
+
+fun pComma()
+  pSpecial(",")
+
+fun angles(p)
+  val l = pLangle()
+  val x = p()
+  val r = pRangle()
+  (x, Range(l.start, r.end))
+
+fun parensCommas(p)
+  parens
+    pSepBy("comma", p, pComma)
+
+fun parseRange(msg: string, f: (lexeme) -> <ast|e> bool): <ast|e> range
+  token(msg, fn(x) if f(x) then Just(x) else Nothing).range
+
+fun pLcurly()
+  parseRange("{", fn(x) x.lex.is-lcurly)
+
+fun pRcurly()
+  parseRange("}", fn(x) x.lex.is-rcurly)
+
+fun pLparen()
+  parseRange("(", fn(x) x.lex.is-lparen)
+
+fun pRparen()
+  parseRange(")", fn(x) x.lex.is-rparen)
+
+fun pLangle()
+  parseRange("(", fn(x) x.lex.is-langle)
+
+fun pRangle()
+  parseRange(")", fn(x) x.lex.is-rangle)
+
 fun pIdentifier()
   ensureUnqualified("identifier", pQIdentifier)
 
+fun pVarId()
+  ensureUnqualified("variable id", pQVarId)
+
+fun pModulePath(): <ast> (name, range)
+  token("module path") fn(x)
+    match x 
+      Lexeme(rng, LexId(id)) -> 
+        Just((id.showPlain.newName, rng))
+      _ -> Nothing
+
 fun pQIdentifier()
   choices("qidentifier", [pQVarId, pQIdOp])
-
 
 fun ensureUnqualified(str, p)
   val (n, r) = p()
@@ -463,6 +614,24 @@ fun pSpecialId(s: string)
   token("special id " ++ s) fn(x)
     match x.lex
       LexId(id) | id.showPlain == s -> Just(x.range)
+      _ -> Nothing
+
+fun pSpecial(s)
+  token(s) fn(x)
+    match x.lex
+      LexSpecial(s') | s == s' -> Just(x.range)
+      _ -> Nothing
+
+fun pSpecialOp(s)
+  token(s) fn(x)
+    match x.lex
+      LexOp(s') | s == s'.showPlain -> Just(x.range)
+      _ -> Nothing
+
+fun pSpecialConId(s)
+  token(s) fn(x)
+    match x.lex
+      LexCons(s') | s == s'.showPlain -> Just(x.range)
       _ -> Nothing
 
 fun pKeyword(s: string, alternates: list<string>): <ast> lexeme

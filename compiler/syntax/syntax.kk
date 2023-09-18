@@ -2,7 +2,9 @@ import std/num/float64
 import compiler/common/range
 import compiler/common/name
 import compiler/common/name-prim
+import compiler/common/name-collections
 import compiler/common/syntax
+import newstd/data/linearset
 import newstd/core
 
 pub struct program<t, k>
@@ -324,3 +326,56 @@ fun show(u: userKind): string
     KindArrow(from, to) -> "KindArrow " ++ from.show ++ " " ++ to.show
     KindParens(kind, range) -> "KindParens " ++ kind.show ++ " " ++ range.showFullRange
     KindNone -> "KindNone"
+
+
+
+
+
+
+
+
+fun range(tp: kUserType<k>, rK: (k) -> range): range
+  match tp
+    TpQuan(range=range) -> range
+    TpQual(preds, tp) -> Range(preds.head.default(tp).unsafe-decreasing.range(rK).start, tp.range(rK).end)
+    TpFun(range=range) -> range
+    TpApp(range=range) -> range
+    TpVar(range=range) -> range
+    TpCon(range=range) -> range
+    TpParens(range=range) -> range
+    TpAnn(userTp, kind) -> Range(userTp.range(rK).start, kind.rK.end)
+
+fun range(uk: userKind): range
+  match uk
+    KindCon(range=range) -> range
+    KindArrow(k1, k2) -> Range(k1.range.start, k2.range.end)
+    KindParens(range=range) -> range
+    KindNone -> rangeNull
+
+fun range(utp: userType): range
+  utp.range(range)
+
+
+
+
+
+
+// free type variables
+fun freeTypeVars(m: maybe<a>, f: (a) -> div nameSet): div nameSet
+  match m
+    Nothing -> namesEmpty
+    Just(x) -> f(x)
+
+fun freeTypeVars(l: list<a>, f: (a) -> div nameSet): div nameSet
+  l.foldl(namesEmpty, fn(s, x) s + f(x))
+
+fun freeTypeVars(tp: kUserType<k>): div nameSet
+  match tp
+    TpQuan(_, TypeBinder(name), tp, _) -> tp.freeTypeVars - name
+    TpQual(preds, tp) -> freeTypeVars(Cons(tp, preds), freeTypeVars)
+    TpFun(args, eff, tp) -> freeTypeVars(Cons(tp,Cons(eff,args.map(snd))), freeTypeVars)
+    TpApp(tp, args) -> tp.freeTypeVars + args.freeTypeVars(freeTypeVars)
+    TpVar(name) -> namesEmpty.add(name)
+    TpCon -> namesEmpty
+    TpParens(tp) -> tp.freeTypeVars
+    TpAnn(tp) -> tp.freeTypeVars

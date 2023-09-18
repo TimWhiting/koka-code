@@ -54,6 +54,16 @@ fun is-lparen(l: lex): bool
     LexSpecial("(") -> True
     _ -> False
 
+fun is-rangle(l: lex): bool
+  match l
+    LexSpecial(">") -> True
+    _ -> False
+
+fun is-langle(l: lex): bool
+  match l
+    LexSpecial("<") -> True
+    _ -> False
+
 pub fun (==)(l1: lexeme, l2: lexeme): bool
   l1.range == l2.range && l1.lex == l2.lex
 

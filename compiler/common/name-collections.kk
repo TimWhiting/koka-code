@@ -1,5 +1,5 @@
-import newstd/data/linearMap
-import newstd/data/linearSet
+import newstd/data/linearmap
+import newstd/data/linearset
 import compiler/common/name
 import compiler/common/failure
 import compiler/platform/config
@@ -11,7 +11,8 @@ fun find(m: name-map<a>, n: name): <div,exn> a
     Just(x) -> x
     _ -> throw("common/name-map.find: could not find: " ++ n.show)
 
-// alias name-set<a> = set<name>;
+alias nameSet = linearSet<name>;
+val namesEmpty = linearSet([], fn(a:name, b:name) a == b, fn(a:name) a.show)
 
 alias qname-map<a> = linearMap<name,list<(name,a)>>;
 
@@ -20,15 +21,30 @@ type lookup<a>
   Ambiguous(names: list<name>)
   NotFound
 
-fun single(n: name, a: a): qname-map<a>
-  linearMap([(n.unqualify, [(n, a)])], fn(k1, k2) k1 == k2)
+fun (==)(l1: list<a>, l2: list<a>, eqA: (a, a) -> e bool): e bool
+  match (l1, l2)
+    (Nil, Nil) -> True
+    (Cons(x, xs), Cons(y, ys)) -> eqA(x, y) && (==)(xs, ys, eqA)
+    _ -> False
+
+fun eqNameList(l1: list<(name,a)>, l2: list<(name,a)>, eqA: (a, a) -> e bool): e bool
+  match (l1, l2)
+    (Nil, Nil) -> True
+    (Cons((n1, x), xs), Cons((n2, y), ys)) -> n1 == n2 && eqA(x, y) && eqNameList(xs, ys, eqA)
+    _ -> False
+
+fun showNameList(l: list<(name,a)>, showA: (a) -> e string): e string
+  l.show-list(fn((n, a)) "(" ++ n.show ++ ", " ++ a.showA ++ ")")
+
+fun single(n: name, a: a, eqA: (a, a) -> <div|e> bool, showA: (a) -> <div|e> string): qname-map<a>
+  linearMap([(n.unqualify, [(n, a)])], fn(k1:name, k2) k1 == k2, fn(v1, v2) eqNameList(v1, v2, eqA), fn(n') n'.show, fn(l) l.showNameList(showA))
 
 fun insertName(m: qname-map<a>, n: name, a: a): <compFlags,exn> qname-map<a>
   m.update(n.unqualify, Cons((n, a), Nil)) fn(xs, ys)
     safeCombine("insert", xs, ys)
 
-fun fromList(l: list<(name,a)>): <compFlags,exn> qname-map<a>
-  l.foldl(linearMap([], fn(k1:name, k2:name) k1 == k2)) fn(qm, (name, x))
+fun fromList(l: list<(name,a)>, eqA: (a, a) -> <div|e> bool, showA: (a) -> <div|e> string): <compFlags,pure> qname-map<a>
+  l.foldl(linearMap([], fn(k1:name, k2) k1 == k2, fn(v1, v2) eqNameList(v1, v2, eqA), fn(n) n.show, fn(l') l'.showNameList(showA))) fn(qm, (name, x))
     qm.insertName(name, x)
 
 fun safeCombine(s: string, xs: list<(name,a)>, ys: list<(name,a)>): <compFlags,exn> list<(name,a)>

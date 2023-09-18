@@ -471,6 +471,26 @@ fun pTypeParams()
 
 // TODO: Here
 
+fun pTId()
+  choices("Type", [
+    {}
+  ])
+
+fun makeApp(expr: expr<t>, args: list<expr<t>>, rT: (t) -> range): expr<t>
+  App(expr, args.map(fn(a) (Nothing, a)), expr.range.combine(args.last.map(range).default(expr.range)))
+
+fun makeTpPure(rng: range): kUserType<k>
+  TpCon(nameTpPure, rng)
+
+fun makeTpTotal(rng: range): kUserType<k>
+  TpCon(nameEffectEmpty, rng)
+
+fun makeEffectEmpty(rng: range): kUserType<k>
+  TpCon(nameEffectEmpty, rng)
+
+fun makeEffectExtend(rng: range, label: kUserType<k>, ext: kUserType<k>, rK: (k) -> range): kUserType<k>
+  TpApp(TpCon(nameEffectExtend, rng), [label, ext], label.range(rK).combine(ext.range(rK)))
+
 fun pTBinderDef()
   val (id, rng) = pTBinderId()
   fn(k) TypeBinder(id, k, rng, rng)

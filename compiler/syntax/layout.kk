@@ -42,12 +42,6 @@ fun startCol(r)
 fun endCol(r)
   r.end.col
 
-fun before(r)
-  Range(r.start, r.start)
-
-fun after(r)
-  Range(r.end, r.end)
-
 fun isAdjacent(comment: string, r1: range, r2: range): bool
   if comment.ends-with("\n").bool then r1.end.line == r2.start.line else r1.end.line == r2.start.line - 1
 

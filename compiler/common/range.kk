@@ -94,6 +94,12 @@ fun combine(r1: range, r2: range): range
 fun combine(rs: list<range>): range
   rs.foldl(rangeNull, combine)
 
+fun before(r: range)
+  Range(r.start, r.start)
+
+fun after(r: range)
+  Range(r.end, r.end)
+
 fun minPos(p1: pos, p2: pos): pos
   if p1.line <= 0 then
     p2

@@ -177,7 +177,7 @@ type expr<t>
   Bind(def: def<t>, e: expr<t>, range: range)
   App(e: expr<t>, args: list<(maybe<(name, range)>, expr<t>)>, range: range)
   Var(name: name, isOp: bool, range: range)
-  Literal(l: lit)
+  Literal(l: lit, range: range = l.range)
   Ann(e: expr<t>, t: t, range: range)
   Case(e: expr<t>, cases: list<branch<t>>, range: range)
   Parens(e: expr<t>, name: name, range: range)
@@ -330,9 +330,6 @@ fun show(u: userKind): string
 
 
 // Range
-
-
-
 
 fun range(tp: kUserType<k>, rK: (k) -> range): range
   match tp

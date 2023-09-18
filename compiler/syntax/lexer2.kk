@@ -477,9 +477,9 @@ fun lexing(source: source, lineNo: int, input: string)
                 LexWhite(w) -> w.count("\n")
                 _ -> 0
               val ncols = match e
-                LexWhite(w) -> w.list.reverse.take-while(fn(c) c == '\n').length
+                LexWhite(w) -> w.list.reverse.take-while(fn(c) c != '\n').length
                 _ -> finalOffset - startOff
-              pos := Pos(source, finalOffset, pos.line + nlines, col=pos.col+ncols)
+              pos := Pos(source, finalOffset, start.line + nlines, col=start.col+ncols)
               result := Cons(Lexeme(Range(start, pos), e), result)
             Left(e) ->
               cont := False

@@ -17,7 +17,7 @@ pub struct program<t, k>
   doc: string
 
 
-fun show(Program(_, n, _, typeDefs, defs, imports, externals, fixDefs, _):program<t,k>, showT: (t) -> <div|e> string, showK: (k) -> <div|e> string): <div|e> string
+fun show(Program(_, n, _, typeDefs, defs, imports, externals, fixDefs, _):program<t,k>, showT: (t) -> div string, showK: (k) -> div string): div string
   name/show(n) ++ ":\n" ++ "typeDefs " ++ typeDefs.show-list(fn(t) t.show(showT, showK)) ++ "\n" ++ "defs " ++ defs.show-list(fn(d) d.show(showT)) ++ "\n" ++ 
   "imports " ++ imports.show-list(fn(i) i.show) ++ "\n" ++ "externals " ++ externals.show-list(fn(e) e.show) ++ "\n" ++ 
   "fixDefs " ++ fixDefs.show-list(fn(f) f.show) ++ "\n"
@@ -48,7 +48,7 @@ fun show(e: external): div string
     External(name, t, params, nameRange, range, inlineCall, vis, doc) -> 
       "External " ++ name.show ++ " " ++ t.show ++ " " ++ params.show-list(fn(p) p.show) ++ " " ++ nameRange.showFullRange ++ " " ++ range.showFullRange ++ " " ++ 
       inlineCall.show-list(fn(c) c.fst.show ++ " " ++ c.snd.show) ++ " " ++ vis.show ++ " " ++ doc.show
-    ExternalImport(eImport, range) -> "ExternalImport " ++ eImport.show-list(fn(e) e.fst.show ++ " " ++ e.snd.show-list(fn(e') e'.fst ++ " " ++ e'.snd)) ++ " " ++ range.showFullRange
+    ExternalImport(eImport, range) -> "ExternalImport " ++ eImport.show-list(fn(e') e'.fst.show ++ " " ++ e'.snd.show-list(fn(e1) e1.fst ++ " " ++ e1.snd)) ++ " " ++ range.showFullRange
 
 value type externalCall
   ExternalInline(content: string)
@@ -87,7 +87,7 @@ value type typeDefGroup<t,k>
   TypeDefRec(defs: list<typeDef<t,t,k>>)
   TypeDefNonRec(def: typeDef<t,t,k>)
 
-fun show(t: typeDefGroup<t,k>, showT: (t) -> e string, showK: (k) -> e string): e string
+fun show(t: typeDefGroup<t,k>, showT: (t) -> div string, showK: (k) -> div string): div string
   match t
     TypeDefRec(defs) -> "TypeDefRec " ++ defs.show-list(fn(t') t'.show(showT, showT, showK))
     TypeDefNonRec(def) -> "TypeDefNonRec " ++ def.show(showT, showT, showK)
@@ -96,13 +96,13 @@ type typeDef<t,u,k>
   Synonym(binder: typeBinder<k>, params: list<typeBinder<k>>, synonym: t, range: range, vis: visibility, doc: string)
   DataType(binder: typeBinder<k>, params: list<typeBinder<k>>, constrs: list<userCon<t,u,k>>, range: range, vis: visibility, sort: dataKind, def: dataDef, isExtend: bool, doc: string)
 
-fun show(td: typeDef<t,u,k>, showT: (t) -> e string, showU: (u) -> e string, showK: (k) -> e string): e string
+fun show(td: typeDef<t,u,k>, showT: (t) -> div string, showU: (u) -> div string, showK: (k) -> div string): div string
   match td
     Synonym(binder, params, synonym, range, vis, doc) -> "Synonym " ++ binder.show(showK) ++ " " ++ params.show-list(fn(b) b.show(showK)) ++ " " ++ synonym.showT ++ " " ++ range.showFullRange ++ " " ++ vis.show ++ " " ++ doc.show
-    DataType(binder, _, _, range, vis, sort, def, isExtend, doc) -> 
+    DataType(binder, params, constrs, range, vis, sort, def, isExtend, doc) -> 
       "DataType " ++ binder.show(showK) ++ " " ++ 
-      // params.show-list(fn(b) b.show(fn(k) k.showK)) ++ " " ++ 
-      // constrs.show-list(fn(c) c.show(showT, showU, showK)) ++ " " ++ 
+      params.show-list(fn(b) b.show(fn(k) k.showK)) ++ " " ++ 
+      constrs.show-list(fn(c) c.show(showT, showU, showK)) ++ " " ++ 
       range.showFullRange ++ " " ++ vis.show ++ " " ++ sort.show ++ " " ++ def.show ++ " " ++ isExtend.show ++ " " ++ doc.show
 
 struct typeBinder<k>
@@ -124,7 +124,7 @@ struct userCon<t, u, k>
   vis: visibility
   doc: string  
 
-fun show(u: userCon<t,u,k>, showT: (t) -> <div|e> string, showU: (u) -> <div|e> string, showK: (k) -> <div|e> string): <div|e> string
+fun show(u: userCon<t,u,k>, showT: (t) -> div string, showU: (u) -> div string, showK: (k) -> div string): div string
   u.name.show ++ " " ++ u.existentials.show-list(fn(e) e.show(showK)) ++ " " ++ u.params.show-list(fn(p) p.fst.show ++ "," ++ p.snd.show(fn(t) t.showT, fn(m) m.show(fn(e1) e1.show(showU)))) ++ " " ++ u.result.show(showT) ++ " " ++ u.nameRange.showFullRange ++ " " ++ u.range.showFullRange ++ " " ++ u.vis.show ++ " " ++ u.doc.show
 
 alias defGroups<t> = list<defGroup<t>>;
@@ -182,24 +182,23 @@ type expr<t>
   Inject(t: t, e: expr<t>, behind: bool, range: range)
   Handler(sort: handlerSort, scope: handlerScope, hOverride: handlerOverride, allowMask: maybe<bool>, hEffect: maybe<t>, localPars: list<valueBinder<maybe<t>, ()>>, initially: maybe<expr<t>>, hReturn: maybe<expr<t>>, finally: maybe<expr<t>>, branches: list<handlerBranch<t>>, declRange: range, range: range)
 
-fun show(expr: expr<t>, showT: (t) -> <div|e> string): <div|e> string
+fun show(expr: expr<t>, showT: (t) -> div string): div string
   match expr
-    // Lam(binder, e, range) -> "Lam " ++ binder.show-list(fn(b) b.show(fn(s) s.show(showT), fn(e') e'.show(fn(s) s.show(showT)))) ++ " " ++ e.show(showT) ++ " " ++ range.showFullRange
+    Lam(binder, e, range) -> "Lam " ++ binder.show-list(fn(b) b.show(fn(s) s.show(showT), fn(e') e'.show(fn(s) s.show(showT)))) ++ " " ++ e.show(showT) ++ " " ++ range.showFullRange
     Let(d, e, range) -> "Let " ++ d.show(showT) ++ " " ++ e.show(showT) ++ " " ++ range.showFullRange
     Bind(d, e, range) -> "Bind " ++ d.show(showT) ++ " " ++ e.show(showT) ++ " " ++ range.showFullRange
-    // App(e, args, range) -> "App " ++ e.show(showT) ++ " " ++ args.show-list(fn(a) "" ++ ":" ++ a.snd.show(showT)) ++ " " ++ range.showFullRange
+    App(e, args, range) -> "App " ++ e.show(showT) ++ " " ++ args.show-list(fn(a) "" ++ ":" ++ a.snd.show(showT)) ++ " " ++ range.showFullRange
     Var(name, isOp, range) -> "Var " ++ name.show ++ " " ++ isOp.show ++ " " ++ range.showFullRange
     Literal(l) -> "Literal " ++ l.show
     Ann(e, t, range) -> "Ann " ++ e.show(showT) ++ " " ++ t.showT ++ " " ++ range.showFullRange
-    // Case(e, cases, range) -> "Case " ++ e.show(showT) ++ " " ++ cases.show-list(fn(c) c.show(showT)) ++ " " ++ range.showFullRange
+    Case(e, cases, range) -> "Case " ++ e.show(showT) ++ " " ++ cases.show-list(fn(c) c.show(showT)) ++ " " ++ range.showFullRange
     Parens(e, name, range) -> "Parens " ++ e.show(showT) ++ " " ++ name.show ++ " " ++ range.showFullRange
     Inject(t, e, behind, range) -> "Inject " ++ t.showT ++ " " ++ e.show(showT) ++ " " ++ behind.show ++ " " ++ range.showFullRange
-    // Handler(sort, scope, hOverride, allowMask, hEffect, localPars, initially, hReturn, finally, branches, declRange, range) -> 
-    //   "Handler " ++ sort.show ++ " " ++ scope.show ++ " " ++ hOverride.show ++ " " ++ 
-    //   allowMask.show(show) ++ " " ++ hEffect.show(showT) ++ " " ++ localPars.show-list(fn(p) p.show(fn(f) f.show(showT), fn(s) "")) ++ " " ++ 
-    //   initially.show(fn(e') e'.show(showT)) ++ " " ++ hReturn.show(fn(e) e.show(showT)) ++ " " ++ finally.show(fn(e) e.show(showT)) ++ " " ++
-    //   branches.show-list(fn(b) b.show(showT)) ++ " " ++ declRange.showFullRange ++ " " ++ range.showFullRange
-    _ -> ""
+    Handler(sort, scope, hOverride, allowMask, hEffect, localPars, initially, hReturn, finally, branches, declRange, range) -> 
+      "Handler " ++ sort.show ++ " " ++ scope.show ++ " " ++ hOverride.show ++ " " ++ 
+      allowMask.show(show) ++ " " ++ hEffect.show(showT) ++ " " ++ localPars.show-list(fn(p) p.show(fn(f) f.show(showT), fn(s) "")) ++ " " ++ 
+      initially.show(fn(e') e'.show(showT)) ++ " " ++ hReturn.show(fn(e) e.show(showT)) ++ " " ++ finally.show(fn(e) e.show(showT)) ++ " " ++
+      branches.show-list(fn(b) b.show(showT)) ++ " " ++ declRange.showFullRange ++ " " ++ range.showFullRange
 
 type handlerOverride
   HandlerOverride
@@ -227,7 +226,7 @@ struct handlerBranch<t>
   branchNameRange: range
   branchPatRange: range
 
-fun show(h: handlerBranch<t>, showT: (t) -> <div|e> string): <div|e> string
+fun show(h: handlerBranch<t>, showT: (t) -> div string): div string
   h.branchName.show ++ " " ++ h.branchPars.show-list(fn(p) p.show(fn(m) m.show(showT), fn(m) "")) ++ " " ++ h.branchExpr.show(showT) ++ " " ++
   h.branchSort.show ++ " " ++ h.branchNameRange.showFullRange ++ " " ++ h.branchPatRange.showFullRange
   
@@ -235,15 +234,14 @@ struct branch<t>
   branchPattern: pattern<t>
   branchGuard: guard<t>
 
-fun show(b: branch<t>, showT: (t) -> <div|e> string): <div|e> string
-  b.branchGuard.show(showT)
-  // b.branchPattern.show(showT) ++ " " ++ b.branchGuard.show(showT)
+fun show(b: branch<t>, showT: (t) -> div string): div string
+  b.branchPattern.show(showT) ++ " " ++ b.branchGuard.show(showT)
   
 struct guard<t>
   guardTest: expr<t>
   guardExpr: expr<t>
 
-fun show(g: guard<t>, showT: (t) -> <div|e> string): <div|e> string
+fun show(g: guard<t>, showT: (t) -> div string): div string
   g.guardTest.show(showT) ++ " " ++ g.guardExpr.show(showT)
 
 type pattern<t>
@@ -254,7 +252,7 @@ type pattern<t>
   PatParens(p: pattern<t>, range: range)
   PatLit(value: lit)
 
-fun show(p: pattern<t>, showT: (t) -> e string): e string
+fun show(p: pattern<t>, showT: (t) -> div string): div string
   match p
     PatWild(range) -> "PatWild " ++ range.showFullRange
     PatVar(ref) -> "PatVar " ++ ref.show(fn(m) m.show(showT), fn(p') p'.show(showT))

@@ -5,6 +5,28 @@
   "version": "0.2.0",
   "configurations": [
     {
+      "name": "(lldb) Launch",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceRoot}/.koka/v2.4.3/clang-debug/testcompiler_syntax_parse",
+      "args": [],
+      "stopAtEntry": false,
+      "cwd": "${workspaceRoot}/.koka/v2.4.3/clang-debug",
+      "environment": [],
+      "externalConsole": false,
+      "MIMode": "lldb"
+    },
+    // {
+    //   "name": "Debug Parse",
+    //   "type": "lldb",
+    //   "request": "launch",
+    //   "target": "./.koka/v2.4.3/clang-debug/testcompiler_syntax_parse",
+    //   "cwd": "${workspaceRoot}",
+    //   // "lldbmipath": "/Users/timwhiting/.vscode/extensions/ms-vscode.cpptools-1.17.5-darwin-x64/debugAdapters/lldb-mi/bin/lldb-mi",
+    //   "valuesFormatting": "parseText",
+    //   "stopAtEntry": true
+    // },
+    {
       "name": "Debug",
       "type": "lldb-mi",
       "request": "launch",

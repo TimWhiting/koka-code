@@ -44,6 +44,16 @@ fun is-rcurly(l: lex): bool
     LexSpecial("}") -> True
     _ -> False
 
+fun is-rparen(l: lex): bool
+  match l
+    LexSpecial(")") -> True
+    _ -> False
+
+fun is-lparen(l: lex): bool
+  match l
+    LexSpecial("(") -> True
+    _ -> False
+
 pub fun (==)(l1: lexeme, l2: lexeme): bool
   l1.range == l2.range && l1.lex == l2.lex
 
@@ -127,17 +137,17 @@ pub fun show(l: lex): <> string
     LexInt(_, s) -> s
     LexFloat(_, s) -> s
     LexChar(c) -> c.show
-    LexString(s) -> "\"" ++ s ++ "\""
+    LexString(s) -> "string \"" ++ s ++ "\""
     LexId(n) -> "identifier \"" ++ n.show ++ "\""
     LexOp(n) -> "operator \"" ++ n.show ++ "\""
     LexPrefix(n) -> "prefix operator \"" ++ n.show ++ "\""
     LexIdOp(n) -> "identifier (operator) \"" ++ n.show ++ "\""
     LexWildCard(n) -> "wildcard \"" ++ n.show ++ "\""
     LexModule(n, _) -> "module \"" ++ n.show ++ "\""
-    LexKeyword(k, d) -> "\"" ++ k ++ "\"" ++ (if d.is-empty then "" else " (" ++ d ++ ")")
-    LexSpecial(s) -> "\"" ++ s ++ "\""
+    LexKeyword(k, d) -> "keyword \"" ++ k ++ "\"" ++ (if d.is-empty then "" else " (" ++ d ++ ")")
+    LexSpecial(s) -> "special \"" ++ s ++ "\""
     LexComment(s) -> "comment \"" ++ s ++ "\""
-    LexWhite(x) -> "white(" ++ x ++ ")"
+    LexWhite(x) -> "white" ++ x ++ ""
     LexInsLCurly -> "start of statements ('{')"
     LexInsRCurly -> "end of statements ('}')"
     LexInsSemi -> "end of statement (';')"

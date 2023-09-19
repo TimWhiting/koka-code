@@ -168,8 +168,7 @@ fun show(d: def<t>, showT: (t) -> e string): e string
 fun defIsVal(d: def<t>): bool
   !d.sort.isFun
 
-fun guardTrue(): expr<t>
-  Var(nameTrue, False, rangeNull)
+val guardTrue = Var(nameTrue, False, rangeNull)
 
 type expr<t>
   Lam(binder: list<valueBinder<maybe<t>,maybe<expr<t>>>>, e: expr<t>, range: range)
@@ -234,10 +233,10 @@ fun show(h: handlerBranch<t>, showT: (t) -> div string): div string
   
 struct branch<t>
   branchPattern: pattern<t>
-  branchGuard: guard<t>
+  branchGuard: list<guard<t>>
 
 fun show(b: branch<t>, showT: (t) -> div string): div string
-  b.branchPattern.show(showT) ++ " " ++ b.branchGuard.show(showT)
+  b.branchPattern.show(showT) ++ " " ++ b.branchGuard.show-list(fn(s) s.show(showT))
   
 struct guard<t>
   guardTest: expr<t>
@@ -352,7 +351,8 @@ fun range(uk: userKind): range
 fun range(utp: userType): range
   utp.range(range)
 
-
+fun range(uhb: userHandlerBranch): range
+  uhb.branchPatRange.combine(uhb.branchExpr.range)
 
 // free type variables
 fun freeTypeVars(m: maybe<a>, f: (a) -> div nameSet): div nameSet

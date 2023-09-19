@@ -144,6 +144,7 @@ type operationSort
   OpExcept
   OpControlRaw
   OpControl
+  OpControlErr
 
 fun show(o: operationSort): string
   match o
@@ -152,6 +153,7 @@ fun show(o: operationSort): string
     OpExcept -> "OpExcept"
     OpControlRaw -> "OpControlRaw"
     OpControl -> "OpControl"
+    OpControlErr -> "OpControlErr"
 
 type dataKind
   Inductive

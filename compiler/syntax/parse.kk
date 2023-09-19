@@ -128,6 +128,12 @@ fun pmanyend(kind: string, l: () -> <ast> a, p: () -> <ast> b): <ast> list<a>
         Nothing -> Cons(r, Nil)
     Nothing -> Nil
 
+fun pmanyend1(kind: string, l: () -> <ast> a, p: () -> <ast> b): <ast> list<a>
+  match maybe("many " ++ kind, l)
+    Just(r) -> 
+      match maybe("sep " ++ kind, p)
+        Just(_) -> Cons(r, pmanyend(kind, l, p))
+
 fun token(msg: string, f: (lexeme) -> <ast|e> maybe<a>): <ast|e> a
   val t = peek()
   match f(t) 
@@ -168,25 +174,25 @@ fun try(str: string, p: () -> <ast> a): <ast> a
   x
 
 // Version of maybe that doesn't backtrack
-fun maybenb(str: string, p: () -> <ast> a): <ast> maybe<a>
+fun optionMaybe(str: string, p: () -> <ast> a): <ast> maybe<a>
   with override
     return(r) 
       Just(r)
-    final ctl astError(e, r) 
-      Nothing
+    final ctl astError(e, r)
+      if tookInput() then
+        astError(e, r)
+      else
+        Nothing 
+  pdelimit(str)
   p()
 
 fun choicesnb(str: string, ps: list<() -> <ast> a>): <ast> a
   fun find(ps': list<() -> <ast> a>): <ast> a
     match ps'
       Cons(p, rst) -> 
-        match maybenb(str, p)
+        match optionMaybe(str, p)
           Just(r) -> r
-          Nothing -> 
-            if tookInput() then
-              astError("expected " ++ str, peek().range)
-            else
-              find(rst)
+          Nothing -> find(rst)
       Nil -> astError("expected " ++ str, peek().range)
   with override
     final ctl astError(e, r) 
@@ -377,7 +383,6 @@ fun pExternDecl(dvis: visibility): <ast> list<topDef>
       [DefExtern(ext), DefValue(extfun)]
   }
   ])
-  
 
 fun externalImport(r: range): <ast> external
   unimplemented()
@@ -390,6 +395,49 @@ fun pAliasDecl(vis: visibility)
 
 fun pTypeDecl(vis: visibility)
   unimplemented()
+
+alias param = (visibility, valueBinder<userType, maybe<userExpr>>);
+
+fun bindExprToVal(opname: name, oprange: range, expr: userExpr)
+  val fresh = "value".makeFreshHiddenName(opname, oprange)
+  val freshVar = Var(fresh, False, oprange)
+  val erange = expr.range
+  val binder = Def(ValueBinder(fresh, (), expr, oprange, erange), oprange, Private, DefVal, InlineAuto, "")
+  (fn(b) Bind(binder, b, erange), fn(params) freshVar)
+
+struct opDecl
+  doc: string
+  id: name
+  kwdrng: range
+  idrng: range
+  lin: bool // linear
+  sort: operationSort
+  exists0: list<typeBinder<userKind>>
+  pars: list<valueBinder<userType, maybe<userExpr>>>
+  prng: range
+  mbteff: maybe<userType>
+  tres: userType;
+
+struct effectDecl
+  vis: visibility
+  vis2: visibility
+  r1: range
+  r2: range
+  name: string
+  kind: dataKind
+  lin: bool
+  inst: bool
+  scoped: bool
+  n: name
+  r3: range
+  exists0: list<typeBinder<userKind>>
+  k: userKind
+  r4: range
+  umbrella: maybe<list<userType>>
+  decls: list<opDecl>
+
+
+
 
 fun pEffectDecl(vis: visibility)
   unimplemented()
@@ -479,14 +527,253 @@ fun pTypeParams()
 fun pTypeAnnotation()
   unimplemented()
 
-fun pNtlExpr()
+fun pBlockExpr()
   unimplemented()
 
+fun pBodyExpr()
+  unimplemented()
+
+fun pBlock(): <ast> userExpr
+  unimplemented()
+
+fun pLambda(l)
+  unimplemented()
+
+fun pParamId()
+  unimplemented()
+
+// TODO: Here
+value type clause
+  ClauseRet(expr: userExpr)
+  ClauseFinally(expr: userExpr)
+  ClauseInitially(expr: userExpr)
+  ClauseBranch(expr: userHandlerBranch)
+
+fun range(c: clause): range
+  match c
+    ClauseRet(e) -> e.range
+    ClauseFinally(e) -> e.range
+    ClauseInitially(e) -> e.range
+    ClauseBranch(e) -> e.range
 
 // TODO: Here
 val userTypeRange = fn(k: userType) k.range
 
-fun argument()
+fun pOpClauses()
+  fun pSingleOp()
+    val (op, bind) = pHandlerOp()
+    ([(op, bind)], op.range)
+  choices("", [
+    {semiBraces("", pHandlerOpX)},
+    pSingleOp,
+    {val rng = pLparen(); astError("unexpected '(': local parameters are no longer supported, use a local 'var' instead", rng)},
+    {([], rangeNull)}
+  ])
+
+fun pHandlerOpX()
+  choices("handler clause", [
+    {
+      val rng = pSpecialId("finally")
+      maybe("", {parens({()})})
+      val expr = pBodyExpr()
+      (ClauseFinally(Lam([], expr, rng.combine(expr.range))), Nothing)
+    },{
+      val rng = pSpecialId("initially")
+      val x = parens
+        choices("", [{
+          val (name,prng) = pParamId()
+          val tp = optionMaybe("", pTypeAnnotPar)
+          (name, prng, tp)
+        },{
+          (newName("_"), rng, Nothing)
+        }])
+      val (name, prng, tp) = x.fst
+      val expr = pBodyExpr()
+      (ClauseInitially(Lam([ValueBinder(name, tp, Nothing, prng, rng.combine(tp.map(range).default(rng)))], expr, rng.combine(expr.range))), Nothing)
+    }, pHandlerOp
+  ])
+
+fun pHandlerOp(): <ast> (clause, maybe<(userExpr -> userExpr)>)
+  choicesnb("handler clause", [
+    {
+      val rng = pKeyword("return",[]).range
+      val (name, prng, tp) = choices("", [
+        {
+          val (name, prng) = pParamId()
+          pWarningMessage("'return x' is deprecated; use 'return(x)' instead.", prng)
+          (name, prng, optionMaybe("", pTypeAnnotPar))
+        },
+        {
+          val x = parens
+            val (name, prng) = pParamId()
+            (name, prng, optionMaybe("", pTypeAnnotPar))
+          x.fst
+        }
+      ])
+      val expr = pBodyExpr()
+      (ClauseRet(Lam([ValueBinder(name, tp, Nothing, prng, prng.combine(tp.map(range).default(prng)))], expr, rng.combine(expr.range))), Nothing)
+    },{
+      pKeyword("val", [])
+      val (name, nameRng) = pQIdentifier()
+      pKeyword("=", [])
+      val expr = pBlockExpr()
+      val (binder, resumeExpr) = bindExprToVal(name, nameRng, expr)
+      (ClauseBranch(HandlerBranch(name.toValueOperationName, [], resumeExpr([]), OpVal, nameRng, nameRng)), Just(binder))
+    },{
+      val (opSort, (name, nameRng)) = choicesnb("opSort", [
+        {pKeyword("fun", []); (OpFun, pQIdentifier())}, {pKeyword("ctl", ["control"]); (OpControl, pQIdentifier())}, 
+        {pKeyword("final", []); pKeyword("ctl", []); (OpExcept, pQIdentifier())},
+        {pKeyword("raw", []); pKeyword("ctl", []); (OpControlRaw, pQIdentifier())}, 
+        // Deprecated
+        {pKeyword("except", []); (OpExcept, pQIdentifier())}, {pKeyword("brk", []); (OpExcept, pQIdentifier())},
+        {pKeyword("rcontrol", []); (OpControlRaw, pQIdentifier())}, {pKeyword("rawctl", []); (OpControlRaw, pQIdentifier())},
+        {
+          val (n, nr) = pQIdentifier(); 
+          pWarningMessage("using a bare operation is deprecated.\n hint: start with 'val', 'fun', 'final ctl', 'ctl', or 'raw ctl'", nr)
+          (OpControlErr, (n, nr))
+        }
+      ])
+      val (opPars, prng) = pOpParams()
+      val expr = pBodyExpr()
+      (ClauseBranch(HandlerBranch(name, opPars, expr, opSort, nameRng, nameRng.combine(prng))), Nothing)
+    }
+  ])
+
+fun pOpParams()
+  choices("", [{parensCommas(pOpParam)}, {([], rangeNull)}])
+
+fun pOpParam()
+  val (name, rng) = pParamId()
+  val tp = optionMaybe("", pTypeAnnot)
+  ValueBinder(name, tp, (), rng, rng.combine(tp.map(range).default(rng)))
+
+fun pHandlerPar()
+  val (name, rng) = pIdentifier()
+  val tp = optionMaybe("", pTypeAnnot)
+  ValueBinder(name, tp, (), rng, rng.combine(tp.map(range).default(rng)))
+
+fun pHandlerReturnDefault(r: range) // Default return clause: return(x) -> x
+  val xname = "x".newHiddenName
+  val xbind = ValueBinder(xname, Nothing, Nothing, r, r)
+  Lam([xbind], Var(xname, False, r), r)
+
+fun pBranch()
+  val pat = pPattern()
+  val grds = pGuards()
+  Branch(pat, grds)
+
+fun pGuards()
+  choicesnb("guards", [
+    {pmany1("", pGuardBar)},
+    {pKeyword("->", []); [Guard(guardTrue, pBlockExpr())]},
+    {
+      val exp = pBlock()
+      pWarningMessage("use '->' for pattern matches", exp.range)
+      [Guard(guardTrue, exp)]
+    }
+  ])
+
+fun pGuardBar()
+  pBar()
+  val grd = pGuardTest()
+  pKeyword("->", [])
+  val exp = pBlockExpr()
+  Guard(grd, exp)
+
+fun pGuardTest()
+  choicesnb("guard condition or '_'", [
+    {pSpecialId("otherwise"); astError("hint: use \"_\" instead of \"otherwise\" for the guard condition", peek().range)},
+    pExpr, {pWildcard(); guardTrue}
+  ])
+
+inline fun pNtlExpr()
+  pOpExprX(False)
+
+inline fun pOpExpr()
+  pOpExprX(True)
+
+fun pOpExprX(allowTrailingLam: bool)
+  val e1 = pPrefixExpr(allowTrailingLam)
+  choicesnb("", [
+    {
+      val ess = pmany1("", {val op = pOperatorVar(); val e2 = pPrefixExpr(allowTrailingLam); [op, e2]})
+      App(Var(nameOpExpr, True, rangeNull), Cons(e1, ess.concat).map(fn(e) (Nothing, e)), e1.range.combine(ess.last.map(fn(l) l.last.map(fn(m) m.range).default(e1.range)).default(e1.range)))
+    }, {e1}
+  ])
+
+fun pOperatorVar()
+  choicesnb("", [
+    {val (name, rng) = pQOperator(); Var(name, True, rng)},
+    {Var(nameAssign, True, pKeyword(":=", []).range)}
+  ])
+
+fun pPrefixExpr(allowTrailingLam: bool): <ast> userExpr
+  val ops = pmany("", pPrefixOp)
+  val aexp = pAppExpr(allowTrailingLam)
+  ops.foldr(aexp, fn(op, e) App(op, [(Nothing, e)], op.range.combine(e.range)))
+
+fun pAppExpr(allowTrailingLam: bool): <ast> userExpr
+  val e0 = pAtom()
+  val fs = pmany("", {choices("", [pDotExpr, pApplier, pIndexer, {pFunApps(allowTrailingLam)}])})
+  fs.foldl(e0, fn(e, f) f(e))
+
+fun pDotExpr(): <ast> (userExpr -> userExpr)
+  pKeyword(".", [])
+  val e = pAtom()
+  choicesnb("", [
+    {
+      val rng0 = pLapp()
+      val args = pSepBy("", pArgument, pComma)
+      val rng1 = pRparen()
+      fn(arg0) App(e, Cons((Nothing, arg0), args), rng0.combine(rng1))
+    },
+    {
+      fn(arg0) App(e, [(Nothing, arg0)], arg0.range.combine(e.range))
+    }
+  ])
+
+fun pIndexer(): <ast> (userExpr -> userExpr)
+  val rng0 = pLidX()
+  choicesnb("", [
+    {
+      val crng = pKeyword("ctx", [])
+      val ct = pCcontext(crng.range)
+      val rng1 = pSpecial("]", [])
+      fn(e)
+        val rng = e.range.combine(rng1)
+        App(Var(nameCCtxComposeExtend, False, rng1), [(Nothing, e), (Nothing, ct)], rng1)
+    },
+    {
+      val idxs = pSepBy1("", pExpr, pComma)
+      val rng1 = pSpecial("]", [])
+      fn(e) App(Var(nameIndex, False, rng0.combine(rng1)), Cons(e, idxs).map(fn(a) (Nothing, a)), rng0.combine(rng1))
+    }
+  ])
+
+fun pApplier(): <ast> (userExpr -> userExpr)
+  val rng0 = pLapp()
+  val args = pSepBy("", pArgument, pComma)
+  val rng1 = pRparen()
+  fn(e) App(e, args, rng1.combine(e.range))
+
+fun pFunApp(allowTrailingLam: bool): <ast> userExpr
+  if allowTrailingLam then choices("", [pFunBlock, {pLambda([])}])
+  else pLambda([])
+
+fun pFunApps(allowTrailingLam): <ast> (userExpr -> userExpr)
+  fun injectApply(e, fs)
+    match fs
+      [] -> e
+      _ -> 
+        val nfargs = fs.map(fn(e') (Nothing, e'))
+        match e
+          App(f, args, rng) -> App(f, args ++ nfargs, rng)
+          _ -> App(e, nfargs, e.range.combine(nfargs.last.map(fn(e') e'.snd.range).default(e.range)))
+  val fs = pmany1("", {pFunApp(allowTrailingLam)})
+  fn(arg0)
+    injectApply(arg0, fs)
+
+fun pArgument()
   val exp = pAExpr()
   match exp
     Var(name, _, rng) ->
@@ -925,10 +1212,17 @@ fun pKindAtom()
    { KindCon(nameKindHandled, pSpecialConId("HX1")) }
   ])
 
+fun semiBraces(kind, p)
+  val rng1 = pLcurly()
+  val xs = semis(kind, p)
+  val rng2 = pRcurly()
+  (xs, rng1.combine(rng2))
+
 fun semis(kind, p)
   pmanyend(kind, p, pSemi1)
 
 val pSepBy = pmanyend
+val pSepBy1 = pmanyend1
 
 fun pSemi1()
   pmany1("semicolons", pSemicolon)

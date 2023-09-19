@@ -515,34 +515,227 @@ fun pDefaultExpr()
 fun pAnnotResult()
   unimplemented()
 
-fun pFunBlock()
-  unimplemented()
-
-fun pExpr()
-  unimplemented()
 
 fun pTypeParams()
   maybeList({angles(pTBinders).fst})
 
-fun pTypeAnnotation()
-  unimplemented()
-
-fun pBlockExpr()
-  unimplemented()
-
-fun pBodyExpr()
-  unimplemented()
 
 fun pBlock(): <ast> userExpr
   unimplemented()
 
-fun pLambda(l)
+fun pFunDef(a)
   unimplemented()
 
 fun pParamId()
   unimplemented()
 
+fun pParameter(a, b)
+  unimplemented()
+
+fun makeReturn(r: range, e: userExpr)
+  App(Var(nameReturn, False, r), [(Nothing, e)], r.combine(e.range))
+
 // TODO: Here
+fun pWithStat()
+  fun promoteValueBinder(binder)
+    match binder.binderType
+      Just(tp) -> binder(binderType=Just(tp.promoteType))
+      _ -> binder
+  val krng = pKeyword("with", []).range
+  choices("", [
+    {
+      val (par, _, transform) = pParameter(False, False)
+      pKeyword("=", [])
+      pKeyword("<-", [])
+      val e = choices("", [pBasicExpr, {pHandlerExprStat(krng, HandlerInstance)}])
+      fn(b) applyToContinuation(krng, [par.promoteValueBinder], e.transform, b)
+    },
+    {
+      val e = choices("", [pBasicExpr, {pHandlerExprStat(krng, HandlerNormal)}])
+      fn(b) applyToContinuation(krng, [], e, b)
+    }
+  ])
+
+fun unParens(e)
+    match e
+      Parens(p) -> p.unParens
+      _ -> e
+
+fun applyToContinuation(wrng: range, params: list<valueBinder<maybe<t>, maybe<expr<t>>>>, expr: expr<t>, body: expr<t>): <ast> expr<t>  
+  val f = Lam(params, body, wrng.combine(body.range))
+  val funarg = [(Nothing, f)]
+  val fullrange = wrng.combine(f.range)
+  match expr.unParens
+    App(f', args, _) -> App(f', (args ++ funarg), fullrange)
+    atom -> App(atom, funarg, fullrange)
+
+fun pTypeAnnotation(): <ast> (userType -> userType)
+  maybe("", {
+    val tp = pTypeAnnot()
+    fn(x) Ann(x, tp, tp.range.combine(e.range))
+  }).default(fn(x) x)
+
+fun pBodyExpr()
+  choices("", [pBlockExpr, {pKeyword("->", []); pBlockExpr()}])
+
+fun pBlockExpr()
+  choicesnb("expression", [pWithExpr, pBFunExpr, pReturnExpr, pValExpr, pBasicExpr])
+
+fun pExpr()
+  choicesnb("expression", [pWithExpr, pFunExpr, pReturnExpr, pValExpr, pBasicExpr])
+
+fun pBasicExpr()
+  choicesnb("basic expression", [pIfExpr, pFnExpr, pMatchExpr, pHandlerExpr, pOpExpr])
+
+fun pWithExpr()
+  val f = pWithStat()
+  pKeyword("in", [])
+  f(pBlockExpr())
+
+fun pValExpr()
+  val f = pLocalValueDecl()
+  pKeyword("in", [])
+  f(pExpr())
+
+fun pBFunExpr()
+  choices("", [pBlock, {pLambda(["fun"])}])
+
+fun pFunExpr()
+  choices("", [pFunBlock, {pLambda(["fun"])}])
+
+inline fun pFnExpr()
+  pLambda([])
+
+fun pFunBlock()
+  val exp = pBlock()
+  Lam([], exp, exp.range)
+
+fun pLambda(alts)
+  val rng = pKeyword("fn", alts)
+  val spars = sQuantifier()
+  val (tpars, pars, _, parsRng, mbTres, preds, ann) = pFunDef(False)
+  val body = pBodyExpr()
+  val f = promote(spars, tpars, preds, mbtres, Lam(pars, body, rng.combine(body.range)))
+  ann(f)
+
+fun pIfExpr()
+  val rng = pKeyword("if", []).range
+  val tst = pNtlExpr()
+  val (tExpr, eExprs, eExpr) =
+    choices("",[
+      {
+        val tExpr = pReturnExpr()
+        (tExpr, [], Var(nameUnit, False, tExpr.range.after))
+      },
+      {
+        val tExpr = pThenExpr(rng)
+        val eExprs = pmany("", pElif)
+        val eExpr = optionMaybe("", {pKeyword("else", []); pBlockExpr()}).default(Var(nameUnit, False, (tExpr.range).combine(eExprs.map(fn(e) e.snd.range).combine).after))
+        (tExpr, eExprs, eExpr)
+      }
+    ])
+  Cons((tst, tExpr), eExprs).foldr(eExpr) fn((tst', tExpr'), eExpr')
+    val r = rangeNull
+    Case(tst', [Branch(PatCon(nameTrue, [], r, r), [Guard(guardTrue, tExpr')]),
+              Branch(PatCon(nameFalse, [], r, r), [Guard(guardTrue, eExpr')])], tst'.range.combine(eExpr'.range))
+  
+fun pElif(): <ast> (userExpr, userExpr)
+  val rng = pKeyword("elif", []).range
+  val tst = pNtlExpr()
+  val tExpr = pThenExpr(rng)
+  (tst, tExpr)
+
+fun pThenExpr(rng: range): <ast> userExpr
+  choicesnb("then", [
+    {pKeyword("then", []); pBlockExpr()},
+    {
+      val expr = pBlockExpr()
+      addWarning("warning " ++ expr.range.before.start.show ++ ": using an 'if' without 'then' is deprecated.\n hint: add the 'then' keyword.", expr.range) 
+      expr
+    }
+  ])
+
+fun pReturnExpr(): <ast> userExpr
+  val rng = pKeyword("return", []).range
+  val exp = pExpr()
+  makeReturn(rng, exp)
+
+fun pMatchExpr()
+  choices("", [{
+    val rng = pKeyword("match", []).range
+    val tst = pNtlExpr()
+    val (branches, rng2) = semiBraces("match clause", pBranch)
+    Case(tst, branches, rng.combine(rng2))
+  },pHandlerExpr])
+
+fun pHandlerExpr()
+  val (rng0, hsort) = optionMaybe("", {val rng = pKeyword("named", []).range; (rng, HandlerInstance)}).default((rangeNull, HandlerNormal))
+  choices("handle or handler", [
+    {
+      val rng1 = pKeyword("handle", []).range
+      val rng = rng0.combine(rng1)
+      val scoped = optionMaybe("", {pSpecialId("scoped"); HandlerScoped}).default(HandlerNoScope)
+      val (over, mbEff) = pHandlerOverride(hsort)
+      val arg = pNtlExpr()
+      val expr = pHandlerClauses(rng, mbEff, scoped, over, hsort)
+      App(expr, [(Nothing, arg)], rng.combine(expr.range))
+    },
+    {
+      val rng1 = pKeyword("handler", []).range
+      val rng = rng0.combine(rng1)
+      pHandlerExprX(rng, hsort)
+    }
+  ])
+
+fun pHandlerExprStat(rng: range, hSort: handlerSort)
+  match hSort
+    HandlerNormal -> pHandlerExprX(rng, hSort)
+    HandlerInstance ->
+      pKeyword("named", [])
+      optionMaybe("", {pKeyword("handler", [])})
+      pHandlerExprX(rng, hSort)
+
+fun pHandlerExprX(rng: range, hSort: handlerSort)
+  val scoped = maybe("", {pKeyword("scoped", []); HandlerScoped}).default(HandlerNoScope)
+  val (over, mbEff) = pHandlerOverride(hSort)
+  pHandlerClauses(rng, mbEff, scoped, over, hSort)
+
+fun pHandlerOverride(hSort: handlerSort)
+  val over = match hSort
+    HandlerNormal -> 
+      maybe("", {pKeyword("override", []); HandlerOverride}).default(HandlerNoOverride)
+    _ -> HandlerNoOverride
+  val mbEff = maybe("", {val eff = angles(pType).fst; eff.promoteType})
+  (over, mbEff)
+
+fun pHandlerClauses(rng: range, mbEff: maybe<userType>, scoped: handlerScope, over: handlerOverride, hsort: handlerSort): <ast> userExpr
+  val (clausesAndBinders, rng2) = pOpClauses()
+  val fullrange = rng.combine(rng2)
+  val (clauses, binders) = extractBinders(clausesAndBinders)
+  val (reinit, ret, finally, ops) = partitionClauses(clauses, fullrange)
+  val hand = match (mbEff, ops)
+    (Nothing, []) -> 
+      val retExpr = match ret
+        Nothing -> fn(x) x
+        Just(f) -> fn(actionExpr) App(f, [(Nothing, App(actionExpr, [], fullrange))], fullrange)
+      val handlerExpr = Lam([ValueBinder("action".newHiddenName, Nothing, Nothing, rng, rng)], retExpr(Var("action".newHiddenName, False, rng)), fullrange)
+      binders(handlerExpr)
+    _ -> binders(Handler(hsort, scoped, over, Nothing, mbEff, [], reinit, ret, finally, ops, rng, fullrange))
+  applyMaybe(fullrange, reinit, finally, hand)
+
+fun applyMaybe(rng: range, reinit: maybe<userExpr>, finally: maybe<userExpr>, f: userExpr): userExpr
+  match (reinit, finally)
+    (Nothing, Nothing) -> f
+    _ -> 
+      val applyH = App(f, [(Nothing, Var("act".newHiddenName, False, rng))], rng)
+      val bodyF = match finally
+        Just(fin) -> App(Var(nameFinally, False, rng), [(Nothing, fin),(Nothing, Lam([], applyH, rng))], rng)
+        Nothing -> applyH
+      val bodyI = match reinit
+        Just(ini) -> App(Var(nameInitially, False, rng), [(Nothing, ini), (Nothing, Lam([], bodyF, rng))], rng)
+        Nothing -> bodyF
+      Lam([ValueBinder("act".newHiddenName, Nothing, Nothing, rng, rng)], bodyI, rng)
+
 value type clause
   ClauseRet(expr: userExpr)
   ClauseFinally(expr: userExpr)
@@ -556,8 +749,37 @@ fun range(c: clause): range
     ClauseInitially(e) -> e.range
     ClauseBranch(e) -> e.range
 
-// TODO: Here
 val userTypeRange = fn(k: userType) k.range
+
+alias transExpr = ((userExpr) -> userExpr)
+alias binder = (clause, maybe<transExpr>);
+fun extractBinders(l: list<binder>)
+  l.foldr(([], fn(x) x)) fn(b, acc: (list<clause>, (userExpr -> userExpr)))
+    match b
+      (clause, Nothing) -> (Cons(clause, acc.fst), acc.snd)
+      (clause, Just(f)) -> (Cons(clause, acc.fst), fn(e) f((acc.snd)(e)))
+
+fun partitionClauses(clauses: list<clause>, rng: range)
+  fun separate(clauses': list<clause>, ret: maybe<userExpr>, fin: maybe<userExpr>, init: maybe<userExpr>, br: ctx<list<userHandlerBranch>>): <astError> (maybe<userExpr>, maybe<userExpr>, maybe<userExpr>, list<userHandlerBranch>)
+    match clauses'
+      Cons(ClauseRet(e), rst) -> 
+        if ret.is-just then
+          astError("There can be at most one 'return' clause in a handler body", e.range)
+        else
+          separate(rst, Just(e), fin, init, br)
+      Cons(ClauseFinally(e), rst) -> 
+        if fin.is-just then
+          astError("There can be at most one 'finally' clause in a handler body", e.range)
+        else
+          separate(rst, ret, Just(e), init, br)
+      Cons(ClauseInitially(e), rst) -> 
+        if init.is-just then 
+          astError("There can be at most one 'initially' clause in a handler body", e.range)
+        else
+          separate(rst, ret, fin, Just(e), br)
+      Cons(ClauseBranch(e), rst) -> separate(rst, ret, fin, init, br ++ (ctx Cons(e, _)))
+      Nil -> (ret, fin, init, br ++. Nil)
+  separate(clauses, Nothing, Nothing, Nothing, ctx _)
 
 fun pOpClauses()
   fun pSingleOp()

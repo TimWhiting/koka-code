@@ -387,6 +387,10 @@ fun pExternDecl(dvis: visibility): <ast> list<topDef>
 fun externalImport(r: range): <ast> external
   unimplemented()
  
+fun pExternalBody()
+  unimplemented()
+
+
 fun pFixityDecl(): <ast> list<fixDef>
   unimplemented()
 
@@ -395,6 +399,12 @@ fun pAliasDecl(vis: visibility)
 
 fun pTypeDecl(vis: visibility)
   unimplemented()
+
+fun tpVar(tb: typeBinder<k>)
+  TpVar(tb.name, tb.range)
+
+fun tpCon(tb: typeBinder<k>)
+  TpCon(tb.name, tb.range)
 
 alias param = (visibility, valueBinder<userType, maybe<userExpr>>);
 
@@ -443,7 +453,7 @@ struct funDef
   parsRng: range
   mbTres: maybe<(maybe<userType>, userType)>
   preds: list<userType>
-  ann: (userExpr -> userExpr);
+  ann: (userExpr -> <ast> userExpr);
 
 fun pEffectDecl(vis: visibility)
   unimplemented()
@@ -459,6 +469,8 @@ fun pDocKeywordFun()
 
 fun pKeywordInject()
   pKeyword("mask", ["inject"])
+
+// TODO: Here
 
 fun pDeclParams(allowBorrow: bool, allowDefaults: bool)
   fun pParamBinder() 
@@ -476,23 +488,102 @@ fun pParamInfo()
     Borrow
   }, {Own}])
 
-fun pPureDecl(vis: visibility)
-  unimplemented()
+fun operationDecl(opCount, vis, forallsScoped:list<userTypeBinder>, forallsNonScoped, docEffect, hndName, effName, mbInstanceUmb:maybe<list<userType>>, effTp, hndTp, hndTpVars, extraEffects, (opIndex, op))
+  val foralls = forallsScoped ++ forallsNonScoped
+  val OpDecl(_doc, id, _kwrng, idrng, _lin, sort, exists0, pars, _prng, _mbTeff, tRes) = op
+  val rng = idrng
+  val krng = rangeNull
+  val grng = krng
+  val opEffTps = mbInstanceUmb.default([effTp])
+  val teff0 = (opEffTps ++ extraEffects).foldr(krng.makeEffectEmpty, fn(e, acc) krng.makeEffectExtend(e, acc, userKindRange))
+  val nameA = ".a".newName
+  val tpVarA = TpVar(nameA, krng)
+  val isInstance = mbInstanceUmb.is-just
+  val exists1 = if exists0.is-cons then exists0 else promoteFree(foralls, (pars.map(binderType) ++ [teff0, tRes]))
+  fun notDiv(tp)
+    match tp
+      TpCon(name, _) -> !(name == nameTpDiv)
+      _ -> True
+  val teff = if (forallsNonScoped ++ exists1).is-cons && isInstance && extraEffects.all(notDiv) then makeEffectExtend(krng, TpCon(nameTpDiv, krng), teff0, userKindRange) else teff0
+  // create a constructor field for the operation as `clauseId : clauseN<a1,..,aN,b,e,r>`
+  val forallParams = forallsNonScoped.map(fn(par) TpVar(par.name, krng))
+  val tpParams = forallParams ++ exists1.map(fn(par) TpVar(par.name, krng))
+  fun makeClauseFieldName(opSort:operationSort, name)
+    prepend(opSort.show ++ "-", if name.isValueOperationName then name.fromValueOperationsName else name)
+  val clauseId = makeClauseFieldName(sort, id)
+  val (clauseName, clauseParsTp) = if pars.length <= 2 then (nameTpClause(pars.length), pars.map(binderType)) else (nameTpClause(1), [TpApp(TpCon(nameTuple(pars.length), krng), pars.map(binderType), krng)])
+  val clauseRhoTp = TpApp(TpCon(clauseName, krng), clauseParsTp ++ Cons(tRes, Cons(TpApp(hndTp, forallsNonScoped.map(tpVar), krng), hndTpVars.map(tpVar))), krng)
+  val clauseTp = quantify(QForall, exists1 ++ forallsScoped, clauseRhoTp)
+  val conField = ValueBinder(clauseId, clauseTp, Nothing, krng, krng)
+  val selectId = id.toOpSelectorName
+  fun createSelect()
+    val hndArg = "hnd".newName
+    val hndParam = ValueBinder(hndArg, Nothing, Nothing, krng, grng)
+    val i = opIndex;
+    val fieldCount = opCount
+    val patterns = list(0, i - 1).map(fn(_) (Nothing, PatWild(grng))) ++ 
+      [(Nothing, PatVar(ValueBinder(clauseId, Nothing, PatWild(grng), grng, grng)))] ++ 
+      list(i+1, fieldCount - 1).map(fn(_) (Nothing, PatWild(grng)))
+    val branch = Branch(PatCon(hndName.toConstructorName, patterns, grng, grng), [Guard(guardTrue, Var(clauseId, False, grng))])
+    val innerBody = Case(Var(hndArg, False, grng), [branch], grng)
+    val fullTp = quantify(QForall, foralls ++ exists1 ++ hndTpVars, TpFun([(hndArg, TpApp(hndTp, (forallsNonScoped ++ hndTpVars).map(tpVar), grng))], makeTpTotal(grng), clauseRhoTp, grng))
+    val body = Ann(Lam([hndParam], innerBody, grng), fullTp, grng)
+    val binder = ValueBinder(selectId, (), body, rng, rng)
+    Def(binder, krng, vis, DefFun([Borrow]), InlineAlways, ("// select `" ++ id.show ++ "` operation out of the " ++ docEffect ++ " handler"))
+  // create an operation selector explicitly so we can hide the handler constructor
+  val opSelect = createSelect()
+  // create a typed perform wrapper: fun op(x1:a1,..,xN:aN) : <l> b { performN(evv-at(0),clause-op,x1,..,xN) }
+  fun createOp()
+    val nameRng = idrng
+    val hasExists = exists1.is-cons
+    val perform = Var(namePerform(pars.length), False, krng)
+    val zeroIdx = App(Var(nameSSizeT, False, krng), [(Nothing, Literal(LitInt(0, krng)))], krng)
+    val resourceName = "hname".newHiddenName
+    val resourceBinder = ValueBinder(resourceName, effTp, Nothing, krng, grng)
+    fun makeOptional(tp: userType)
+      TpApp(TpCon(nameTpOptional, tp.range), [tp], tp.range)
+    val params0 = pars.map(fn(par) par(binderType=if par.expr.is-just then par.binderType.makeOptional else par.binderType))
+    val params = if isInstance then Cons(resourceBinder, params0) else params0
+    val arguments = params0.map(fn(par) (Nothing, Var(par.name, False, par.nameRange)))
+    val lParams = params.map(fn(ValueBinder(name, _, expr, nameRng', rng')) ValueBinder(name, Nothing, expr, nameRng', rng') )
+    val tplParams = params.map(fn(par) (par.name, par.binderType))
+    val tpFull = quantify(QForall, foralls ++ exists1, TpFun(tplParams, teff, tRes, grng))
+    val inner = 
+      if isInstance then 
+        Case(Var(resourceName, False, krng), 
+         [Branch(PatCon(effName.toConstructorName, [(Nothing, PatVar(ValueBinder("ev".newName, Nothing, PatWild(krng), krng, grng)))], krng, grng), 
+           [Guard(guardTrue, Var("ev".newName, False, krng))])], grng)
+      else App(Var(nameEvvAt, False, krng), [(Nothing, zeroIdx)], krng)
+    val innerBody = App(perform, [(Nothing, inner), (Nothing, Var(selectId, False, krng))] ++ arguments, grng)
+    val body = Ann(Lam(lParams, innerBody, rng), tpFull, rng)
+    val binder = ValueBinder(id, (), body, nameRng, nameRng)
+    Def(binder, idrng, vis, DefFun([]), InlineAlways, "// call `" ++ id.show ++ "` operation of the " ++ docEffect)
+  val opDef = createOp()
+
+  if id.isValueOperationName then
+    // create a temporary value definition for type checking
+    val opName = id.fromValueOperationsName
+    val qualTpe = promoteType(TpApp(TpCon(nameTpValueOp, krng), [tRes], krng))
+    val phantom = App(Var(namePhantom, False, krng), [], krng)
+    val annot = Ann(phantom, qualTpe, krng)
+    return (conField, opSelect, opDef, Just(Def(ValueBinder(opName, (), annot, idrng, krng), krng, vis, DefVal, InlineNever, "// phantom definition for value operations")))
+  (conField, opSelect, opDef, Nothing)
+
+fun pPureDecl(dvis: visibility)
+  val (vis, vrng) = pVisibility(dvis)
+  val inl = pInline()
+  choices("", [
+    {val (rng, doc) = pDocKeyword("val", []); pValDecl(vrng.combine(rng), doc, vis, inl)},
+    {val f = pFip(); val (rng, doc) = pDocKeywordFun(); pFunDecl(vrng.combine(rng), doc, vis, inl, f)},
+    {pKeyword("fn", []); astError("hint: use 'fun' to start a named function definition (and 'fn' for anonymous functions)", peek().range)}
+  ])
 
 fun pFipAlloc()
   parens
     choices("alloc", [
-      {
-        val (i, _) = pInteger()
-        AllocAtMost(i)
-      },
-      {
-        val _ = pSpecialId("n")
-        AllocFinitely
-      },
-      {
-        AllocAtMost(0)
-      }
+      { val (i, _) = pInteger(); AllocAtMost(i) },
+      { val _ = pSpecialId("n"); AllocFinitely },
+      { AllocAtMost(0) }
     ])
 
 fun pFip()
@@ -511,26 +602,45 @@ fun pFip()
     }, 
     {NoFip(isTail)}])
 
-fun pExternalBody()
-  unimplemented()
+fun pFunctionDecl(vrng: range, vis: visibility)
+  val inl = pInline()
+  val f = pFip()
+  val (rng, doc) = pDocKeywordFun()
+  pFunDecl(vrng.combine(rng), doc, vis, inl, f)
 
 fun pVarDecl()
-  unimplemented()
-fun pFunctionDecl(rng: range, vis: visibility)
-  unimplemented()
+  val (vrng, doc) = pDocKeyword("var", [])
+  val bind = pBinder(vrng)
+  pKeyword(":=", [])
+  val body = pBlockExpr()
+  Def(bind(body), vrng.combine(body.range), Private, DefVar, InlineNever, doc)
 
+fun pValDecl(rng: range, doc: string, vis: visibility, inl: defInline)
+  val bind = pBinder(rng)
+  pKeyword("=", [])
+  val body = pBlockExpr()
+  Def(bind(body), rng.combine(body.range), vis, DefVal, inl, doc)
 
+fun pFunDecl(rng: range, doc: string, vis: visibility, inl: defInline, f: fipT)
+  val spars = sQuantifier()
+  val (name, nameRng) = pFunId()
+  val FunDef(tpars, pars, pinfos, _, mbTres, preds, ann) = pFunDef(True)
+  val body = pBodyExpr()
+  val fnct = promote(spars, tpars, preds, mbTres, Lam(pars, body, rng.combine(body.range)))
+  Def(ValueBinder(name, (), ann(fnct), nameRng, nameRng), rng.combine(fnct.range), vis, defFunEx(pinfos, f), inl, doc)
 
+fun pFunDef(allowBorrow: bool)
+  val tpars = pTypeParams()
+  val (pars, pinfos, transform, rng) = pParameters(allowBorrow, True)
+  val resultTp = pAnnotRes()
+  val preds = maybe("predicates", {pKeyword("with", []); parens({pmany1("", pPredicate)}).fst}).default([])
+  FunDef(tpars, pars, pinfos, rng, resultTp, preds, transform)
 
+fun pAnnotRes()
+  maybe("") fn()
+    val (teff, tres) = pAnnotResult()
+    (Just(teff), tres)
 
-fun pFunDef(a)
-  unimplemented()
-
-
-
-
-
-// TODO: Here
 fun pAnnotResult()
   pKeyword(":", [])
   pTResultTotal()
@@ -541,7 +651,7 @@ fun pTypeParams()
 fun pParameters(allowBorrow: bool, allowDefaults: bool)
   val (results, rng) = parensCommas({pParameter(allowBorrow, allowDefaults)})
   val (binders, pinfos, transforms) = results.unzip3
-  fun transform(e: userExpr)
+  fun transform(e: userExpr): <ast> userExpr
     transforms.foldr(e, fn(f, e') f(e'))
   (binders, pinfos, transform, rng)
 
@@ -869,6 +979,7 @@ fun range(c: clause): range
     ClauseBranch(e) -> e.range
 
 val userTypeRange = fn(k: userType) k.range
+val userKindRange = fn(k: userKind) k.range
 
 alias transExpr = ((userExpr) -> userExpr)
 alias binder = (clause, maybe<transExpr>);
@@ -1214,7 +1325,7 @@ fun pFunId()
     }
     ])
 
-inline fun pPattern()
+inline fun pPattern(): <ast> userPattern
   pPatAnn()
 
 fun pPatAnn(): <ast> userPattern

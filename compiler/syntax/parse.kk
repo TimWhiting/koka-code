@@ -156,6 +156,17 @@ fun maybeList(p: () -> <ast> list<a>): <ast> list<a>
     Just(r) -> r
     Nothing -> []
 
+fun try(str: string, p: () -> <ast> a): <ast> a
+  with override
+    return(r) r
+    final ctl astError(e, r) 
+      reset()
+      astError(e,r)
+  pdelimit(str)
+  val x = p()
+  commit()
+  x
+
 // Version of maybe that doesn't backtrack
 fun maybenb(str: string, p: () -> <ast> a): <ast> maybe<a>
   with override
@@ -186,6 +197,7 @@ fun choicesnb(str: string, ps: list<() -> <ast> a>): <ast> a
   commit()
   x
 
+// TODO: Add a choices with default, which will never backtrack?
 fun choices(str: string, ps: list<() -> <ast> a>): <ast> a
   match ps.find-maybe(fn(p) maybe(str, p)) // TODO Capture error from below for better error message expected one of...
     Just(r) -> r
@@ -315,7 +327,7 @@ fun genParArgs(tp)
     _ -> astError("external declarations must have a function type", tp.range)
 
 fun genFunParArgs(pars: list<(name, userType)>)
-  pars.map-indexed(fn(i, p) p.genParArg(i)).unzip
+  pars.map-indexed(fn(i, p) p.genParArg(i)).unzip 
 
 fun genParArg((name:name, _:userType), idx: int)
   val fullName = if name == nameNil then newHiddenName("arg" ++ idx.show) else name
@@ -382,6 +394,17 @@ fun pTypeDecl(vis: visibility)
 fun pEffectDecl(vis: visibility)
   unimplemented()
 
+fun pDocKeywordEffect()
+  pDocKeyword("effect", ["context", "ambient"])
+
+fun pKeywordFun()
+  pKeyword("fun",[])
+
+fun pDocKeywordFun()
+  pDocKeyword("fun",[])
+
+fun pKeywordInject()
+  pKeyword("mask", ["inject"])
 
 fun pDeclParams(allowBorrow: bool, allowDefaults: bool)
   fun pParamBinder() 
@@ -437,17 +460,117 @@ fun pFip()
 fun pExternalBody()
   unimplemented()
 
-fun pType(): <ast> userType
-  unimplemented()
-
-fun pParamType(): <ast> (name, range, userType)
-  unimplemented()
 
 fun pDefaultExpr()
   unimplemented()
 
 fun pAnnotResult()
   unimplemented()
+
+fun pFunBlock()
+  unimplemented()
+
+fun pExpr()
+  unimplemented()
+
+fun pTypeParams()
+  maybeList({angles(pTBinders).fst})
+
+fun pTypeAnnotation()
+  unimplemented()
+
+fun pNtlExpr()
+  unimplemented()
+
+
+// TODO: Here
+val userTypeRange = fn(k: userType) k.range
+
+fun argument()
+  val exp = pAExpr()
+  match exp
+    Var(name, _, rng) ->
+      val x = maybe("=")
+        pKeyword("=", [])
+        (Just((name, rng)), pExpr())
+      match x
+        Just(x') -> x'
+        Nothing -> (Nothing, exp)
+    _ -> (Nothing, exp)
+
+/// Atomic expression
+fun pAtom()
+  choicesnb("(simple) expression", [
+    {val (name, rng) = choicesnb("", [pQIdentifier, pQConstructor]); Var(name, False, rng)},
+    pTupleExpr, pListExpr, {Literal(pLiteral())}, pCCtxHole, pCCtxExpr, pInjectExpr
+  ])
+
+fun pLiteral()
+  choicesnb("", [
+    {val (i, tok) = pInteger(); LitInt(i, tok.range)},
+    {val (f, tok) = pFloat(); LitFloat(f, tok.range)},
+    {val (s, range) = pStringLit(); LitString(s, range)},
+    {val (c, range) = pCharLit(); LitChar(c, range)},
+  ])
+
+fun pAExpr()
+  val e = pExpr()
+  choicesnb("", [{pKeyword(":", []); val tp = pTypeScheme(); Ann(e, tp, e.range.combine(tp.range))}, {e}])
+
+fun pTupleExpr()
+  val rng1 = pLparen()
+  val es = pSepBy("", pAExpr, pComma)
+  val rng2 = pRparen()
+  val rng = rng1.combine(rng2)
+  match es
+    Nil -> Var(nameUnit, False, rng)
+    [e] -> Parens(e, nameNil, rng)
+    _ -> App(Var(nameTuple(es.length), False, rng), es.map(fn(e) (Nothing, e)), rng)
+
+fun pListExpr(): <ast> userExpr
+  val rng1 = pSpecial("[", [])
+  val es = pSepBy("",pAExpr, pComma)
+  val rng2 = pSpecial("]", [])
+  if es.is-nil then
+    makeNil(rng1.combine(rng2))
+  else
+    es.foldr(makeNil(rng2.after), fn(x, acc) rng1.makeCons(x, acc, userTypeRange)).adjustRange(rng1.combine(rng2))
+
+fun makeNil(r: range)
+  makeApp(Var(nameNull, False, r), [], userTypeRange)
+
+fun makeCons(r: range, x: expr<t>, xs: expr<t>, rT: (t) -> range): expr<t>
+  makeApp(Var(nameCons, False, r), [x, xs], rT)
+
+fun pCCtxExpr()
+  pCcontext(pKeyword("ctx", []).range)
+
+fun pCcontext(rng: range)
+  makeApp(Var(nameCCtxCreate, False, rng), [pNtlExpr()], userTypeRange)
+
+fun pCCtxHole(): <ast> userExpr
+  val rng = choices("", [{pKeyword("hole", []).range}, {pWildcard().snd}])
+  makeApp(Var(nameCCtxHoleCreate, False, rng), [], userTypeRange)
+
+fun pInjectExpr()
+  val (rng, mkInj) = injectType()
+  choicesnb("", [
+    {mkInj(parens({choices("", [pExpr, pFunBlock])}).fst)},
+    {val name = newHiddenName("mask-action"); Lam([ValueBinder(name, Nothing, Nothing, rng, rng)], mkInj(Var(name, False, rng)), rng)}
+  ])
+
+fun injectType()
+  val rng1 = pKeywordInject().range
+  val behind = choicesnb("", [{choices("", [{pSpecialId("behind")}, {pSpecialId("other")}]); True}, {False}])
+  pLangle()
+  val tp = pType()
+  pRangle()
+  (rng1, fn(exp) Inject(promoteType(tp), exp, behind, rng1.combine(exp.range)))
+
+fun pBinder(pre: range)
+  val (name, range) = pIdentifier()
+  val ann = pTypeAnnotation()
+  fn(e) ValueBinder(name, (), ann(e), range, pre.combine(range))
 
 fun pFunId()
   choicesnb("function id", [
@@ -463,18 +586,249 @@ fun pFunId()
     }
     ])
 
-fun pTypeParams()
-  maybeList({angles(pTBinders).fst})
+inline fun pPattern()
+  pPatAnn()
 
+fun pPatAnn(): <ast> userPattern
+  val p = pPatAtom()
+  pMaybeTypeAnnot(p) fn(tp0)
+    val tp = promoteType(tp0)
+    match p
+      PatVar(ValueBinder(name, Nothing, npat, rng1, rng2)) -> PatVar(ValueBinder(name, Just(tp), npat, rng1, rng2))
+      _ -> PatAnn(p, tp, p.range.combine(tp.range))
 
+fun pPatAtom()
+  choicesnb("pattern atom", [
+    {
+      val (name, rng) = pQConstructor()
+      val (ps, r) = choicesnb("", [{parensCommas(pNamedPattern)}, {([], rangeNull)}])
+      PatCon(name, ps, rng, rng.combine(r))
+    },
+    {
+      val (name, rng) = pIdentifier()
+      choices("", [
+        {pKeyword("as", []); val p = pPattern(); PatVar(ValueBinder(name, Nothing, p, rng, rng.combine(p.range)))},
+        {PatVar(ValueBinder(name, Nothing, PatWild(rng), rng, rng))}
+      ])
+    },
+    {PatWild(pWildcard().snd)},
+    {PatLit(pLiteral())},
+    {pListPattern()},
+    {
+      val (ps, rng) = parensCommas(pNamedPattern);
+      match ps
+        [(_, p)] -> PatParens(p, rng)
+        _ -> PatCon(nameTuple(ps.length), ps, rng, rng)
+    }
+  ])
 
+fun pNamedPattern()
+  choices("named pattern", [
+    {
+      val (name, rng) = pIdentifier();
+      pKeyword("=", [])
+      (Just((name, rng)), pPattern())
+    },
+    { (Nothing, pPattern()) }
+  ])
 
-// TODO: Here
+fun pMaybeTypeAnnot(d: a, f: (userType) -> div a): <ast> a
+  choices("", [{f(pTypeAnnot())}, {d}])
+
+fun pListPattern()
+  val rng1 = pSpecial("[", [])
+  val es = pSepBy("", pPattern, pComma)
+  val rng2 = pSpecial("]", [])
+  if es.is-nil then
+    makeNilPat(rng1.combine(rng2))
+  else
+    PatParens(es.foldr(makeNilPat(rng2.after), fn(x, acc) makeConsPat(x, acc)), rng1.combine(rng2))
+
+fun makeNilPat(rng)
+  PatCon(nameNull, [], rng, rng)
+
+fun makeConsPat(x, xs)
+  PatCon(nameCons, [(Nothing, x), (Nothing, xs)], x.range, x.range)
+
+fun pTypeAnnot()
+  pKeyword(":", [])
+  pType()
+
+fun pTypeAnnotPar()
+  pKeyword(":", [])
+  choicesnb("", [
+    {
+      val rng = pSpecialOp("?")
+      val tp = pType()
+      TpApp(TpCon(nameTpOptional, rng), [tp], rng.combine(tp.range))
+    },
+    {
+      val rng = pSpecialOp("$")
+      val (eff, res) = pTResultTotal()
+      TpApp(TpCon(nameTpDelay, rng), [eff, res], rng.combine(res.range))
+    },
+    pType
+  ])
+
+fun pTypeScheme()
+  promoteType(choices("type signature", [pQuanSome, pType]))
+
+fun pType(): <ast> userType
+  choices("type", [pQuanForall, pQuanSome, pTQual])
+
+fun aQuantifier()
+  maybeList({pKeyword("forall", []); parens(pTBinders).fst})
+
+fun sQuantifier()
+  maybeList({pKeyword("some", []); parens(pTBinders).fst})
+
+fun pQuanSome()
+  pQuantifier(QSome, pType)
+
+fun pQuanForall() 
+  pQuantifier(QForall, pTQual)
+
+fun pQuanExists()
+  pQuantifier(QExists, pType)
+
+fun pQuantifier(quan: userQuantifier, next)
+  val tok = pKeyword(if quan.is-qsome then "some" else if quan.is-qexists then "exists" else "forall", [])
+  val params = angles(pTBinders).fst
+  val tp = next()
+  params.foldr(tp, fn(name, t) TpQuan(quan, name, t, tok.range.combine(t.range)))
+
+fun pTQual()
+  pQualifier(pTArrow())
+
+fun pQualifier(tp: userType)
+  choices("", [
+    {
+      pKeyword("with", [])
+      TpQual(parens({pmany1("", pPredicate)}).fst, tp)
+    },
+    {tp}
+  ])
+
+fun pPredicate()
+  choices("predicate", [{pTypeApp(pTId())}])
+
+fun pTArrow()
+  val (tps, rng1) = pTAtom()
+  choices("", [
+    {pKeyword("->", []); val (teff, tres) = pTResultTotal(); TpFun(tps, teff, tres, rng1.combine(tres.range))},
+    {tuple(tps, rng1)}
+  ])
+
+fun pTEffect(): <ast> userType
+  val rng1 = pLangle()
+  val labels:list<userType> = pSepBy("", pTLabel, pComma)
+  val (ext, brng) = pTExtend()
+  val rng = pRangle()
+  labels.foldr(ext(rng), fn(x, acc) brng.makeEffectExtend(x, acc, range))
+
+fun pTExtend()
+  choices("", [
+    {val brng = pBar(); val tp = choices("", [pTEffect, pTId]); (fn(x) tp, brng)},
+    {(makeEffectEmpty, rangeNull)}
+  ])
+
+fun pTLabel()
+  pTypeApp(pTId())
+
+fun pTResultTotal()
+  val (mbeff, tres) = pTResult()
+  val teff = mbeff.default(makeTpTotal(tres.range.before))
+  (teff, tres)
+
+fun pTResult(): <ast> (maybe<userType>, userType)
+  val (tps1, rng1) = pTAtom()
+  choices("", [{val (tps, rng) = pTAtom(); (Just(tuple(tps1, rng)), tuple(tps, rng))}, {(Nothing, tuple(tps1, rng1))}])
+
+fun pTAtomic()
+  val (ts, rng) = pTAtom()
+  tuple(ts, rng)
+
+fun tuple(tps: list<(name, userType)>, r: range): userType
+  match tps
+    Cons(tp, Nil) -> tp.snd
+    _ -> TpApp(TpCon(nameTuple(tps.length), r), tps.map(snd), r)
+
+fun pTAtom()
+  fun single(tp: userType)
+    ([(nameNil, tp)], tp.range)
+  fun mkTuple(n: int, rng: range)
+    TpCon(nameTuple(n).unqualify, rng)
+  choices("type atom", [
+    {val tp1 = pTId(); val tp2 = pTypeApp(tp1); single(tp2)},
+    {
+      val rng1 = pLparen()
+      choices("", [
+        {
+          val tps = pSepBy("", pParamTypeX, pComma)
+          val rng2 = pRparen()
+          (tps.map(fn((name, _, tp)) (name, tp)), rng1.combine(rng2))
+        },
+        {
+          val cs = pmany1("", pComma)
+          val rng2 = pRparen()
+          val tp = pTypeApp(mkTuple(cs.length + 1, rng1.combine(rng2)))
+          single(tp)
+        }
+      ])
+    },
+    { single(pTEffect()) }
+  ])
+
+fun pTypeApp(tp: userType)
+  choices("", [
+    {
+      val rng1 = pLangle()
+      val targs = pSepBy("", pAnnTypeK, pComma)
+      val rng2 = pRangle()
+      TpApp(tp, targs, tp.range.combine(rng2).combine(rng1))
+    },
+    {tp}
+  ])
+
+fun pParamType(): <ast> (name, range, userType)
+  val (id, rng) = choices("", [pVarId, pWildcard, {(nameNil, rangeNull)}])
+  pKeyword(":", [])
+  val tp = pParameterType(rng)
+  (id, rng, tp)
+
+fun pParamTypeX(): <ast> (name, range, userType)
+  choices("parameter type", [
+    {
+      val (id, rng) = try("", {val x = choices("", [pVarId, pWildcard]); pKeyword(":", []); x})
+      val tp = pParameterType(rng)
+      (id, rng, tp)
+    },
+    {
+      val tp = pParameterType(rangeNull)
+      (nameNil, tp.range, tp)
+    }
+  ])
+
+fun pParameterType(r: range)
+  choices("parameter type", [
+    {
+      val rng2 = pSpecialOp("?")
+      val tp = pType()
+      TpApp(TpCon(nameTpOptional, r), [tp], rng2.combine(tp.range))
+    },
+    pType
+  ])
+
+fun pAnnTypeK()
+  val tp = pType()
+  choices("TypeAnnotation", [
+    {pSpecialOp("::"); TpAnn(tp, pKind())},
+    {tp}
+  ])
 
 fun pTId()
-  choices("Type", [
-    {}
-  ])
+  val (id, rng) = choices("Type", [pQVarId, pTypeIdCtx, pWildcard])
+  if id.isWildcard || id.isTypeVar then TpVar(id, rng) else TpCon(id, rng)
 
 fun makeApp(expr: expr<t>, args: list<expr<t>>, rT: (t) -> range): expr<t>
   App(expr, args.map(fn(a) (Nothing, a)), expr.range.combine(args.last.map(range).default(expr.range)))
@@ -822,7 +1176,7 @@ fun uniqueRangeName(rng: range, pre: string): name
   val pos = rng.start
   newName(pre ++ "-l" ++ pos.line.show ++ "-c" ++ pos.col.show)
 
-fun adjustRange(r: range, ue: userExpr): userExpr
+fun adjustRange(ue: userExpr, r: range): userExpr
   Parens(ue, nameNil, r)
 
 fun adjustTpRange(r: range, ut: userType): userType

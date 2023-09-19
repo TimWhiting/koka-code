@@ -248,11 +248,11 @@ fun show(g: guard<t>, showT: (t) -> div string): div string
 
 type pattern<t>
   PatWild(range: range)
-  PatVar(ref: valueBinder<maybe<t>, pattern<t>>)
+  PatVar(ref: valueBinder<maybe<t>, pattern<t>>, range: range= ref.range)
   PatAnn(p: pattern<t>, t: t, range: range)
   PatCon(name: name, args: list<(maybe<(name, range)>, pattern<t>)>, nameRange: range, range: range)
   PatParens(p: pattern<t>, range: range)
-  PatLit(value: lit)
+  PatLit(value: lit, range:range = value.range)
 
 fun show(p: pattern<t>, showT: (t) -> div string): div string
   match p
@@ -266,14 +266,14 @@ fun show(p: pattern<t>, showT: (t) -> div string): div string
 type lit
   LitInt(value: int, range: range)
   LitFloat(value: float64, range: range)
-  LitChar(value: char, range: range)
+  LitChar(value: string, range: range)
   LitString(value: string, range: range)
 
 fun show(l: lit): string
   match l
     LitInt(v, r) -> v.show ++ " " ++ r.showFullRange
     LitFloat(v, r) -> v.show ++ " " ++ r.showFullRange
-    LitChar(v, r) -> v.show ++ " " ++ r.showFullRange
+    LitChar(v, r) -> v ++ " " ++ r.showFullRange
     LitString(v, r) -> v ++ " " ++ r.showFullRange
 
 // Types and kinds

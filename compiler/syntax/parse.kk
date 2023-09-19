@@ -434,10 +434,16 @@ struct effectDecl
   k: userKind
   r4: range
   umbrella: maybe<list<userType>>
-  decls: list<opDecl>
+  decls: list<opDecl>;
 
-
-
+struct funDef
+  tpars: list<typeBinder<userKind>> 
+  pars: list<valueBinder<maybe<userType>, maybe<userExpr>>>
+  pinfos: list<paramInfo>
+  parsRng: range
+  mbTres: maybe<(maybe<userType>, userType)>
+  preds: list<userType>
+  ann: (userExpr -> userExpr);
 
 fun pEffectDecl(vis: visibility)
   unimplemented()
@@ -508,34 +514,142 @@ fun pFip()
 fun pExternalBody()
   unimplemented()
 
-
-fun pDefaultExpr()
+fun pVarDecl()
+  unimplemented()
+fun pFunctionDecl(rng: range, vis: visibility)
   unimplemented()
 
-fun pAnnotResult()
-  unimplemented()
 
 
-fun pTypeParams()
-  maybeList({angles(pTBinders).fst})
 
-
-fun pBlock(): <ast> userExpr
-  unimplemented()
 
 fun pFunDef(a)
   unimplemented()
 
-fun pParamId()
-  unimplemented()
 
-fun pParameter(a, b)
-  unimplemented()
+
+
+
+// TODO: Here
+fun pAnnotResult()
+  pKeyword(":", [])
+  pTResultTotal()
+
+fun pTypeParams()
+  maybeList({angles(pTBinders).fst})
+
+fun pParameters(allowBorrow: bool, allowDefaults: bool)
+  val (results, rng) = parensCommas({pParameter(allowBorrow, allowDefaults)})
+  val (binders, pinfos, transforms) = results.unzip3
+  fun transform(e: userExpr)
+    transforms.foldr(e, fn(f, e') f(e'))
+  (binders, pinfos, transform, rng)
+
+fun pParameter(allowBorrow: bool, allowDefaults: bool)
+  val pinfo = if allowBorrow then pParamInfo() else Own
+  val pat = pPatAtom()
+  val tp = optionMaybe("", pTypeAnnotPar)
+  val (opt, drng) = if allowDefaults then pDefaultExpr() else (Nothing, rangeNull)
+  val rng = match pat
+    PatVar(binder) -> binder.expr.range
+    _ -> pat.range
+  fun binder(name: name, nameRng: range)
+    ValueBinder(name, tp, opt, nameRng, combine([rng, tp.map(range).default(rng), drng]))
+  match pat
+    PatVar(ValueBinder(name, Nothing, PatWild, nameRng, _)) -> (binder(name, nameRng), pinfo, fn(x) x)
+    PatWild(nameRng) -> (binder("_wildcard".uniqueRangeHiddenName(nameRng), nameRng), pinfo, fn(x) x)
+    _ -> 
+      val name = "pat".uniqueRangeHiddenName(rng)
+      fun transform(e)
+        match e
+          Lam(binders, body, lambdaRng) -> Lam(binders, Case(Var(name, False, rng), [Branch(pat, [Guard(guardTrue, body)])], rng), lambdaRng)
+          Ann(body, tp', rng') -> Ann(body.transform, tp', rng')
+          _ -> astError("Syntax.Parse.parameter: unexpected function expression in parameter match transform", rng)
+      (binder(name, rng), pinfo, transform)
+
+fun pParamId()
+  choices("param id", [pIdentifier, pWildcard])
+
+fun pDefaultExpr()
+  maybe("default", {val krng = pKeyword("=", []).range; val e = pExpr(); (Just(e), krng.combine(e.range))}).default((Nothing, rangeNull))
+
+fun anyStatVar(l: list<statement>): maybe<userDef>
+  match l
+    Cons(StatVar(def), _) -> Just(def)
+    Cons(_, tl) -> tl.anyStatVar
+    Nil -> Nothing
+
+fun combine(e1: statement, e2: userExpr)
+  match e1
+    StatFun(f) -> f(e2)
+    StatExpr(e) ->
+      val r = e.range
+      Bind(Def(ValueBinder("_".newName, (), e, r, r), r, Private, DefVal, InlineAuto, ""), e2, r)
+    StatVar(def) ->
+      val ValueBinder(name, (), expr, nameRng, rng) = def.binder
+      App(Var(nameLocal, False, rng), 
+       [(Nothing, expr), 
+        (Nothing, Parens(Lam([ValueBinder(name, Nothing, Nothing, nameRng, nameRng)], e2, range/combine(def.range,e2.range)), name, rng))],
+       range/combine(rng, e2.range))
+
+fun localScope(vdef: userDef, exp: userExpr): userExpr
+  val erng = exp.range
+  val drng = vdef.range
+  val nrng = vdef.binder.nameRange
+  App(Var(nameRunLocal, False, nrng), [(Nothing, Lam([], exp, erng))], drng)
+
+fun pBlock(): <ast> userExpr
+  val rng1 = pLcurly()
+  pmany("semicolons", pSemicolon)
+  val stmts1 = semis("statements", pStatement)
+  val stmts2 = maybe("", {val rng2 = pKeyword("return", []).range; val e = pExpr(); pmany("semicolons", pSemicolon); [StatExpr(makeReturn(rng2, e))]}).default([])
+  val rng2 = pRcurly()
+  val localize = match stmts1.anyStatVar { Just(def) -> [StatFun(fn(e) localScope(def, e))]; Nothing -> []}
+  val stats = localize ++ stmts1 ++ stmts2
+  match stats.reverse
+    Cons(StatExpr(exp), rst) -> Parens(rst.foldr(exp, combine), nameNil, rng1.combine(rng2))
+    [] -> Var(nameUnit, False, rng1.combine(rng2))
+    _ -> astError("Last statement in a block must be an expression", rng1.combine(rng2))
 
 fun makeReturn(r: range, e: userExpr)
   App(Var(nameReturn, False, r), [(Nothing, e)], r.combine(e.range))
 
-// TODO: Here
+value type statement
+  StatFun(e: (userExpr -> <ast> userExpr))
+  StatExpr(e: userExpr)
+  StatVar(e: userDef)
+
+fun pStatement()
+  choices("statement", [
+   {
+    val funs = pmany1("", {pFunctionDecl(rangeNull, Private)})
+    StatFun(fn(body) Let(DefRec(funs), body, body.range.combine(funs.last.map(fn(f) f.range).default(body.range))))
+   },
+   {StatFun(pLocalValueDecl())},
+   {StatVar(pVarDecl())},
+   {
+    val f = pWithStat()
+    maybe("", {pKeyword("in", []); StatExpr(f(pBlockExpr()))}).default(StatFun(f))
+   },
+   {StatExpr(choices("", [pBasicExpr, pReturnExpr]))}
+  ])
+
+fun pLocalValueDecl(): <ast> (userExpr -> userExpr)
+  val krng = pKeyword("val", []).range
+  val pat = pPattern()
+  pKeyword("=", [])
+  val e = pBlockExpr()
+  fun bindVar(binder:valueBinder<maybe<userType>, pattern<userType>>, mbTyp, rng)
+    val annExpr = match mbTyp
+      Just(tp) -> Ann(e, tp.promoteType, rng)
+      Nothing -> e
+    val vBinder = ValueBinder(binder.name, (), annExpr, binder.nameRange, binder.range)
+    fn(b) Bind(Def(vBinder, rng, Private, DefVal, InlineAuto, ""), b, krng.combine(b.range))
+  match pat.unParens
+    PatVar(binder as ValueBinder(expr=PatWild)) -> bindVar(binder, binder.binderType, binder.range) 
+    PatAnn(PatVar(binder as ValueBinder(expr=PatWild)), tp, rng) -> bindVar(binder, Just(tp), rng)
+    _ -> fn(b) Case(e, [Branch(pat, [Guard(guardTrue, b)])], krng.combine(b.range))
+
 fun pWithStat()
   fun promoteValueBinder(binder)
     match binder.binderType
@@ -556,9 +670,14 @@ fun pWithStat()
     }
   ])
 
-fun unParens(e)
+fun unParens(e: expr<t>): expr<t>
     match e
       Parens(p) -> p.unParens
+      _ -> e
+
+fun unParens(e: pattern<t>): pattern<t>
+    match e
+      PatParens(p) -> p.unParens
       _ -> e
 
 fun applyToContinuation(wrng: range, params: list<valueBinder<maybe<t>, maybe<expr<t>>>>, expr: expr<t>, body: expr<t>): <ast> expr<t>  
@@ -569,10 +688,10 @@ fun applyToContinuation(wrng: range, params: list<valueBinder<maybe<t>, maybe<ex
     App(f', args, _) -> App(f', (args ++ funarg), fullrange)
     atom -> App(atom, funarg, fullrange)
 
-fun pTypeAnnotation(): <ast> (userType -> userType)
+fun pTypeAnnotation(): <ast> (userExpr -> userExpr)
   maybe("", {
     val tp = pTypeAnnot()
-    fn(x) Ann(x, tp, tp.range.combine(e.range))
+    fn(x) Ann(x, tp, tp.range.combine(x.range))
   }).default(fn(x) x)
 
 fun pBodyExpr()
@@ -611,11 +730,11 @@ fun pFunBlock()
   Lam([], exp, exp.range)
 
 fun pLambda(alts)
-  val rng = pKeyword("fn", alts)
+  val rng = pKeyword("fn", alts).range
   val spars = sQuantifier()
-  val (tpars, pars, _, parsRng, mbTres, preds, ann) = pFunDef(False)
+  val FunDef(tpars, pars, _, _, mbTres, preds, ann) = pFunDef(False)
   val body = pBodyExpr()
-  val f = promote(spars, tpars, preds, mbtres, Lam(pars, body, rng.combine(body.range)))
+  val f = promote(spars, tpars, preds, mbTres, Lam(pars, body, rng.combine(body.range)))
   ann(f)
 
 fun pIfExpr()
@@ -1684,7 +1803,7 @@ fun pWarningMessage(msg: string, rng: range)
   addWarning("warning " ++ rng.start.show ++ ":" ++ msg, rng)
 
 
-fun uniqueRangeHiddenName(rng: range, pre: string): name
+fun uniqueRangeHiddenName(pre: string, rng: range): name
   val pos = rng.start
   newHiddenName(pre ++ "_" ++ pos.line.show ++ "_" ++ pos.col.show)
 

@@ -52,9 +52,8 @@
     {
       "type": "koka",
       "request": "launch",
-      "program": "scratch/test2",
-      "name": "scratch/test2",
-      "args": "-O2"
+      "program": "scratch/test3",
+      "name": "scratch/test3"
     },
     {
       "type": "koka",

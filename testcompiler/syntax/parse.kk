@@ -4,6 +4,7 @@ import compiler/syntax/lexeme
 import compiler/syntax/syntax
 import compiler/common/range
 import compiler/common/name
+import compiler/common/parse
 
 fun main()
   with handler

@@ -15,14 +15,70 @@ fun promoteType(tp: userType): div userType
 fun promoteFree(bound: list<userTypeBinder>, tps: list<userType>): div list<userTypeBinder>
   (tps.freeTypeVars(freeTypeVars) - (namesEmpty + bound.map(name))).list.map(toTypeBinder)
 
+fun promote(somePars:list<userTypeBinder>, forallPars: list<userTypeBinder>, preds: list<userType>, mbResTp: maybe<(maybe<userType>, userType)>, uexpr: userExpr): pure userExpr
+  fun resType(expr': userExpr)
+    match expr'
+      Parens(e, n, r) -> 
+        val (es, e') = e.resType
+        (es, Parens(e', n, r))
+      _ -> match mbResTp
+        Just((mbteff, tres)) -> 
+          ([
+            (nameNil, match mbteff {Nothing -> Right(expr'.range); Just(teff) -> Left(teff)}),
+            (nameNil, Left(tres))], expr')
+  fun argresTypes(expr': userExpr)
+    match expr'
+      Parens(e, n, r) -> 
+        val (es, e') = argresTypes(e)
+        (es, Parens(e', n, r))
+      Ann(e, t, r) -> 
+        val (es, e') = argresTypes(e)
+        (es, Ann(e', t, r))
+      Lam(args, e, r) ->
+        val (es, e1) = e.resType
+        val (fs, args') = args.map(fn(b)
+          match b.binderType
+            Nothing -> ((b.name, Right(r)), b)
+            Just(t) ->
+              val optTp = match b.expr
+                Nothing -> t
+                Just -> TpApp(TpCon(nameTpOptional, t.range), [t], t.range)
+              ((b.name, Left(optTp)), b(binderType=Nothing))
+        ).unzip
+        (fs ++ es, Lam(args', e1, r))
+      _ -> ([], expr')
+  
+  val (argresTps, expr') = argresTypes(uexpr)
+  if argresTps.all(fn(a) a.snd.is-right) then uexpr
+  else
+    // promote quantified variables of TpCon to TpVar
+    val quantified = namesEmpty + somePars.map(name) + forallPars.map(name)
+    val argresTypes1 = argresTps.map(fn(a) promoteTpVars(a, quantified))
+    // create full type by inserting some types if no parameter was annotated
+    val (namess, argresTypes2) = list(1, argresTypes1.length).zip(argresTypes1).map(insertSome).unzip
+    val Cons(resType', Cons(effType, rargsTypes)) = argresTypes2
+    val names = namess.concat
+    val eff = effType.snd
+    val funTp = TpFun(rargsTypes.reverse, eff, resType'.snd, expr'.range)
+    // Quantify over free type variables
+    val implicit = (funTp.freeTypeVars - (quantified + names)).list
+    // Create fully quantified type
+    val (impSome, impForall) = implicit.partition(isSomeVar)
+    val fullTp =
+      quantify(QSome, somePars ++ (names ++ impSome).map(toTypeBinder),
+      quantify(QForall, forallPars ++ impForall.map(toTypeBinder), 
+      qualify(funTp, preds)))
+    Ann(expr', fullTp, expr'.range.combine(fullTp.range))
 
-fun promote(somePars:list<userTypeBinder>, forallPars: list<userTypeBinder>, preds: list<userType>, mbResTp: maybe<(maybe<userType>, userType)>, expr: userExpr): div userExpr
-// TODO: Do this
-  promote(somePars, forallPars, preds, mbResTp, expr)
+fun insertSome((i, (name, eitherTp)): (int, (name, either<userType, range>)))
+  match eitherTp
+    Left(t) -> ([], (name, t))
+    Right(r) ->
+      val tname = i.newImplicitTypeVarName
+      ([tname], (name, TpVar(tname, r)))
 
 fun isSomeVar(n: name)
   n.isWildcard
-
 
 fun qualify(tp: userType, preds: list<userType>): userType
   TpQual(preds, tp)

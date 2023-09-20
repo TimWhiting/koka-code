@@ -389,19 +389,108 @@ fun externalImport(r: range): <ast> external
   unimplemented()
  
 fun pExternalBody()
-  unimplemented()
+  semiBraces("external entries", pExternalEntry)
+
+fun pExternalEntry()
+  val (target, inl, _) = pExternalEntryRanged()
+  (target, inl)
+
+fun pExternalEntryRanged()
+  val target = pExternalTarget()
+  val (call, rng) = pExternalCall()
+  (target, call, rng)
+
+fun pExternalCall()
+  val f = optionMaybe("specialId", {pSpecialId("inline"); ExternalInline}).default(ExternalCall)
+  val (s, rng) = pStringLit()
+  (f(s), rng)
+
+fun pExternalTarget()
+  choicesnb("target", [
+    {pSpecialId("c"); C(CDefault)},
+    {pSpecialId("cs"); CS},
+    {pSpecialId("js"); JS(JsDefault)},
+    {Default}
+  ])
 
 fun pFixityDecl(): <ast> list<fixDef>
-  unimplemented()
+  val (vis, vrng, assoc) = maybe("", {val (vis, vrng) = pVisibility(Private); val assoc = pAssocDef(); (vis, vrng, assoc)})
+  val (prec, rng) = pInteger()
+  if prec < 0 || prec > 100 then
+    astError("fixity must be between 0 and 100", rng)
+  val names = pSepBy1("names", pIdentifier, pComma)
+  names.map(fn(name) FixDef(name, FixInfix(prec, assoc), vis, rng.combine(vrng)))
 
-fun pAliasDecl(vis: visibility)
-  unimplemented()
+fun pAssocDef()
+  choices("associativity", [
+    {pKeyword("infixl", []); AssocLeft},
+    {pKeyword("infixr", []); AssocRight},
+    {pKeyword("infix", []); AssocNone}
+  ])
+
+fun pAliasDecl(dvis: visibility)
+  val (vis, vrng, trng, doc) = try("")
+    val (vis, vrng) = pVisibility(dvis)
+    val (trng, doc) = pDocKeyword("alias", [])
+    (vis, vrng, trng, doc)
+  val tbind = pTBinderDef()
+  val (tpars, kind, krng) = pTypeKindParams()
+  pKeyword("=", [])
+  val tp = pType()
+  val range = combine([vrng, trng, krng, tp.range])
+  Synonym(tbind(kind), tpars, tp, range, vis, doc) 
 
 fun pTypeDecl(vis: visibility)
-  unimplemented()
+  choices("type", [{pDataTypeDecl(vis)}, {pStructDecl(vis)}])
+
+fun pDataTypeDecl(dvis: visibility)
+  val (vis, defvis, vrng, (typeSort, trng, doc, ddef, isExtend)) = choices("type", [
+    {
+      val rng = pKeyword("abstract", []).range
+      val x = pTypeDeclKind()
+      (Public, Private, rng, x)
+    },
+    {
+      val (vis, rng) = pVisibility(dvis)
+      val x = pTypeDeclKind()
+      (vis, vis, rng, x)
+    }
+  ])
+  val tbind =
+    if isExtend then
+      val (qid, rng) = pQTypeId()
+      fn(kind) TypeBInder(qid, kind, rng, rng)
+    else pTBinderDef()
+  val (tpars, kind, prng) = pTypeKindParams()
+  val name = tbind(kind)
+  val resTp = TpApp(name.tpCon, tpars.map(tpVar), name.range.combine(tpars.last.map(range).default(name.range)))
+  val (cs, crng) = maybe("", {semiBraces({pConstructor(dvis, tpars, resTp)})}).default(([], rangeNull))
+  val (constrs, creatorss) = cs.unzip
+  val range = combine([vrng, trng, tbind.kind.range, prng, crng])
+  (DataType(name, tpars, constrs, range, vis, typeSort, ddef, isExtend, doc), creatorss.concat)
 
 fun pStructDecl(dvis: visibility)
-  unimplemented()
+  val (vis, dvis, rng, ddefs, trng, doc) = maybe("")
+    val (vis, dvis, rng) = choices("", [
+      {val rng = pKeyword("abstract", []); (Public, Private, rng)},
+      {val (vis, rng) = pVisibility(dvis); (vis, vis, rng)}
+    ])
+    val ddef = choices("", [
+      {pSpecialId("value"); DataDefValue(valueReprZero)},
+      {pSpecialId("ref", ["reference"]); DataDefNormal},
+      {DataDefAuto}
+    ])
+    val (trng, doc) = pDocKeyword("struct", [])
+    (vis, dvis, rng, ddef, trng, doc)
+  val tbind = pTBinderDef()
+  val tpars = maybe("", {angles(pTBinders)}).default([])
+  val name = tbind(KindNone)
+  val resTp = TpApp(name.tpCon, tpars.map(tpVar), name.range.combine(tpars.last.map(range).default(name.range)))
+  val (pars, prng) = pConPars(dvis)
+  val (tid, rng) = name.getRName
+  val conId = tid.toConstructorName
+  val (usercon, creators) = makeUserCon(conId, tpars, resTp, [], pars, rng, rng.combine(prng), dvis, doc)
+  (DataType(name, tpars, [usercon], combine(vrng, trng, rng, prng), vis, Inductive, ddef, False, doc), creators)
 
 fun tpVar(tb: typeBinder<k>)
   TpVar(tb.name, tb.range)
@@ -410,7 +499,7 @@ fun tpCon(tb: typeBinder<k>)
   TpCon(tb.name, tb.range)
 
 fun pTypeDeclKind()
-  choicesnb("", [
+  choices("", [
     {
       val (rng1, kind) = choicesnb("", 
         [{val rng = pSpecialId("rec"); (rng, Retractive)},
@@ -433,7 +522,7 @@ fun pTypeDeclKind()
 
 fun pTypeKindParams()
   choices("", [
-    {val (tpars, rng) = angles(pTbinders); val kind = pKindAnnot(); (tpars, kind, rng.combine(kind.range))},
+    {val (tpars, rng) = angles(pTBinders); val kind = pKindAnnot(); (tpars, kind, rng.combine(kind.range))},
     {val kind = pKindAnnot(); ([], kind, kind.range)},
     {([], KindNone, rangeNull)}
   ])
@@ -1844,10 +1933,10 @@ fun pTBinders()
 
 fun pTBinder()
   val (id, rng) = pVarId()
-  val kind = pKindAnnotation()
+  val kind = pKindAnnot()
   return TypeBinder(id, kind, rng, rng)
 
-fun pKindAnnotation()
+fun pKindAnnot()
   choices("kind", [{
     pSpecialId("::")
     pKind()
@@ -2102,7 +2191,7 @@ fun pSpecialId(s: string, alternates: list<string>)
     match x.lex
       LexId(id) | id.showPlain == s -> Just(x.range)
       LexId(id) | alternates.any(fn(v) v == id.showPlain) -> 
-        addWarning("using deprecated keyword " ++ s' ++ ", use " ++ s ++ " instead", x.range)
+        addWarning("using deprecated keyword " ++ id.showPlain ++ ", use " ++ s ++ " instead", x.range)
         Just(x.range)
       _ -> Nothing
 

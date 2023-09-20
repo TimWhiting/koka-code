@@ -14,7 +14,7 @@ value type target
   CS
   JS(t: jsTarget)
   C(t: cTarget)
-  Default
+  DefaultTarget
 
 struct platform
   ptrSize: int // sizeof(intptr_t)
@@ -55,7 +55,7 @@ pub fun (==)(t1: target, t2: target): bool
     (CS, CS) -> True
     (JS(j1), JS(j2)) -> j1 == j2
     (C(c1), C(c2)) -> c1 == c2
-    (Default, Default) -> True
+    (DefaultTarget, DefaultTarget) -> True
     _ -> False
 
 fun show(t: target): string
@@ -63,7 +63,7 @@ fun show(t: target): string
     CS -> "CS"
     JS(j) -> "JS(" ++ j.show ++ ")"
     C(c) -> "C(" ++ c.show ++ ")"
-    Default -> "Default"
+    DefaultTarget -> "Default"
 
 fun show(t: jsTarget): string
   match t
@@ -166,8 +166,8 @@ fun show(k: dataKind): string
     CoInductive -> "CoInductive"
     Retractive -> "Retractive"
 
-type dataDef
-  DataDefValue(rawFields: int, scanFields: int) // size in bytes and count of scannable fields
+value type dataDef
+  DataDefValue(repr: valueRepr) // size in bytes and count of scannable fields
   DataDefNormal
   DataDefAuto
   DataDefRec
@@ -175,7 +175,7 @@ type dataDef
 
 fun show(d: dataDef): string
   match d
-    DataDefValue(r, s) -> "DataDefValue(" ++ r.show ++ ", " ++ s.show ++ ")"
+    DataDefValue(r) -> "DataDefValue(" ++ r.show ++ ")"
     DataDefNormal -> "DataDefNormal"
     DataDefAuto -> "DataDefAuto"
     DataDefRec -> "DataDefRec"
@@ -193,7 +193,7 @@ fun isOpen(d: dataDef): bool
   
 fun isValue(d: dataDef): bool
   match d
-    DataDefValue(_, _) -> True
+    DataDefValue -> True
     _ -> False
 
 type valueRepr

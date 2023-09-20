@@ -39,7 +39,7 @@ fun next(): ast lexeme
     Just(l) -> l
     Nothing -> astError("unexpected end of file", rangeNull)
 
-alias ast = <astParse, astError, pure>
+alias ast = <astParse, astError, pure, fsys>
 
 fun parseProgramFromFile(semiInsert: bool, fname: path)
   val r = read-text-file(fname)
@@ -48,7 +48,7 @@ fun parseProgramFromFile(semiInsert: bool, fname: path)
 fun parseProgramFromString(semiInsert: bool, input: string, fname: path)
   lexParse(semiInsert, fn(x) x, parseProgram, fname.string, input)
 
-fun lexParse(insSemi: bool, preprocess: list<lexeme> -> list<lexeme>, p: () -> <console,ast|e> a, sourceName: string, input: string): <console,astError,pure|e> a
+fun lexParse(insSemi: bool, preprocess: list<lexeme> -> list<lexeme>, p: () -> <console,ast|e> a, sourceName: string, input: string): <console,astError,fsys,pure|e> a
   val src = Source(sourceName, input)
   val lexes = lex(src, 0, input)
   var lexemes := preprocess(layout(insSemi, lexes))
@@ -222,7 +222,7 @@ fun parseProgram()
 fun pModule()
   val res = maybe("module name")
     val vis = pVisibility().fst
-    val doc = pDocKeyword("module", []).snd
+    val doc = pDocKeyword("module").snd
     val (name, rng) = pModulePath() 
     pBody(vis, name, rng, doc)
   match res
@@ -282,14 +282,14 @@ fun pTopDef(vis): <ast> list<topDef>
 
 fun pImportDecl(): <ast> kimport
   val (vis, vrng) = pVisibility(Private)
-  val _ = pKeyword("import", [])
+  pKeyword("import")
   val (asname, name, rng) = pImportAlias()
   Kimport(asname, name, Range(vrng.start, rng.end), vis)
 
 fun pImportAlias()
   val (name1, rng1) = pModulePath()
   val r = maybe("import alias")
-    val _ = pKeyword("=", [])
+    pKeyword("=")
     pModulePath()
   match r
     Just((name2, rng2)) -> (name1, name2, rng2)
@@ -297,21 +297,21 @@ fun pImportAlias()
 
 fun pVisibility(vis=Private)
   choices("visibility", [{
-    val x = pKeyword("pub", ["public"])
-    (Public, x.range)
+    val rng = pKeyword("pub", ["public"])
+    (Public, rng)
   },
   {
-    val x = pKeyword("private", [])
-    addWarning("using private is deprecated, only use pub to make declarations public", x.range)
-    (Private, x.range)
+    val rng = pKeyword("private")
+    addWarning("using private is deprecated, only use pub to make declarations public", rng)
+    (Private, rng)
   },{(vis, rangeNull)}])
 
 fun pInline()
   choices("inline", [{
-    val _ = pSpecialId("inline")
+    pSpecialId("inline")
     InlineAlways
   }, {
-    val _ = pSpecialId("noinline")
+    pSpecialId("noinline")
     InlineNever
   }, {InlineAuto}])
 
@@ -343,14 +343,14 @@ fun genParArg((name:name, _:userType), idx: int)
 
 fun pExternDecl(dvis: visibility): <ast> list<topDef>
   choices("externDecl", [{
-    val krng = pDocKeyword("extern", []).fst
+    val krng = pDocKeyword("extern").fst
     val _ = choices("import", [
-      {pKeyword("import", []); ()},
+      {pKeyword("import"); ()},
       {
         pSpecialId("include"); 
         warnDeprecated("include", "import", krng); 
       }])
-    [DefExtern(externalImport(krng))]
+    [DefExtern(pExternalImport(krng))]
   }, {
     val (vis,vrng) = pVisibility(dvis)
     val inl = pInline()
@@ -359,7 +359,7 @@ fun pExternDecl(dvis: visibility): <ast> list<topDef>
     val (name, nameRng) = pFunId()
     val (pars, pinfos, args, tp, annotate) = choices("extern type", [
       {
-        pKeyword(":", [])
+        pKeyword(":")
         val tp = pType()
         val (pars, args) = genParArgs(promoteType(tp))
         (pars, [], args, tp, fn(body) Ann(body, tp, tp.range))
@@ -385,8 +385,51 @@ fun pExternDecl(dvis: visibility): <ast> list<topDef>
   }
   ])
 
-fun externalImport(r: range): <ast> external
-  unimplemented()
+fun pExternalImportKeyVal()
+  val key = pExternalImportKey()
+  pKeyword("=")
+  val (v, _) = pStringLit()
+  (key, v)
+
+fun pExternalImportKey()
+  val (id, _) = pVarId()
+  id.show
+
+fun externalIncludes(target: target, rng: range, (key, fname): (string, string))
+  val currentFile = rng.source.name
+  val fpath = currentFile.path.dirname / fname
+  if target.is-c && fpath.extname == "" && key == "file" then
+    [("header-include-inline", preadFile(fpath.change-ext("h"))), ("include-inline", preadFile(fpath.change-ext("c")))]
+  elif target.is-c && key == "header-file" then
+    [("header-include-inline", preadFile(fpath))]
+  elif target.is-c && key == "header-end-file" then
+    [("header-end-include-inline", preadFile(fpath))]
+  elif key == "file" then
+    [("include-inline", preadFile(fpath))]
+  else [(key, fpath.show)]
+
+fun preadFile(fpath: path)
+  catch({read-text-file(fpath)}, fn(e) astError("Unable to read external file at path: " ++ fpath.show ++ ": got error " ++ e.message, rangeNull))
+
+fun pExternalImportEntry()
+  val target = pExternalTarget()
+  val (keyvals, rng) = choices("", [
+    {val key = pExternalImportKey(); val (v, rng) = pStringLit(); ([(key, v)], rng)},
+    {semiBraces("", pExternalImportKeyVal)}
+    ])
+  (target, keyvals.map(fn(kv) externalIncludes(target, rng, kv)).concat)
+
+fun pExternalImport(r: range): <ast> external
+  choices("import", [
+    {
+      pKeyword("=")
+      val entry = pExternalImportEntry()
+      ExternalImport([entry], r)
+    },{
+      val (entries, rng2) = semiBraces("entries", pExternalImportEntry)
+      ExternalImport(entries, r.combine(rng2))
+    }
+  ])
  
 fun pExternalBody()
   semiBraces("external entries", pExternalEntry)
@@ -410,32 +453,32 @@ fun pExternalTarget()
     {pSpecialId("c"); C(CDefault)},
     {pSpecialId("cs"); CS},
     {pSpecialId("js"); JS(JsDefault)},
-    {Default}
+    {DefaultTarget}
   ])
 
 fun pFixityDecl(): <ast> list<fixDef>
-  val (vis, vrng, assoc) = maybe("", {val (vis, vrng) = pVisibility(Private); val assoc = pAssocDef(); (vis, vrng, assoc)})
-  val (prec, rng) = pInteger()
+  val (vis, vrng, assoc) = try("", {val (vis, vrng) = pVisibility(Private); val assoc = pAssocDef(); (vis, vrng, assoc)})
+  val (prec, lex) = pInteger()
   if prec < 0 || prec > 100 then
-    astError("fixity must be between 0 and 100", rng)
+    astError("fixity must be between 0 and 100", lex.range)
   val names = pSepBy1("names", pIdentifier, pComma)
-  names.map(fn(name) FixDef(name, FixInfix(prec, assoc), vis, rng.combine(vrng)))
+  names.map(fn((name, rng)) FixDef(name, FixInfix(prec, assoc), rng.combine(vrng), vis))
 
 fun pAssocDef()
   choices("associativity", [
-    {pKeyword("infixl", []); AssocLeft},
-    {pKeyword("infixr", []); AssocRight},
-    {pKeyword("infix", []); AssocNone}
+    {pKeyword("infixl"); AssocLeft},
+    {pKeyword("infixr"); AssocRight},
+    {pKeyword("infix"); AssocNone}
   ])
 
 fun pAliasDecl(dvis: visibility)
   val (vis, vrng, trng, doc) = try("")
     val (vis, vrng) = pVisibility(dvis)
-    val (trng, doc) = pDocKeyword("alias", [])
+    val (trng, doc) = pDocKeyword("alias")
     (vis, vrng, trng, doc)
   val tbind = pTBinderDef()
   val (tpars, kind, krng) = pTypeKindParams()
-  pKeyword("=", [])
+  pKeyword("=")
   val tp = pType()
   val range = combine([vrng, trng, krng, tp.range])
   Synonym(tbind(kind), tpars, tp, range, vis, doc) 
@@ -446,7 +489,7 @@ fun pTypeDecl(vis: visibility)
 fun pDataTypeDecl(dvis: visibility)
   val (vis, defvis, vrng, (typeSort, trng, doc, ddef, isExtend)) = choices("type", [
     {
-      val rng = pKeyword("abstract", []).range
+      val rng = pKeyword("abstract")
       val x = pTypeDeclKind()
       (Public, Private, rng, x)
     },
@@ -459,38 +502,39 @@ fun pDataTypeDecl(dvis: visibility)
   val tbind =
     if isExtend then
       val (qid, rng) = pQTypeId()
-      fn(kind) TypeBInder(qid, kind, rng, rng)
+      fn(kind) TypeBinder(qid, kind, rng, rng)
     else pTBinderDef()
-  val (tpars, kind, prng) = pTypeKindParams()
-  val name = tbind(kind)
+  val (tpars, k, prng) = pTypeKindParams()
+  val name = tbind(k)
   val resTp = TpApp(name.tpCon, tpars.map(tpVar), name.range.combine(tpars.last.map(range).default(name.range)))
-  val (cs, crng) = maybe("", {semiBraces({pConstructor(dvis, tpars, resTp)})}).default(([], rangeNull))
+  val (cs, crng) = maybe("", {semiBraces("", {pConstructor(defvis, tpars, resTp)})}).default(([], rangeNull))
   val (constrs, creatorss) = cs.unzip
-  val range = combine([vrng, trng, tbind.kind.range, prng, crng])
+  val range = combine([vrng, trng, name.range, prng, crng])
   (DataType(name, tpars, constrs, range, vis, typeSort, ddef, isExtend, doc), creatorss.concat)
 
-fun pStructDecl(dvis: visibility)
-  val (vis, dvis, rng, ddefs, trng, doc) = maybe("")
-    val (vis, dvis, rng) = choices("", [
-      {val rng = pKeyword("abstract", []); (Public, Private, rng)},
-      {val (vis, rng) = pVisibility(dvis); (vis, vis, rng)}
+fun pStructDecl(dvis': visibility)
+  val ((vis, defvis, ddef), (vrng, trng, doc)) = try("", {
+    val (vis, defvis, rng) = choices("", [
+      {val rng = pKeyword("abstract"); (Public, Private, rng)},
+      {val (vis, rng) = pVisibility(dvis'); (vis, vis, rng)}
     ])
     val ddef = choices("", [
       {pSpecialId("value"); DataDefValue(valueReprZero)},
       {pSpecialId("ref", ["reference"]); DataDefNormal},
       {DataDefAuto}
     ])
-    val (trng, doc) = pDocKeyword("struct", [])
-    (vis, dvis, rng, ddef, trng, doc)
+    val (trng, doc) = pDocKeyword("struct")
+    ((vis, defvis, ddef), (rng, trng, doc))
+  })
   val tbind = pTBinderDef()
-  val tpars = maybe("", {angles(pTBinders)}).default([])
-  val name = tbind(KindNone)
-  val resTp = TpApp(name.tpCon, tpars.map(tpVar), name.range.combine(tpars.last.map(range).default(name.range)))
-  val (pars, prng) = pConPars(dvis)
-  val (tid, rng) = name.getRName
+  val tpars = maybe("", {angles(pTBinders).fst}).default([])
+  val n = tbind(KindNone)
+  val resTp = TpApp(n.tpCon, tpars.map(tpVar), n.range.combine(tpars.last.map(range).default(n.range)))
+  val (pars, prng) = pConPars(defvis)
+  val (tid, rng) = (n.name, n.nameRange)
   val conId = tid.toConstructorName
-  val (usercon, creators) = makeUserCon(conId, tpars, resTp, [], pars, rng, rng.combine(prng), dvis, doc)
-  (DataType(name, tpars, [usercon], combine(vrng, trng, rng, prng), vis, Inductive, ddef, False, doc), creators)
+  val (usercon, creators) = makeUserCon(conId, tpars, resTp, [], pars, rng, rng.combine(prng), defvis, doc)
+  (DataType(n, tpars, [usercon], combine([vrng, trng, rng, prng]), vis, Inductive, ddef, False, doc), creators)
 
 fun tpVar(tb: typeBinder<k>)
   TpVar(tb.name, tb.range)
@@ -504,7 +548,7 @@ fun pTypeDeclKind()
       val (rng1, kind) = choicesnb("", 
         [{val rng = pSpecialId("rec"); (rng, Retractive)},
          {val rng = pSpecialId("co"); (rng, CoInductive)}])
-      val (rng2, doc) = pDocKeyword("type", [])
+      val (rng2, doc) = pDocKeyword("type")
       (kind, rng1.combine(rng2), doc, DataDefNormal, False)
     },
     {
@@ -515,7 +559,7 @@ fun pTypeDeclKind()
         {pSpecialId("ref", ["reference"]); (DataDefNormal, False)},
         {(DataDefAuto, False)}
       ])
-      val (rng, doc) = pDocKeyword("type", [])
+      val (rng, doc) = pDocKeyword("type")
       (Inductive, rng, doc, ddef, isExtend)
     }
   ])
@@ -533,7 +577,7 @@ fun pConstructor(dvis: visibility, foralls: list<userTypeBinder>, resTp: userTyp
   val (constr, rng) = pConstructorId()
   val exists0 = pTypeParams()
   val (pars, prng) = pConPars(vis)
-  makeUserCon(constr, foralls, restTp, exists0, pars, rng, combine([vrng, rng0, rng, prng]), vis, doc)
+  makeUserCon(constr, foralls, resTp, exists0, pars, rng, combine([vrng, rng0, rng, prng]), vis, doc)
 
 fun makeUserCon(const: name, foralls: list<userTypeBinder>, resTp: userType, exists0: list<userTypeBinder>, pars: list<(visibility, valueBinder<userType, maybe<userExpr>>)>, nameRng: range, rng: range, vis: visibility, doc: string)
   val conParams = pars.map(fn((v, p)) (v, p(expr=Nothing)))
@@ -549,7 +593,7 @@ fun makeUserCon(const: name, foralls: list<userTypeBinder>, resTp: userType, exi
   (UserCon(const, exists0, conParams, Nothing, nameRng, rng, vis, doc), if pars.any(fn(p) p.snd.expr.is-just) then [creator] else [])
 
 fun pConPars(dvis: visibility)
-  choices("", [{semiBraces({conBinder(dvis)})}, {parensCommas({conBinder(dvis)})}, {([], rangeNull)}])
+  choices("", [{semiBraces("", {pConBinder(dvis)})}, {parensCommas({pConBinder(dvis)})}, {([], rangeNull)}])
 
 fun pConBinder(dvis: visibility)
   val (vis, vrng) = pVisibility(dvis)
@@ -570,7 +614,7 @@ fun bindExprToVal(opname: name, oprange: range, expr: userExpr)
   (fn(b) Bind(binder, b, erange), fn(params) freshVar)
 
 struct opDecl
-  doc: string
+  opdoc: string
   name: name
   kwdrng: range
   idrng: range
@@ -610,28 +654,30 @@ struct funDef
   ann: (userExpr -> <ast> userExpr);
 
 fun pEffectDecl(dvis: visibility)
-  val (vis, defVis, vrng) = choices("", [{val (v, vr) = pVisibility(dvis); (v, v, vr)}, {val vr = pKeyword("abstract", []).range; (Public, Private, vr)}])
+  val (vis, defVis, vrng) = choices("", [{val (v, vr) = pVisibility(dvis); (v, v, vr)}, {val vr = pKeyword("abstract"); (Public, Private, vr)}])
   val isInstance = optionMaybe("named", {pKeyword("named")}).is-just
   val isScoped = optionMaybe("scoped", {pKeyword("scoped")}).is-just
-  val (rng1, singleShot) = optionMaybe("linear", {val rng = pKeyword("linear").range; (rng, True)}).default((rangeNull, False))
-  val sort = optionMaybe("sort", {pSpecialid("rec"); Retractive}).default(Inductive)
-  val (rng2, doc) = pDocKeyword("effect", [])
+  val (rng1, singleShot) = optionMaybe("linear", {val rng = pKeyword("linear"); (rng, True)}).default((rangeNull, False))
+  val sort = optionMaybe("sort", {pSpecialId("rec"); Retractive}).default(Inductive)
+  val (rng2, doc) = pDocKeyword("effect")
   val erng = rng1.combine(rng2)
   makeEffectDecl(choices("", [{
     val (effectId, irng) = pTypeId()
     val (tpars, kind, prng) = pTypeKindParams()
     val mbInstanceUmb = if !isInstance then Nothing else 
-      choices("", [
-        {pKeyword("in"); Just([pType(), TpCon(nameTpPartial, irng)])}, 
-        {if isScoped then [] else [TpCon(nameTpPartial, irng)]}])
-    EffectDecl(vis, defvis, crng, erng, doc, sort, singleShot, isInstance, isScoped, effectId, irng, tpars, kind, prng, mbInstanceUmb, operations)
+      Just(choices("", [
+        {pKeyword("in"); [pType(), TpCon(nameTpPartial, irng)]}, 
+        {if isScoped then [] else [TpCon(nameTpPartial, irng)]}]))
+    val (operations, _) = semiBraces("", {pOpDecl(singleShot, defVis)})
+    EffectDecl(vis, defVis, vrng, erng, doc, sort, singleShot, isInstance, isScoped, effectId, irng, tpars, kind, prng, mbInstanceUmb, operations)
    },
    {
-    val (tpars, kind, prng) = pTypeKindParams()
-    val op as OpDecl(doc, opId, krng, idrng, lin, opSort, exists0, pars, prng, mbTeff, tRes) = pOpDecl(singleShot, vis)
+    val (tpars, kind, _) = pTypeKindParams()
+    val op = pOpDecl(singleShot, vis)
     val mbInstance = Nothing
+    val opId = op.name
     val effectId = if opId.isValueOperationName then opId.fromValueOperationsName else opId
-    EffectDecl(vis, defvis, vrng, erng, doc, sort, singleShot || lin, False, isScoped, effectId, idrng.extendRange(-1), tpars, kind, prng, mbInstance, [op])
+    EffectDecl(vis, defVis, vrng, erng, op.opdoc, sort, singleShot || op.lin, False, isScoped, effectId, op.idrng.extend(-1), tpars, kind, op.prng, mbInstance, [op])
    }
   ]))
 
@@ -639,7 +685,7 @@ fun pDocKeywordEffect()
   pDocKeyword("effect", ["context", "ambient"])
 
 fun pKeywordFun()
-  pKeyword("fun",[])
+  pKeyword("fun")
 
 fun pDocKeywordFun()
   pDocKeyword("fun",[])
@@ -754,9 +800,9 @@ fun pOpDecl(lin: bool, vis: visibility)
 // (a) also constrain the definition in the handler to use `val`
 // (b) constrain the use site to use it as a value
 fun pValOpDecl(vis: visibility): <ast> opDecl
-  val (rng0, doc) = pDocKeyword("val", [])
+  val (rng0, doc) = pDocKeyword("val")
   val (id, idrng) = pIdentifier()
-  pKeyword(":", [])
+  pKeyword(":")
   val (mbTeff, tRes) = pTResult()
   if mbTeff.is-just then
     astError("an explicit effect in result type of an operation is not allowed (yet)", mbTeff.map(range).default(rng0))
@@ -770,7 +816,7 @@ fun pFunOpDecl(lin: bool, vis: visibility): <ast> opDecl
       else (rdoc, OpControl)
     },{
      val rdoc = pDocKeyword("final",["except", "brk"]);
-     pKeyword("ctl",[])
+     pKeyword("ctl")
      if lin then astError("'final ctl' operations are invalide for a linear effect", rdoc.fst)
      else (rdoc, OpExcept)
     }
@@ -778,7 +824,7 @@ fun pFunOpDecl(lin: bool, vis: visibility): <ast> opDecl
   val (id, idrng) = pIdentifier()
   val exists0 = pTypeParams()
   val (pars, _, prng) = pDeclParams(False, True)
-  pKeyword(":", [])
+  pKeyword(":")
   val (mbTeff, tRes) = pTResult()
   if mbTeff.is-just then
     astError("an explicit effect in result type of an operation is not allowed (yet)", mbTeff.map(range).default(rng0))
@@ -886,9 +932,9 @@ fun pPureDecl(dvis: visibility)
   val (vis, vrng) = pVisibility(dvis)
   val inl = pInline()
   choices("", [
-    {val (rng, doc) = pDocKeyword("val", []); pValDecl(vrng.combine(rng), doc, vis, inl)},
+    {val (rng, doc) = pDocKeyword("val"); pValDecl(vrng.combine(rng), doc, vis, inl)},
     {val f = pFip(); val (rng, doc) = pDocKeywordFun(); pFunDecl(vrng.combine(rng), doc, vis, inl, f)},
-    {pKeyword("fn", []); astError("hint: use 'fun' to start a named function definition (and 'fn' for anonymous functions)", peek().range)}
+    {pKeyword("fn"); astError("hint: use 'fun' to start a named function definition (and 'fn' for anonymous functions)", peek().range)}
   ])
 
 fun pFipAlloc()
@@ -922,15 +968,15 @@ fun pFunctionDecl(vrng: range, vis: visibility)
   pFunDecl(vrng.combine(rng), doc, vis, inl, f)
 
 fun pVarDecl()
-  val (vrng, doc) = pDocKeyword("var", [])
+  val (vrng, doc) = pDocKeyword("var")
   val bind = pBinder(vrng)
-  pKeyword(":=", [])
+  pKeyword(":=")
   val body = pBlockExpr()
   Def(bind(body), vrng.combine(body.range), Private, DefVar, InlineNever, doc)
 
 fun pValDecl(rng: range, doc: string, vis: visibility, inl: defInline)
   val bind = pBinder(rng)
-  pKeyword("=", [])
+  pKeyword("=")
   val body = pBlockExpr()
   Def(bind(body), rng.combine(body.range), vis, DefVal, inl, doc)
 
@@ -946,7 +992,7 @@ fun pFunDef(allowBorrow: bool)
   val tpars = pTypeParams()
   val (pars, pinfos, transform, rng) = pParameters(allowBorrow, True)
   val resultTp = pAnnotRes()
-  val preds = maybe("predicates", {pKeyword("with", []); parens({pmany1("", pPredicate)}).fst}).default([])
+  val preds = maybe("predicates", {pKeyword("with"); parens({pmany1("", pPredicate)}).fst}).default([])
   FunDef(tpars, pars, pinfos, rng, resultTp, preds, transform)
 
 fun pAnnotRes()
@@ -955,7 +1001,7 @@ fun pAnnotRes()
     (Just(teff), tres)
 
 fun pAnnotResult()
-  pKeyword(":", [])
+  pKeyword(":")
   pTResultTotal()
 
 fun pTypeParams()
@@ -994,7 +1040,7 @@ fun pParamId()
   choices("param id", [pIdentifier, pWildcard])
 
 fun pDefaultExpr()
-  maybe("default", {val krng = pKeyword("=", []).range; val e = pExpr(); (Just(e), krng.combine(e.range))}).default((Nothing, rangeNull))
+  maybe("default", {val krng = pKeyword("="); val e = pExpr(); (Just(e), krng.combine(e.range))}).default((Nothing, rangeNull))
 
 fun anyStatVar(l: list<statement>): maybe<userDef>
   match l
@@ -1025,7 +1071,7 @@ fun pBlock(): <ast> userExpr
   val rng1 = pLcurly()
   pmany("semicolons", pSemicolon)
   val stmts1 = semis("statements", pStatement)
-  val stmts2 = maybe("", {val rng2 = pKeyword("return", []).range; val e = pExpr(); pmany("semicolons", pSemicolon); [StatExpr(makeReturn(rng2, e))]}).default([])
+  val stmts2 = maybe("", {val rng2 = pKeyword("return"); val e = pExpr(); pmany("semicolons", pSemicolon); [StatExpr(makeReturn(rng2, e))]}).default([])
   val rng2 = pRcurly()
   val localize = match stmts1.anyStatVar { Just(def) -> [StatFun(fn(e) localScope(def, e))]; Nothing -> []}
   val stats = localize ++ stmts1 ++ stmts2
@@ -1052,15 +1098,15 @@ fun pStatement()
    {StatVar(pVarDecl())},
    {
     val f = pWithStat()
-    maybe("", {pKeyword("in", []); StatExpr(f(pBlockExpr()))}).default(StatFun(f))
+    maybe("", {pKeyword("in"); StatExpr(f(pBlockExpr()))}).default(StatFun(f))
    },
    {StatExpr(choices("", [pBasicExpr, pReturnExpr]))}
   ])
 
 fun pLocalValueDecl(): <ast> (userExpr -> userExpr)
-  val krng = pKeyword("val", []).range
+  val krng = pKeyword("val")
   val pat = pPattern()
-  pKeyword("=", [])
+  pKeyword("=")
   val e = pBlockExpr()
   fun bindVar(binder:valueBinder<maybe<userType>, pattern<userType>>, mbTyp, rng)
     val annExpr = match mbTyp
@@ -1078,12 +1124,12 @@ fun pWithStat()
     match binder.binderType
       Just(tp) -> binder(binderType=Just(tp.promoteType))
       _ -> binder
-  val krng = pKeyword("with", []).range
+  val krng = pKeyword("with")
   choices("", [
     {
       val (par, _, transform) = pParameter(False, False)
-      pKeyword("=", [])
-      pKeyword("<-", [])
+      pKeyword("=")
+      pKeyword("<-")
       val e = choices("", [pBasicExpr, {pHandlerExprStat(krng, HandlerInstance)}])
       fn(b) applyToContinuation(krng, [par.promoteValueBinder], e.transform, b)
     },
@@ -1118,7 +1164,7 @@ fun pTypeAnnotation(): <ast> (userExpr -> userExpr)
   }).default(fn(x) x)
 
 fun pBodyExpr()
-  choices("", [pBlockExpr, {pKeyword("->", []); pBlockExpr()}])
+  choices("", [pBlockExpr, {pKeyword("->"); pBlockExpr()}])
 
 fun pBlockExpr()
   choicesnb("expression", [pWithExpr, pBFunExpr, pReturnExpr, pValExpr, pBasicExpr])
@@ -1131,12 +1177,12 @@ fun pBasicExpr()
 
 fun pWithExpr()
   val f = pWithStat()
-  pKeyword("in", [])
+  pKeyword("in")
   f(pBlockExpr())
 
 fun pValExpr()
   val f = pLocalValueDecl()
-  pKeyword("in", [])
+  pKeyword("in")
   f(pExpr())
 
 fun pBFunExpr()
@@ -1153,7 +1199,7 @@ fun pFunBlock()
   Lam([], exp, exp.range)
 
 fun pLambda(alts)
-  val rng = pKeyword("fn", alts).range
+  val rng = pKeyword("fn", alts)
   val spars = sQuantifier()
   val FunDef(tpars, pars, _, _, mbTres, preds, ann) = pFunDef(False)
   val body = pBodyExpr()
@@ -1161,7 +1207,7 @@ fun pLambda(alts)
   ann(f)
 
 fun pIfExpr()
-  val rng = pKeyword("if", []).range
+  val rng = pKeyword("if")
   val tst = pNtlExpr()
   val (tExpr, eExprs, eExpr) =
     choices("",[
@@ -1172,7 +1218,7 @@ fun pIfExpr()
       {
         val tExpr = pThenExpr(rng)
         val eExprs = pmany("", pElif)
-        val eExpr = optionMaybe("", {pKeyword("else", []); pBlockExpr()}).default(Var(nameUnit, False, (tExpr.range).combine(eExprs.map(fn(e) e.snd.range).combine).after))
+        val eExpr = optionMaybe("", {pKeyword("else"); pBlockExpr()}).default(Var(nameUnit, False, (tExpr.range).combine(eExprs.map(fn(e) e.snd.range).combine).after))
         (tExpr, eExprs, eExpr)
       }
     ])
@@ -1182,14 +1228,14 @@ fun pIfExpr()
               Branch(PatCon(nameFalse, [], r, r), [Guard(guardTrue, eExpr')])], tst'.range.combine(eExpr'.range))
   
 fun pElif(): <ast> (userExpr, userExpr)
-  val rng = pKeyword("elif", []).range
+  val rng = pKeyword("elif")
   val tst = pNtlExpr()
   val tExpr = pThenExpr(rng)
   (tst, tExpr)
 
 fun pThenExpr(rng: range): <ast> userExpr
   choicesnb("then", [
-    {pKeyword("then", []); pBlockExpr()},
+    {pKeyword("then"); pBlockExpr()},
     {
       val expr = pBlockExpr()
       addWarning("warning " ++ expr.range.before.start.show ++ ": using an 'if' without 'then' is deprecated.\n hint: add the 'then' keyword.", expr.range) 
@@ -1198,23 +1244,23 @@ fun pThenExpr(rng: range): <ast> userExpr
   ])
 
 fun pReturnExpr(): <ast> userExpr
-  val rng = pKeyword("return", []).range
+  val rng = pKeyword("return")
   val exp = pExpr()
   makeReturn(rng, exp)
 
 fun pMatchExpr()
   choices("", [{
-    val rng = pKeyword("match", []).range
+    val rng = pKeyword("match")
     val tst = pNtlExpr()
     val (branches, rng2) = semiBraces("match clause", pBranch)
     Case(tst, branches, rng.combine(rng2))
   },pHandlerExpr])
 
 fun pHandlerExpr()
-  val (rng0, hsort) = optionMaybe("", {val rng = pKeyword("named", []).range; (rng, HandlerInstance)}).default((rangeNull, HandlerNormal))
+  val (rng0, hsort) = optionMaybe("", {val rng = pKeyword("named"); (rng, HandlerInstance)}).default((rangeNull, HandlerNormal))
   choices("handle or handler", [
     {
-      val rng1 = pKeyword("handle", []).range
+      val rng1 = pKeyword("handle")
       val rng = rng0.combine(rng1)
       val scoped = optionMaybe("", {pSpecialId("scoped"); HandlerScoped}).default(HandlerNoScope)
       val (over, mbEff) = pHandlerOverride(hsort)
@@ -1223,7 +1269,7 @@ fun pHandlerExpr()
       App(expr, [(Nothing, arg)], rng.combine(expr.range))
     },
     {
-      val rng1 = pKeyword("handler", []).range
+      val rng1 = pKeyword("handler")
       val rng = rng0.combine(rng1)
       pHandlerExprX(rng, hsort)
     }
@@ -1233,19 +1279,19 @@ fun pHandlerExprStat(rng: range, hSort: handlerSort)
   match hSort
     HandlerNormal -> pHandlerExprX(rng, hSort)
     HandlerInstance ->
-      pKeyword("named", [])
-      optionMaybe("", {pKeyword("handler", [])})
+      pKeyword("named")
+      optionMaybe("", {pKeyword("handler")})
       pHandlerExprX(rng, hSort)
 
 fun pHandlerExprX(rng: range, hSort: handlerSort)
-  val scoped = maybe("", {pKeyword("scoped", []); HandlerScoped}).default(HandlerNoScope)
+  val scoped = maybe("", {pKeyword("scoped"); HandlerScoped}).default(HandlerNoScope)
   val (over, mbEff) = pHandlerOverride(hSort)
   pHandlerClauses(rng, mbEff, scoped, over, hSort)
 
 fun pHandlerOverride(hSort: handlerSort)
   val over = match hSort
     HandlerNormal -> 
-      maybe("", {pKeyword("override", []); HandlerOverride}).default(HandlerNoOverride)
+      maybe("", {pKeyword("override"); HandlerOverride}).default(HandlerNoOverride)
     _ -> HandlerNoOverride
   val mbEff = maybe("", {val eff = angles(pType).fst; eff.promoteType})
   (over, mbEff)
@@ -1361,7 +1407,7 @@ fun pHandlerOpX()
 fun pHandlerOp(): <ast> (clause, maybe<(userExpr -> userExpr)>)
   choicesnb("handler clause", [
     {
-      val rng = pKeyword("return",[]).range
+      val rng = pKeyword("return")
       val (name, prng, tp) = choices("", [
         {
           val (name, prng) = pParamId()
@@ -1378,20 +1424,20 @@ fun pHandlerOp(): <ast> (clause, maybe<(userExpr -> userExpr)>)
       val expr = pBodyExpr()
       (ClauseRet(Lam([ValueBinder(name, tp, Nothing, prng, prng.combine(tp.map(range).default(prng)))], expr, rng.combine(expr.range))), Nothing)
     },{
-      pKeyword("val", [])
+      pKeyword("val")
       val (name, nameRng) = pQIdentifier()
-      pKeyword("=", [])
+      pKeyword("=")
       val expr = pBlockExpr()
       val (binder, resumeExpr) = bindExprToVal(name, nameRng, expr)
       (ClauseBranch(HandlerBranch(name.toValueOperationName, [], resumeExpr([]), OpVal, nameRng, nameRng)), Just(binder))
     },{
       val (opSort, (name, nameRng)) = choicesnb("opSort", [
-        {pKeyword("fun", []); (OpFun, pQIdentifier())}, {pKeyword("ctl", ["control"]); (OpControl, pQIdentifier())}, 
-        {pKeyword("final", []); pKeyword("ctl", []); (OpExcept, pQIdentifier())},
-        {pKeyword("raw", []); pKeyword("ctl", []); (OpControlRaw, pQIdentifier())}, 
+        {pKeyword("fun"); (OpFun, pQIdentifier())}, {pKeyword("ctl", ["control"]); (OpControl, pQIdentifier())}, 
+        {pKeyword("final"); pKeyword("ctl"); (OpExcept, pQIdentifier())},
+        {pKeyword("raw"); pKeyword("ctl"); (OpControlRaw, pQIdentifier())}, 
         // Deprecated
-        {pKeyword("except", []); (OpExcept, pQIdentifier())}, {pKeyword("brk", []); (OpExcept, pQIdentifier())},
-        {pKeyword("rcontrol", []); (OpControlRaw, pQIdentifier())}, {pKeyword("rawctl", []); (OpControlRaw, pQIdentifier())},
+        {pKeyword("except"); (OpExcept, pQIdentifier())}, {pKeyword("brk"); (OpExcept, pQIdentifier())},
+        {pKeyword("rcontrol"); (OpControlRaw, pQIdentifier())}, {pKeyword("rawctl"); (OpControlRaw, pQIdentifier())},
         {
           val (n, nr) = pQIdentifier(); 
           pWarningMessage("using a bare operation is deprecated.\n hint: start with 'val', 'fun', 'final ctl', 'ctl', or 'raw ctl'", nr)
@@ -1430,7 +1476,7 @@ fun pBranch()
 fun pGuards()
   choicesnb("guards", [
     {pmany1("", pGuardBar)},
-    {pKeyword("->", []); [Guard(guardTrue, pBlockExpr())]},
+    {pKeyword("->"); [Guard(guardTrue, pBlockExpr())]},
     {
       val exp = pBlock()
       pWarningMessage("use '->' for pattern matches", exp.range)
@@ -1441,7 +1487,7 @@ fun pGuards()
 fun pGuardBar()
   pBar()
   val grd = pGuardTest()
-  pKeyword("->", [])
+  pKeyword("->")
   val exp = pBlockExpr()
   Guard(grd, exp)
 
@@ -1469,7 +1515,7 @@ fun pOpExprX(allowTrailingLam: bool)
 fun pOperatorVar()
   choicesnb("", [
     {val (name, rng) = pQOperator(); Var(name, True, rng)},
-    {Var(nameAssign, True, pKeyword(":=", []).range)}
+    {Var(nameAssign, True, pKeyword(":="))}
   ])
 
 fun pPrefixExpr(allowTrailingLam: bool): <ast> userExpr
@@ -1483,7 +1529,7 @@ fun pAppExpr(allowTrailingLam: bool): <ast> userExpr
   fs.foldl(e0, fn(e, f) f(e))
 
 fun pDotExpr(): <ast> (userExpr -> userExpr)
-  pKeyword(".", [])
+  pKeyword(".")
   val e = pAtom()
   choicesnb("", [
     {
@@ -1501,16 +1547,16 @@ fun pIndexer(): <ast> (userExpr -> userExpr)
   val rng0 = pLidX()
   choicesnb("", [
     {
-      val crng = pKeyword("ctx", [])
-      val ct = pCcontext(crng.range)
-      val rng1 = pSpecial("]", [])
+      val crng = pKeyword("ctx")
+      val ct = pCcontext(crng)
+      val rng1 = pSpecial("]")
       fn(e)
         val rng = e.range.combine(rng1)
         App(Var(nameCCtxComposeExtend, False, rng1), [(Nothing, e), (Nothing, ct)], rng1)
     },
     {
       val idxs = pSepBy1("", pExpr, pComma)
-      val rng1 = pSpecial("]", [])
+      val rng1 = pSpecial("]")
       fn(e) App(Var(nameIndex, False, rng0.combine(rng1)), Cons(e, idxs).map(fn(a) (Nothing, a)), rng0.combine(rng1))
     }
   ])
@@ -1543,7 +1589,7 @@ fun pArgument()
   match exp
     Var(name, _, rng) ->
       val x = maybe("=")
-        pKeyword("=", [])
+        pKeyword("=")
         (Just((name, rng)), pExpr())
       match x
         Just(x') -> x'
@@ -1567,7 +1613,7 @@ fun pLiteral()
 
 fun pAExpr()
   val e = pExpr()
-  choicesnb("", [{pKeyword(":", []); val tp = pTypeScheme(); Ann(e, tp, e.range.combine(tp.range))}, {e}])
+  choicesnb("", [{pKeyword(":"); val tp = pTypeScheme(); Ann(e, tp, e.range.combine(tp.range))}, {e}])
 
 fun pTupleExpr()
   val rng1 = pLparen()
@@ -1580,9 +1626,9 @@ fun pTupleExpr()
     _ -> App(Var(nameTuple(es.length), False, rng), es.map(fn(e) (Nothing, e)), rng)
 
 fun pListExpr(): <ast> userExpr
-  val rng1 = pSpecial("[", [])
+  val rng1 = pSpecial("[")
   val es = pSepBy("",pAExpr, pComma)
-  val rng2 = pSpecial("]", [])
+  val rng2 = pSpecial("]")
   if es.is-nil then
     makeNil(rng1.combine(rng2))
   else
@@ -1595,13 +1641,13 @@ fun makeCons(r: range, x: expr<t>, xs: expr<t>, rT: (t) -> range): expr<t>
   makeApp(Var(nameCons, False, r), [x, xs], rT)
 
 fun pCCtxExpr()
-  pCcontext(pKeyword("ctx", []).range)
+  pCcontext(pKeyword("ctx"))
 
 fun pCcontext(rng: range)
   makeApp(Var(nameCCtxCreate, False, rng), [pNtlExpr()], userTypeRange)
 
 fun pCCtxHole(): <ast> userExpr
-  val rng = choices("", [{pKeyword("hole", []).range}, {pWildcard().snd}])
+  val rng = choices("", [{pKeyword("hole")}, {pWildcard().snd}])
   makeApp(Var(nameCCtxHoleCreate, False, rng), [], userTypeRange)
 
 fun pInjectExpr()
@@ -1612,7 +1658,7 @@ fun pInjectExpr()
   ])
 
 fun injectType()
-  val rng1 = pKeywordInject().range
+  val rng1 = pKeywordInject()
   val behind = choicesnb("", [{choices("", [{pSpecialId("behind")}, {pSpecialId("other")}]); True}, {False}])
   pLangle()
   val tp = pType()
@@ -1659,7 +1705,7 @@ fun pPatAtom()
     {
       val (name, rng) = pIdentifier()
       choices("", [
-        {pKeyword("as", []); val p = pPattern(); PatVar(ValueBinder(name, Nothing, p, rng, rng.combine(p.range)))},
+        {pKeyword("as"); val p = pPattern(); PatVar(ValueBinder(name, Nothing, p, rng, rng.combine(p.range)))},
         {PatVar(ValueBinder(name, Nothing, PatWild(rng), rng, rng))}
       ])
     },
@@ -1678,7 +1724,7 @@ fun pNamedPattern()
   choices("named pattern", [
     {
       val (name, rng) = pIdentifier();
-      pKeyword("=", [])
+      pKeyword("=")
       (Just((name, rng)), pPattern())
     },
     { (Nothing, pPattern()) }
@@ -1688,9 +1734,9 @@ fun pMaybeTypeAnnot(d: a, f: (userType) -> div a): <ast> a
   choices("", [{f(pTypeAnnot())}, {d}])
 
 fun pListPattern()
-  val rng1 = pSpecial("[", [])
+  val rng1 = pSpecial("[")
   val es = pSepBy("", pPattern, pComma)
-  val rng2 = pSpecial("]", [])
+  val rng2 = pSpecial("]")
   if es.is-nil then
     makeNilPat(rng1.combine(rng2))
   else
@@ -1703,11 +1749,11 @@ fun makeConsPat(x, xs)
   PatCon(nameCons, [(Nothing, x), (Nothing, xs)], x.range, x.range)
 
 fun pTypeAnnot()
-  pKeyword(":", [])
+  pKeyword(":")
   pType()
 
 fun pTypeAnnotPar()
-  pKeyword(":", [])
+  pKeyword(":")
   choicesnb("", [
     {
       val rng = pSpecialOp("?")
@@ -1729,10 +1775,10 @@ fun pType(): <ast> userType
   choices("type", [pQuanForall, pQuanSome, pTQual])
 
 fun aQuantifier()
-  maybeList({pKeyword("forall", []); parens(pTBinders).fst})
+  maybeList({pKeyword("forall"); parens(pTBinders).fst})
 
 fun sQuantifier()
-  maybeList({pKeyword("some", []); parens(pTBinders).fst})
+  maybeList({pKeyword("some"); parens(pTBinders).fst})
 
 fun pQuanSome()
   pQuantifier(QSome, pType)
@@ -1744,10 +1790,10 @@ fun pQuanExists()
   pQuantifier(QExists, pType)
 
 fun pQuantifier(quan: userQuantifier, next)
-  val tok = pKeyword(if quan.is-qsome then "some" else if quan.is-qexists then "exists" else "forall", [])
+  val rng = pKeyword(if quan.is-qsome then "some" else if quan.is-qexists then "exists" else "forall")
   val params = angles(pTBinders).fst
   val tp = next()
-  params.foldr(tp, fn(name, t) TpQuan(quan, name, t, tok.range.combine(t.range)))
+  params.foldr(tp, fn(name, t) TpQuan(quan, name, t, rng.combine(t.range)))
 
 fun pTQual()
   pQualifier(pTArrow())
@@ -1755,7 +1801,7 @@ fun pTQual()
 fun pQualifier(tp: userType)
   choices("", [
     {
-      pKeyword("with", [])
+      pKeyword("with")
       TpQual(parens({pmany1("", pPredicate)}).fst, tp)
     },
     {tp}
@@ -1767,7 +1813,7 @@ fun pPredicate()
 fun pTArrow()
   val (tps, rng1) = pTAtom()
   choices("", [
-    {pKeyword("->", []); val (teff, tres) = pTResultTotal(); TpFun(tps, teff, tres, rng1.combine(tres.range))},
+    {pKeyword("->"); val (teff, tres) = pTResultTotal(); TpFun(tps, teff, tres, rng1.combine(tres.range))},
     {tuple(tps, rng1)}
   ])
 
@@ -1844,14 +1890,14 @@ fun pTypeApp(tp: userType)
 
 fun pParamType(): <ast> (name, range, userType)
   val (id, rng) = choices("", [pVarId, pWildcard, {(nameNil, rangeNull)}])
-  pKeyword(":", [])
+  pKeyword(":")
   val tp = pParameterType(rng)
   (id, rng, tp)
 
 fun pParamTypeX(): <ast> (name, range, userType)
   choices("parameter type", [
     {
-      val (id, rng) = try("", {val x = choices("", [pVarId, pWildcard]); pKeyword(":", []); x})
+      val (id, rng) = try("", {val x = choices("", [pVarId, pWildcard]); pKeyword(":"); x})
       val tp = pParameterType(rng)
       (id, rng, tp)
     },
@@ -1905,8 +1951,8 @@ fun pTBinderId()
   choicesnb("", [pTypeId, pTList, pTTuple, pTEmptyOrExtend])
 
 fun pTList(): <ast> (name, range)
-  val rng1 = pSpecial("[", [])
-  val rng2 = pSpecial("]", [])
+  val rng1 = pSpecial("[")
+  val rng2 = pSpecial("]")
   (nameTpList.unqualify, rng1.combine(rng2))
 
 fun pTTuple(): <ast> (name, range)
@@ -1947,14 +1993,14 @@ fun pKind()
   choices("kind", [
    {
     val (params, _) = parensCommas(pKind)
-    pKeyword("->", [])
+    pKeyword("->")
     val res = pKind()
     params.foldr(res, fn(a, acc) KindArrow(a, acc))
    },
    {
     val k = pKindAtom()
     choices("kind", [{
-      pKeyword("->", [])
+      pKeyword("->")
       val k2 = pKind()
       KindArrow(k, k2)
     }, {k}])
@@ -2018,10 +2064,10 @@ inline fun pLidX()
   pLbracket()
 
 inline fun pBar()
-  pKeyword("|", []).range
+  pKeyword("|")
 
 inline fun pComma()
-  pSpecial(",", [])
+  pSpecial(",")
 
 inline fun pSemicolon(): <ast> lexeme
   token("semicolon") fn(x) 
@@ -2105,7 +2151,7 @@ fun pQTypeId()
   else astError("type name (and not type variable)", range)
 
 fun pTypeIdCtx()
-  ("ctx".newName, pKeyword("ctx", []).range)
+  ("ctx".newName, pKeyword("ctx"))
 
 fun pQOp()
   token("operator") fn(a)
@@ -2195,7 +2241,10 @@ fun pSpecialId(s: string, alternates: list<string>)
         Just(x.range)
       _ -> Nothing
 
-fun pSpecial(s: string, alternates: list<string>)
+inline fun pSpecial(s: string): <ast> range
+  pSpecial(s, [])
+
+fun pSpecial(s: string, alternates: list<string>): <ast> range
   token(s) fn(x)
     match x.lex
       LexSpecial(s') | s == s' -> Just(x.range)
@@ -2216,7 +2265,13 @@ fun pSpecialConId(s)
       LexCons(s') | s == s'.showPlain -> Just(x.range)
       _ -> Nothing
 
-fun pKeyword(s: string, alternates: list<string>): <ast> lexeme
+inline fun pKeyword(s: string): <ast> range
+  pKeywordBase(s, []).range
+
+inline fun pKeyword(s: string, alts: list<string>): <ast> range
+  pKeywordBase(s, alts).range
+
+fun pKeywordBase(s: string, alternates: list<string>): <ast> lexeme
   token("keyword " ++ s) fn(x)
     match x.lex
       LexKeyword(s', _) | s == s' -> Just(x)
@@ -2225,8 +2280,11 @@ fun pKeyword(s: string, alternates: list<string>): <ast> lexeme
         Just(x)
       _ -> Nothing
 
+fun pDocKeyword(s: string): <ast> (range, string)
+  pDocKeyword(s, [])
+
 fun pDocKeyword(s: string, alternates: list<string>): <ast> (range, string)
-  match pKeyword(s, alternates)
+  match pKeywordBase(s, alternates)
     Lexeme(rng, LexKeyword(_, doc)) -> (rng, doc)
     _ -> astError("expected " ++ s, rangeNull)
 

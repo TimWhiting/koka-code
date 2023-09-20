@@ -1,6 +1,7 @@
 import std/text/parse
 import std/os/path
 import std/os/file
+import newstd/data/sort
 import compiler/syntax/lexer2
 import compiler/syntax/lexeme
 import compiler/syntax/layout
@@ -390,7 +391,6 @@ fun externalImport(r: range): <ast> external
 fun pExternalBody()
   unimplemented()
 
-
 fun pFixityDecl(): <ast> list<fixDef>
   unimplemented()
 
@@ -400,11 +400,76 @@ fun pAliasDecl(vis: visibility)
 fun pTypeDecl(vis: visibility)
   unimplemented()
 
+fun pStructDecl(dvis: visibility)
+  unimplemented()
+
 fun tpVar(tb: typeBinder<k>)
   TpVar(tb.name, tb.range)
 
 fun tpCon(tb: typeBinder<k>)
   TpCon(tb.name, tb.range)
+
+fun pTypeDeclKind()
+  choicesnb("", [
+    {
+      val (rng1, kind) = choicesnb("", 
+        [{val rng = pSpecialId("rec"); (rng, Retractive)},
+         {val rng = pSpecialId("co"); (rng, CoInductive)}])
+      val (rng2, doc) = pDocKeyword("type", [])
+      (kind, rng1.combine(rng2), doc, DataDefNormal, False)
+    },
+    {
+      val (ddef, isExtend) = choicesnb("", [
+        {pSpecialId("open"); (DataDefOpen, False)},
+        {pSpecialId("extend"); (DataDefOpen, True)},
+        {pSpecialId("value"); (DataDefValue(valueReprZero), False)},
+        {pSpecialId("ref", ["reference"]); (DataDefNormal, False)},
+        {(DataDefAuto, False)}
+      ])
+      val (rng, doc) = pDocKeyword("type", [])
+      (Inductive, rng, doc, ddef, isExtend)
+    }
+  ])
+
+fun pTypeKindParams()
+  choices("", [
+    {val (tpars, rng) = angles(pTbinders); val kind = pKindAnnot(); (tpars, kind, rng.combine(kind.range))},
+    {val kind = pKindAnnot(); ([], kind, kind.range)},
+    {([], KindNone, rangeNull)}
+  ])
+
+fun pConstructor(dvis: visibility, foralls: list<userTypeBinder>, resTp: userType)
+  val (vis, vrng) = pVisibility(dvis)
+  val (rng0, doc) = maybe("", {pDocKeyword("con")}).default((rangeNull, ""))
+  val (constr, rng) = pConstructorId()
+  val exists0 = pTypeParams()
+  val (pars, prng) = pConPars(vis)
+  makeUserCon(constr, foralls, restTp, exists0, pars, rng, combine([vrng, rng0, rng, prng]), vis, doc)
+
+fun makeUserCon(const: name, foralls: list<userTypeBinder>, resTp: userType, exists0: list<userTypeBinder>, pars: list<(visibility, valueBinder<userType, maybe<userExpr>>)>, nameRng: range, rng: range, vis: visibility, doc: string)
+  val conParams = pars.map(fn((v, p)) (v, p(expr=Nothing)))
+  val cName = const.newCreatorName
+  val params = pars.map(fn((_, p)) p(binderType=if p.expr.is-just then makeOptional(p.binderType) else p.binderType))
+  val lParams = params.map(fn(ValueBinder(name', _, expr, nameRng', rng')) ValueBinder(name', Nothing, expr, nameRng', rng') )
+  val arguments = params.map(fn(p) (Nothing, Var(p.name, False, p.nameRange)))
+  val tpParams = params.map(fn(p) (p.name, p.binderType))
+  val tpFull = quantify(QForall, foralls, TpFun(tpParams, makeTpTotal(nameRng), resTp, rng))
+  val body = Ann(Lam(lParams, App(Var(const, False, nameRng), arguments, rng), rng), tpFull, rng)
+  val binder = ValueBinder(cName, (), body, nameRng, nameRng)
+  val creator = Def(binder, rng, vis, DefFun([]), InlineAlways, doc) 
+  (UserCon(const, exists0, conParams, Nothing, nameRng, rng, vis, doc), if pars.any(fn(p) p.snd.expr.is-just) then [creator] else [])
+
+fun pConPars(dvis: visibility)
+  choices("", [{semiBraces({conBinder(dvis)})}, {parensCommas({conBinder(dvis)})}, {([], rangeNull)}])
+
+fun pConBinder(dvis: visibility)
+  val (vis, vrng) = pVisibility(dvis)
+  val (name, rng, tp) = pParamType()
+  val (opt, drng) = pDefaultExpr()
+  (vis, ValueBinder(name, tp, opt, rng, vrng.combine(rng).combine(tp.range).combine(drng)))
+
+fun pConstructorId()
+  choices("constructor", [pTTuple, pTList, pConId])
 
 alias param = (visibility, valueBinder<userType, maybe<userExpr>>);
 
@@ -417,7 +482,7 @@ fun bindExprToVal(opname: name, oprange: range, expr: userExpr)
 
 struct opDecl
   doc: string
-  id: name
+  name: name
   kwdrng: range
   idrng: range
   lin: bool // linear
@@ -455,8 +520,31 @@ struct funDef
   preds: list<userType>
   ann: (userExpr -> <ast> userExpr);
 
-fun pEffectDecl(vis: visibility)
-  unimplemented()
+fun pEffectDecl(dvis: visibility)
+  val (vis, defVis, vrng) = choices("", [{val (v, vr) = pVisibility(dvis); (v, v, vr)}, {val vr = pKeyword("abstract", []).range; (Public, Private, vr)}])
+  val isInstance = optionMaybe("named", {pKeyword("named")}).is-just
+  val isScoped = optionMaybe("scoped", {pKeyword("scoped")}).is-just
+  val (rng1, singleShot) = optionMaybe("linear", {val rng = pKeyword("linear").range; (rng, True)}).default((rangeNull, False))
+  val sort = optionMaybe("sort", {pSpecialid("rec"); Retractive}).default(Inductive)
+  val (rng2, doc) = pDocKeyword("effect", [])
+  val erng = rng1.combine(rng2)
+  makeEffectDecl(choices("", [{
+    val (effectId, irng) = pTypeId()
+    val (tpars, kind, prng) = pTypeKindParams()
+    val mbInstanceUmb = if !isInstance then Nothing else 
+      choices("", [
+        {pKeyword("in"); Just([pType(), TpCon(nameTpPartial, irng)])}, 
+        {if isScoped then [] else [TpCon(nameTpPartial, irng)]}])
+    EffectDecl(vis, defvis, crng, erng, doc, sort, singleShot, isInstance, isScoped, effectId, irng, tpars, kind, prng, mbInstanceUmb, operations)
+   },
+   {
+    val (tpars, kind, prng) = pTypeKindParams()
+    val op as OpDecl(doc, opId, krng, idrng, lin, opSort, exists0, pars, prng, mbTeff, tRes) = pOpDecl(singleShot, vis)
+    val mbInstance = Nothing
+    val effectId = if opId.isValueOperationName then opId.fromValueOperationsName else opId
+    EffectDecl(vis, defvis, vrng, erng, doc, sort, singleShot || lin, False, isScoped, effectId, idrng.extendRange(-1), tpars, kind, prng, mbInstance, [op])
+   }
+  ]))
 
 fun pDocKeywordEffect()
   pDocKeyword("effect", ["context", "ambient"])
@@ -470,7 +558,142 @@ fun pDocKeywordFun()
 fun pKeywordInject()
   pKeyword("mask", ["inject"])
 
-// TODO: Here
+fun makeEffectDecl(decl: effectDecl): div list<topDef>
+  val EffectDecl(vis, _, vrng, erng, doc, sort, singleShot, isInstance, isScoped, id, irng, tpars, effkind, _, mbInstanceUmb, operations) = decl
+  val rng = vrng.combine(erng).combine(irng)
+  val krng = rangeNull // For generated code
+  val grng = krng
+  val (tparsScoped, tparsNonScoped) = if isScoped then (tpars.take(1), tpars.drop(1)) else ([], tpars)
+  val infKind = match effkind
+    KindNone -> tpars.map(kind).foldr(KindCon(if isInstance then nameKindStar elif singleShot then nameKindHandled1 else nameKindHandled, krng)) fn(e, acc)
+      KindArrow(e, acc)
+    _ -> effkind
+  val ename = TypeBinder(id, infKind, irng, irng)
+  val effTpH = TpApp(TpCon(ename.name, ename.range), tpars.map(tpVar), krng)
+  val effTp = if isInstance then effTpH else TpApp(TpCon(if singleShot then nameTpHandled1 else nameTpHandled, ename.range), [effTpH], krng)
+  // declare the effect type (for resources, generate a hidden constructor to check the types)
+  val docEffect = "`:" ++ id.show ++ "` effect"
+  val docx = if doc != "" then doc else "// " ++ docEffect
+  // Effect handler type
+  val hndName = id.toHandlerName
+  val kindStar = KindCon(nameKindStar, krng)
+  val kidnEffect = KindCon(nameKindEffect, krng)
+  val hndTpName = TypeBinder(hndName, KindNone, krng, krng)
+  val hndEffTp = TypeBinder("e".newHiddenName, KindCon(nameKindEffect, krng), krng, krng)
+  val hndResTp = TypeBinder("r".newHiddenName, kindStar, krng, krng)
+  val hndTp = TpApp(hndTpName.tpCon, (tparsNonScoped ++ [hndEffTp, hndResTp]).map(tpVar), grng)
+
+  val (effTpDecl, wrapAction) = 
+    if isInstance then 
+      val evTp = TpApp(TpCon(nameTpEv, rng), [TpApp(hndTpName.tpCon, tparsNonScoped.map(tpVar), rng)], rng)
+      val evName = "ev".newName
+      val evFld = ValueBinder(evName, evTp, Nothing, irng, rng)
+      val evCon = UserCon(id.toConstructorName, [], [(Private, evFld)], Nothing, irng, rng, Private, "")
+      (DataType(ename, tpars, [evCon], rng, vis, Inductive, DataDefNormal, False, docx), 
+        fn(action) Lam([ValueBinder(evName, Nothing, Nothing, irng, rng)], 
+          App(action, [(Nothing, 
+            App(Var(id.toConstructorName, False, rng), [(Nothing, Var(evName, False, rng))], rng))], rng), rng))
+    else
+      // add a private constructor that refers to the handler type to get a proper recursion check
+      val hndfld = ValueBinder(nameNil, hndTp, Nothing, irng, irng)
+      val hndcon = UserCon(id.toConstructorName, [hndEffTp, hndResTp], [(Private, hndfld)], Nothing, irng, irng, Private, "")
+      (DataType(ename, tpars, [hndcon], rng, vis, Inductive, DataDefNormal, False, docx), fn(action) action)
+  
+  // Effect tag
+  val tagName = id.toEffectTagName
+  val tagDef = Def(ValueBinder(tagName, (), Ann(App(Var(nameHTag, False, krng), 
+    [(Nothing, Literal(LitString(id.show ++ "." ++ irng.source.name.path.basename, krng)))], krng), 
+      quantify(QForall, tpars, TpApp(TpCon(nameTpHTag, krng), 
+        [TpApp(TpCon(hndName, krng), tparsNonScoped.map(tpVar), krng)], krng)), krng),
+       krng, krng), krng, vis, DefVal, InlineNever, "// runtime tag for the " ++ docEffect)
+  val scopeEff = TpApp(TpCon(nameTpScope, krng), tparsScoped.map(fn(tb) TpVar(tb.name, krng)), krng)
+  val extraEffects = (if isScoped && isInstance then [scopeEff] else []) ++ (if sort.is-retractive then [TpCon(nameTpDiv, krng)] else [])
+  
+
+  // parse the operations and return the constructor fields and function definitions
+  val orderedOperations = operations.sortBy(fn(op1:opDecl, op2:opDecl) (op1.name).compare(op2.name))
+  val opCount = operations.length
+  val (opFields, opSelects, opDefs, opValDefs) = list(0, opCount - 1).zip(orderedOperations).map(fn(op) operationDecl(opCount, vis, tparsScoped, tparsNonScoped, docEffect, hndName, id, mbInstanceUmb, effTp, hndTpName.tpCon, ([hndEffTp, hndResTp]), extraEffects, op)).unzip4
+  
+  // Handle function
+  val hndCon = UserCon(hndName.toConstructorName, [], opFields.map(fn(f) (Public, f)), Nothing, krng, grng, vis, "")
+  val hndTpDecl = DataType(hndTpName, tparsNonScoped ++ [hndEffTp, hndResTp], [hndCon], grng, vis, sort, DataDefNormal, False, "// handler for the " ++ docEffect)
+  val handleRetTp = TypeBinder("b".newHiddenName, kindStar, krng, krng)
+  val handleName = id.toHandleName
+  val handleEff = 
+    if isInstance then 
+      if isScoped then krng.makeEffectExtend(scopeEff, hndEffTp.tpVar, userKindRange) 
+      else hndEffTp.tpVar 
+    else krng.makeEffectExtend(effTp, hndEffTp.tpVar, userKindRange)
+  val actionArgTp = if isInstance then [("hname".newName, effTp)] else []
+  val actionTp = TpFun(actionArgTp, handleEff, handleRetTp.tpVar, grng)
+  val handleTp = quantify(QForall, tparsNonScoped ++ [handleRetTp, hndEffTp, hndResTp], TpFun(
+    [("cfc".newName, TpCon(nameTpInt32, krng)),
+    ("hnd".newName, TpApp(TpCon(hndName, grng), (tparsNonScoped ++ [hndEffTp, hndResTp]).map(tpVar), grng)),
+    ("ret".newName, TpFun([("res".newName, handleRetTp.tpVar)], hndEffTp.tpVar, hndResTp.tpVar, grng)),
+    ("action".newName, if isScoped then quantify(QForall, tparsScoped, actionTp) else actionTp)],
+    hndEffTp.tpVar, hndResTp.tpVar, grng
+  ))
+  val params = [
+    ValueBinder("cfc".newName, Nothing, Nothing, krng, grng),
+    ValueBinder("hnd".newName, Nothing, Nothing, krng, grng),
+    ValueBinder("ret".newName, Nothing, Nothing, krng, grng),
+    ValueBinder("action".newName, Nothing, Nothing, krng, grng)]
+  val arguments = [
+    (Nothing, Var(tagName, False, krng)),
+    (Nothing, Var("cfc".newName, False, krng)),
+    (Nothing, Var("hnd".newName, False, krng)),
+    (Nothing, Var("ret".newName, False, krng)),
+    (Nothing, wrapAction(Var(newName("action"), False, krng)))
+  ]
+  val handleInner = App(Var(if isInstance then nameNamedHandle else nameHandle, False, grng), arguments, grng)
+  val handleBody = Ann(Lam(params, handleInner, grng), handleTp, grng)
+  val handleDef = Def(ValueBinder(handleName, (), handleBody, irng, rng), grng, vis, DefFun([]), InlineNever, "// handler for the " ++ docEffect)
+  [DefType(effTpDecl), DefValue(tagDef), DefType(hndTpDecl), DefValue(handleDef)] ++ opSelects.map(DefValue) ++ opDefs.map(DefValue) ++ opValDefs.concat-maybe.map(DefValue)
+
+fun unzip4(l: list<(a, b, c, d)>): (list<a>, list<b>, list<c>, list<d>)
+  l.foldr(([], [], [], []), fn((a, b, c, d), (ass, bs, cs, ds)) (Cons(a,ass), Cons(b,bs), Cons(c,cs), Cons(d,ds)))
+
+fun pOpDecl(lin: bool, vis: visibility)
+  choicesnb("op decl", [
+    {pValOpDecl(vis)},
+    {pFunOpDecl(lin, vis)}
+  ])
+
+// effect NAME {val op = ...}
+// TODO: annotate the operation as "value operation" to
+// (a) also constrain the definition in the handler to use `val`
+// (b) constrain the use site to use it as a value
+fun pValOpDecl(vis: visibility): <ast> opDecl
+  val (rng0, doc) = pDocKeyword("val", [])
+  val (id, idrng) = pIdentifier()
+  pKeyword(":", [])
+  val (mbTeff, tRes) = pTResult()
+  if mbTeff.is-just then
+    astError("an explicit effect in result type of an operation is not allowed (yet)", mbTeff.map(range).default(rng0))
+  OpDecl(doc, id.toValueOperationName, rng0, idrng, True, OpVal, [], [], idrng, mbTeff, tRes)
+
+fun pFunOpDecl(lin: bool, vis: visibility): <ast> opDecl
+  val ((rng0, doc), sort) = choices("op decl", [
+    {(pDocKeywordFun(), OpFun)},{
+      val rdoc = pDocKeyword("ctl",["control"])
+      if lin then astError("'ctl' operations are invalide for a linear effect", rdoc.fst)
+      else (rdoc, OpControl)
+    },{
+     val rdoc = pDocKeyword("final",["except", "brk"]);
+     pKeyword("ctl",[])
+     if lin then astError("'final ctl' operations are invalide for a linear effect", rdoc.fst)
+     else (rdoc, OpExcept)
+    }
+  ])
+  val (id, idrng) = pIdentifier()
+  val exists0 = pTypeParams()
+  val (pars, _, prng) = pDeclParams(False, True)
+  pKeyword(":", [])
+  val (mbTeff, tRes) = pTResult()
+  if mbTeff.is-just then
+    astError("an explicit effect in result type of an operation is not allowed (yet)", mbTeff.map(range).default(rng0))
+  OpDecl(doc, id, rng0, idrng, False, sort, exists0, pars, prng, mbTeff, tRes)
 
 fun pDeclParams(allowBorrow: bool, allowDefaults: bool)
   fun pParamBinder() 
@@ -487,6 +710,9 @@ fun pParamInfo()
     pSpecialOp("^")
     Borrow
   }, {Own}])
+
+fun makeOptional(tp: userType)
+  TpApp(TpCon(nameTpOptional, tp.range), [tp], tp.range)
 
 fun operationDecl(opCount, vis, forallsScoped:list<userTypeBinder>, forallsNonScoped, docEffect, hndName, effName, mbInstanceUmb:maybe<list<userType>>, effTp, hndTp, hndTpVars, extraEffects, (opIndex, op))
   val foralls = forallsScoped ++ forallsNonScoped
@@ -540,8 +766,6 @@ fun operationDecl(opCount, vis, forallsScoped:list<userTypeBinder>, forallsNonSc
     val zeroIdx = App(Var(nameSSizeT, False, krng), [(Nothing, Literal(LitInt(0, krng)))], krng)
     val resourceName = "hname".newHiddenName
     val resourceBinder = ValueBinder(resourceName, effTp, Nothing, krng, grng)
-    fun makeOptional(tp: userType)
-      TpApp(TpCon(nameTpOptional, tp.range), [tp], tp.range)
     val params0 = pars.map(fn(par) par(binderType=if par.expr.is-just then par.binderType.makeOptional else par.binderType))
     val params = if isInstance then Cons(resourceBinder, params0) else params0
     val arguments = params0.map(fn(par) (Nothing, Var(par.name, False, par.nameRange)))
@@ -1870,6 +2094,16 @@ fun pSpecialId(s: string)
   token(s) fn(x)
     match x.lex
       LexId(id) | id.showPlain == s -> Just(x.range)
+      _ -> Nothing
+
+
+fun pSpecialId(s: string, alternates: list<string>)
+  token(s) fn(x)
+    match x.lex
+      LexId(id) | id.showPlain == s -> Just(x.range)
+      LexId(id) | alternates.any(fn(v) v == id.showPlain) -> 
+        addWarning("using deprecated keyword " ++ s' ++ ", use " ++ s ++ " instead", x.range)
+        Just(x.range)
       _ -> Nothing
 
 fun pSpecial(s: string, alternates: list<string>)

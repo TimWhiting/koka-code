@@ -198,6 +198,18 @@ fun choices(str: string, ps: list<() -> <ast> a>): <ast> a
 fun makeParseError(r: range, e: string)
   astError("invalid syntax" ++ e.list.drop-while(fn(x) x != ':').string, r)
 
+fun braced(p)
+  val v = maybe("braced") 
+    pLcurly()
+    pmany("semicolons", pSemicolon)
+    val x = p()
+    pmany("semicolons", pSemicolon)
+    pRcurly()
+    x
+  match v
+    Just(v') -> v'
+    Nothing -> p()
+
 fun semiBraces(kind, p)
   val rng1 = pLcurly()
   val xs = semis(kind, p)

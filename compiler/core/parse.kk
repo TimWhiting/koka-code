@@ -3,6 +3,7 @@ import compiler/common/parse
 import compiler/syntax/lexeme
 import compiler/common/range
 import compiler/common/name
+import core
 
 fun parseCore(fname: path)
   lexParse(False, fn(lexes) lexes.allowDotIds.requalify, pProgram, fname.string, read-text-file(fname))
@@ -67,7 +68,9 @@ fun pModule()
   pKeyword("interface")
   val (name, _) = pModulePath()
   pmany("semis", pSemicolon)
-  pBraced
-    val (imps, impAliases) = semis(pImportDecl).unzip
+  braced
+    val (imps, impAliases) = semis("", pImportDecl).unzip
     ()
-  
+
+fun pImportDecl(): <ast> (kimport, (name, name))
+  unimplemented()

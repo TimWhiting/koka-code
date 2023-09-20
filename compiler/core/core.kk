@@ -153,11 +153,11 @@ pub fun eimportLookup(b: buildType, s: string, ls: list<(string, string)>): mayb
 
 pub fun lookupTarget(t: target, ims: list<(target, a)>): maybe<a>
   val tgs = match t
-    C(WasmJs) -> [t, C(Wasm), C(CDefault) ,Default]
-    C(WasmWeb) -> [t, C(Wasm), C(CDefault), Default]
-    C(t1) -> [t, C(t1), Default]
-    JS(_) -> [t, JS(JsDefault), Default]
-    _ -> [t, Default]
+    C(WasmJs) -> [t, C(Wasm), C(CDefault) ,DefaultTarget]
+    C(WasmWeb) -> [t, C(Wasm), C(CDefault), DefaultTarget]
+    C(t1) -> [t, C(t1), DefaultTarget]
+    JS(_) -> [t, JS(JsDefault), DefaultTarget]
+    _ -> [t, DefaultTarget]
   val r = tgs.map(fn(t1:target) ims.find(fn(t2) t2.fst == t1).map(fn(a) a.snd)).filter(fn(i) i.is-just)
   match r
     Cons(Just(x)) -> Just(x)
@@ -689,7 +689,7 @@ fun openEffect(effFrom: keffect, effTo: keffect, tpFrom: ktype, tpTo: ktype, exp
     val e1 = TypeVar(-3, kindEffect, Bound)
     val e2 = TypeVar(-4, kindEffect, Bound)
     val tpOpen = TForAll([e1, e2, a, b], [], TFun([(newName("x"), tpFrom)], typeTotal, tpTo))
-    val varOpen = Var(TName(nameEffectOpen, tpOpen), InfoExternal([(Default, "#1")]))
+    val varOpen = Var(TName(nameEffectOpen, tpOpen), InfoExternal([(DefaultTarget, "#1")]))
     App(TypeApp(varOpen, [effFrom, effTo, tpFrom, tpTo]), [expr])
 
 fun makeInt32(i: int): expr

@@ -51,18 +51,6 @@ fun pBody(vis: visibility, name: name, rng: range, doc: string): <ast> userProgr
   val prelude = if name.show.starts-with("std/core").is-just then [] else [Kimport(nameSystemCore, nameSystemCore, rangeNull, Private)]
   Program(sourceInfo, name, rng, [TypeDefRec(typeDefs)], [DefRec(defs)], prelude ++ imports, externals, fixDefss.concat, doc)
 
-fun braced(p)
-  val v = maybe("braced") 
-    pLcurly()
-    pmany("semicolons", pSemicolon)
-    val x = p()
-    pmany("semicolons", pSemicolon)
-    pRcurly()
-    x
-  match v
-    Just(v') -> v'
-    Nothing -> p()
-
 value type topDef
   DefValue(def: userDef)
   DefType(def: userTypeDef)
@@ -221,7 +209,7 @@ fun externalIncludes(target: target, rng: range, (key, fname): (string, string))
 fun preadFile(fpath: path)
   catch({read-text-file(fpath)}, fn(e) astError("Unable to read external file at path: " ++ fpath.show ++ ": got error " ++ e.message, rangeNull))
 
-fun pExternalImportEntry()
+fun pExternalImportEntry() 
   val target = pExternalTarget()
   val (keyvals, rng) = choices("", [
     {val key = pExternalImportKey(); val (v, rng) = pStringLit(); ([(key, v)], rng)},

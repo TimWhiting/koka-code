@@ -476,12 +476,12 @@ fun isEvType(tp: tau): bool
     _ -> False
 fun makeEvType(arg: tau): tau
   typeApp(typeEv, [arg])
-fun typeApp(t: tau, args: list<tau>): tau
+fun typeApp(tau: tau, args: list<tau>): tau
   match args
-    Nil -> t
-    _ -> match t
-      TApp(t, ts0) -> TApp(t, ts0 ++ args)
-      _ -> TApp(t, args)
+    Nil -> tau
+    _ -> match tau
+      TApp(tau', ts0) -> TApp(tau', ts0 ++ args)
+      _ -> TApp(tau, args)
 
 val typeUnit = TCon(tconUnit)
 val tconUnit = TypeCon(nameTpUnit, kindStar)

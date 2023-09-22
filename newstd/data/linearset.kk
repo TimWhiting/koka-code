@@ -24,7 +24,13 @@ pub fun member(l: linearSet<v>, a: v): e bool
 pub fun union(l: linearSet<v>, l2: linearSet<v>): e linearSet<v>
   l2.list.foldl(l, fn(acc, x) acc.add(x))
 
+pub fun unions(ls: list<linearSet<v>>): <exn|e> linearSet<v>
+  ls.foldl(ls.head.unjust, fn(acc, x) acc.union(x))
+
 pub fun add(l: linearSet<v>, a: v): e linearSet<v>
+  if (l.member(a)) then l else l(list=Cons(a, l.list))
+
+pub fun (+)(l: linearSet<v>, a: v): e linearSet<v>
   if (l.member(a)) then l else l(list=Cons(a, l.list))
 
 pub fun (+)(l1: linearSet<v>, l2: linearSet<v>): e linearSet<v>
@@ -53,6 +59,15 @@ pub fun intersection(l1: linearSet<v>, l2: linearSet<v>): e linearSet<v>
 
 pub fun disjoint(l1: linearSet<v>, l2: linearSet<v>): bool
   l1.intersection(l2).list.is-nil
+
+pub fun common(l1: linearSet<v>, l2: linearSet<v>): e bool
+  !l1.disjoint(l2)
+
+fun filter(l: linearSet<v>, f: (v) -> e bool): e linearSet<v>
+  l(list=l.list.filter(f))
+
+fun isSubsetOf(l1: linearSet<v>, l2: linearSet<v>): bool
+  l1.list.all(fn(x) l2.member(x))
 // pub fun main()
 //   val s = linearSet([1, 2, 3], (==))
 //   val s2 = linearSet([2, 3, 4], (==))

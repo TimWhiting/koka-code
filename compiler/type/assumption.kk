@@ -5,9 +5,12 @@ import compiler/type/type
 import compiler/core/core
 import compiler/common/name-collections
 import newstd/data/linearmap
+import newstd/data/linearset
 import newstd/data/sort
 import compiler/common/failure
 import compiler/platform/config
+import compiler/core/corevar
+import compiler/type/typevar
 
 type nameInfo
   InfoVal(vis: visibility, cname: name, typ: scheme, range: range, isVar: bool)
@@ -147,37 +150,37 @@ fun extractGammaImports(imports: list<(name,name)>, modName: name): gamma
 fun extractImport((name, qname))
   single(name, InfoImport(Private, typeVoid, name, qname, rangeNull))
 
-fun extractGamma(isValue: (dataInfo -> bool), privateAsPublic: bool, c: core): gamma
+fun extractGamma(isValue: (dataInfo -> bool), privateAsPublic: bool, c: core): <exn, compFlags> gamma
   fun updateVis(vis)
     match vis
       Public -> Public
       _ -> if privateAsPublic then Public else vis
   gammaUnions([
-    c.defGroups.map(fn(dg) extractDefGroup(updateVis)).gammaUnions,
-    c.externals.map(fn(es) extractExternal(updateVis)).gammaUnions,
-    c.typeDefs.map(fn(td) extractTypeDefGroup(isValue, updateVis)).gammaUnions
+    c.defs.map(fn(dg) dg.extractDefGroup(updateVis)).gammaUnions,
+    c.externals.map(fn(ex) ex.extractExternal(updateVis)).gammaUnions,
+    c.typeDefs.map(fn(td) td.extractTypeDefGroup(isValue, updateVis)).gammaUnions
   ])
 
-fun extractTypeDefGroup(isValue: (dataInfo -> bool), updateVis, td: typeDefGroup)
+fun extractTypeDefGroup(td: typeDefGroup, isValue: (dataInfo -> bool), updateVis)
   td.map(fn(d) extractTypeDef(isValue, updateVis, d)).gammaUnions
 
 fun extractTypeDef(isValue: (dataInfo -> bool), updateVis, td: typeDef)
   fun extractConInfo((info, repr): (conInfo, conRepr))
     single(info.name, InfoCon(updateVis(info.vis), info.typeScheme, repr, info, info.range))
   match td
-    Data(dataInfo, isExtend) -> zip(dataInfo.constrs, dataInfo.getDataReprEx(isValue).snd).map(extractConInfo).gammaUnions
-    _ -> empty
+    Data(dataInfo, _) -> zip(dataInfo.constrs, dataInfo.dataRepr(isValue).snd).map(extractConInfo).gammaUnions
+    _ -> assumption/empty
 
-fun extractDefGroup(updateVis, def)
+fun extractDefGroup(def, updateVis)
   match def
     DefRec(defs) -> defs.map(fn(v) extractDef(v, updateVis)).gammaUnions
     DefNonRec(v) -> extractDef(v, updateVis)
 
 fun extractDef(def: def, updateVis)
-  single(def.name.nonCanonicalName, createNameInfoX(updateVis(def.vis), def.name, def.sort, def.nameRange, def.doc))
+  single(def.name.nonCanonicalName, createNameInfoX(updateVis(def.vis), def.name, def.sort, def.nameRange, def.ktype))
 
 fun coreDefInfo(def: def)
-  (def.name.nonCanonicalName, createNameInfoX(def.vis, def.name, if def.sort.is-defFun && !def.isTopLevel then DefVal else sort, nameRng, tp))
+  (def.name.nonCanonicalName, createNameInfoX(def.vis, def.name, if def.sort.is-defFun && !def.isTopLevel then DefVal else def.sort, def.nameRange, def.ktype))
 
 fun createNameInfoX(vis, name, sort, rng, tp)
   match sort
@@ -194,11 +197,22 @@ fun arity(tp: ktype): <compFlags, exn> (int, int)
     TFun(pars) -> (0, pars.length)
     _ -> fail("type/assumption createNameInfoX")
 
-fun extractExternal(updateVis, external: external)
+fun extractExternal(external: external, updateVis)
   match external
-    External(name, tp, pinfos, body, vis, fipT, nameRng, doc) ->
-      single(name.nonCanonicalName, InfoExternal(updateVis(vis), name, tp, body, fipT, nameRange))
-    _ -> empty
+    External(name, tp, _, body, vis, fipT, nameRng, _) ->
+      single(name.nonCanonicalName, InfoExternal(updateVis(vis), name, tp, body, fipT, nameRng))
+    _ -> assumption/empty
 
+// TODO: PRETTY PRINT && substitutions
 
-// TODO: PRETTY PRINT && TypeVar / substitution
+fun freeTypeVars(g: gamma): pure tvs
+  g.schemes.map(freeTypeVars).unions
+
+fun boundTypeVars(g: gamma): pure tvs
+  g.schemes.map(boundTypeVars).unions
+
+fun freeTypeVars(info: nameInfo): pure tvs
+  info.typ.freeTypeVars
+
+fun boundTypeVars(info: nameInfo): pure tvs
+  info.typ.boundTypeVars

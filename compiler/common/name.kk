@@ -29,6 +29,9 @@ fun lowerCompare(Name(m1, _, n1, _), Name(m2, _, n2, _)): order
 pub fun (==)(n1: name, n2: name): bool
   n1.hashId == n2.hashId && n1.hashModule == n2.hashModule && n1.lowerCompare(n2) == Eq
 
+pub fun (!=)(n1: name, n2: name): bool
+  !(n1 == n2)
+
 pub fun compare(n1: name, n2: name): order
   match n1.hashModule.compare(n2.hashModule)
     Eq -> 

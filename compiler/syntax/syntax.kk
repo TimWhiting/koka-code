@@ -361,7 +361,7 @@ fun freeTypeVars(m: maybe<a>, f: (a) -> div nameSet): div nameSet
     Just(x) -> f(x)
 
 fun freeTypeVars(l: list<a>, f: (a) -> div nameSet): div nameSet
-  l.foldl(namesEmpty, fn(s, x) s + f(x))
+  l.foldl(namesEmpty, fn(s:nameSet, x) s + f(x))
 
 fun freeTypeVars(tp: kUserType<k>): div nameSet
   match tp

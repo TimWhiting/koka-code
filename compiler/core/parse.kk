@@ -6,6 +6,7 @@ import compiler/common/name
 import compiler/common/name-collections
 import compiler/syntax/syntax
 import compiler/common/name-prim
+import compiler/kind/kind
 import compiler/kind/synonyms
 import compiler/kind/importmap
 import compiler/type/type
@@ -81,6 +82,27 @@ fun pModule()
 
 fun pImportDecl(): <ast> (compiler/core/core/kimport, (name, name))
   unimplemented()
+
+
+
+fun pKind()
+  choices("kind", [
+    {val params = parensCommas("", pKind); pKeyword("->"); val res = pKind(); params.foldr(res, kindFun)},
+    {val k = pKatom(); choices("", [{pKeyword("->"); val res = pKind(); kindFun(k, res)}, {k}])}
+  ])
+
+fun pKatom()
+  choices("kind", [
+    {parens(pKind)},
+    {pSpecialConId("V"); kindStar},
+    {pSpecialConId("X"); kindLabel},
+    {pSpecialConId("E"); kindEffect},
+    {pSpecialConId("H"); kindHeap},
+    {pSpecialConId("S"); kindScope},
+    {pSpecialConId("HX"); kindHandled},
+    {pSpecialConId("HX1"); kindHandled1},
+    {pSpecialConId("P"); kindPred}
+  ])
 
 
 effect eenv

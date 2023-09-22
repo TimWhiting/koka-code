@@ -122,6 +122,7 @@ type external
     params: list<paramInfo>
     format: list<(target, string)>
     visibility: visibility
+    fipT: fipT
     range: range
     doc: string
   ExternalImport
@@ -295,18 +296,18 @@ fun isValue(d: dataInfo): bool
   d.def.isValue
 
 fun conRepr(d: dataInfo, c: conInfo)
-  val (_, creprs) = d.dataRepr
+  val (_, creprs) = d.dataRepr(fn(d') d'.isValue)
   match d.constrs.zip(creprs).filter(fn((a, _)) a.name == c.name).map(snd)
     [crepr] -> crepr
     _ -> throw("core/core: conRepr: constructor not in the datatype")
 
-fun dataRepr(i: dataInfo): exn (dataRepr, list<conRepr>)
+fun dataRepr(i: dataInfo, isVal: (dataInfo) -> bool): exn (dataRepr, list<conRepr>)
   val typeName = i.name
   val conInfos = i.constrs
   val tags = list(0, conInfos.length - 1)
   val singletons = conInfos.filter(fn(c) c.params.is-nil)
   val hasExistentials = conInfos.any(fn(c) c.existentials.is-cons)
-  val isValue = i.isValue && !i.isRec
+  val isValue = isVal(i) && !i.isRec
   val (dataRepr, conReprFuns) = 
     if i.isRec then (DataOpen, conInfos.map(fn(ci) fn(ctag) ConOpen(typeName, DataOpen, ci.valueRepr, CtxNone)))
     elif conInfos.length == 1 then
@@ -347,6 +348,11 @@ fun flatten(dgs: list<defGroup>): list<def>
 
 fun flatten(dgs: list<defGroups>): list<def>
   dgs.map(flatten).concat()
+
+fun flatten(dg: defGroup): list<def>
+  match dg
+    DefRec(defs) -> defs 
+    DefNonRec(def) -> [def]
 
 fun map(dg: defGroup, f: (def) -> e def): e defGroup
   match dg
@@ -802,7 +808,7 @@ fun splitTForAll(tp: ktype): <exn> (list<typeVar>, ktype)
 
 alias deps = linearSet<name>
 fun depsUnions(l: list<deps>): deps
-  l.foldl(namesEmpty, fn(s, a) s + a)
+  l.foldl(namesEmpty, fn(s: deps, a: deps) s + a)
 fun dep(t: tName): deps
   dep(t.getName)
 fun dep(n: name): deps

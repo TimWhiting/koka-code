@@ -75,3 +75,6 @@ pub fun filter(m: linearMap<k,v>, f: (k, v) -> e bool): e linearMap<k,v>
 
 pub fun remove(m: linearMap<k,v>, k: k): e linearMap<k,v>
   m(list=m.list.filter(fn((k1,_)) !(m.eq)(k, k1)))
+
+pub fun unionWith(m1: linearMap<k,v>, m2: linearMap<k,v>, f: (v, v) -> e v): e linearMap<k,v>
+  m2.list.foldl(m1, fn(x, (k, y)) x.update(k, y, f))

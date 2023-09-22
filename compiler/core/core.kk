@@ -528,7 +528,7 @@ fun isTotalFun(e: expr): pure bool
     TypeApp(ex, _) -> ex.isTotalFun
     Con -> True
     ELit -> True
-    Let(dgs, e) -> dgs.flatten.all(isTotal) && e.isTotalFun
+    Let(dgs, e1) -> dgs.flatten.all(isTotal) && e1.isTotalFun
     Case(exps, brnchs) -> exps.all(isTotalFun) && brnchs.all(isTotalFun)
     App(f, args) -> e.typeOf.hasTotalEffect && f.isTotalFun && args.all(isTotal)
     Var(v) -> v.getName == nameBox || v.getName == nameUnbox
@@ -655,14 +655,14 @@ fun makeTypeApp(e: expr, l: list<ktype>): expr
   match l
     Nil -> e
     _ -> match e
-      TypeApp(e, l') -> TypeApp(e, l ++ l')
+      TypeApp(e1, l') -> TypeApp(e1, l ++ l')
       _ -> TypeApp(e, l)
 
 fun addApps(l: list<expr>, e: expr)
   match l
     Nil -> e
     _ -> match e
-      App(e, l') -> App(e, l ++ l')
+      App(e1, l') -> App(e1, l ++ l')
       _ -> App(e, l)
 
 fun addTypeApps(l: list<typeVar>, e: expr)

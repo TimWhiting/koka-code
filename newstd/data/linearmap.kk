@@ -72,3 +72,6 @@ pub fun unions(l: list<linearMap<k,v>>): <exn|e> linearMap<k,v>
 
 pub fun filter(m: linearMap<k,v>, f: (k, v) -> e bool): e linearMap<k,v>
   m(list=m.list.filter(fn((k,v)) f(k,v)))
+
+pub fun remove(m: linearMap<k,v>, k: k): e linearMap<k,v>
+  m(list=m.list.filter(fn((k1,_)) !(m.eq)(k, k1)))

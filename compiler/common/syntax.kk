@@ -114,6 +114,12 @@ type visibility
   Public
   Private
 
+fun (==)(v1: visibility, v2: visibility): bool
+  match (v1, v2)
+    (Public, Public) -> True
+    (Private, Private) -> True
+    _ -> False
+
 fun show(v: visibility): string
   match v
     Public -> "Public"

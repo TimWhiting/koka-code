@@ -204,6 +204,20 @@ value type dataRepr
   DataNormal(hasSingletons: bool)
   DataOpen;
 
+fun show(d: dataRepr): string
+  match d
+    DataEnum -> "DataEnum"
+    DataIso -> "DataIso"
+    DataSingleStruct -> "DataSingleStruct"
+    DataStructAsMaybe -> "DataStructAsMaybe"
+    DataStruct -> "DataStruct"
+    DataSingle(b) -> "DataSingle(" ++ b.show ++ ")"
+    DataAsMaybe -> "DataAsMaybe"
+    DataAsList -> "DataAsList"
+    DataSingleNormal -> "DataSingleNormal"
+    DataNormal(b) -> "DataNormal(" ++ b.show ++ ")"
+    DataOpen -> "DataOpen"
+
 type conRepr
   ConEnum(name: name, repr: dataRepr, valueRepr: valueRepr, tag: int) // part of enumeration (none has fields)
   ConIso(name: name, repr: dataRepr, valueRepr: valueRepr, tag: int) // one constructor with one field
@@ -215,9 +229,26 @@ type conRepr
   ConOpen(name: name, repr: dataRepr, valueRepr: valueRepr, ctxPath: ctxPath) // constructor of open data type
   ConNormal(name: name, repr: dataRepr, valueRepr: valueRepr, ctxPath: ctxPath, tag: int); // a regular constructor
 
+fun show(r: conRepr): string
+  match r
+    ConEnum(name, drepr, vrepr, tag) -> "ConEnum(" ++ name.show ++ "," ++ show(drepr) ++ "," ++ show(vrepr) ++ "," ++ tag.show ++ ")"
+    ConIso(name, drepr, vrepr, tag) -> "ConIso(" ++ name.show ++ "," ++ show(drepr) ++ "," ++ show(vrepr) ++ "," ++ tag.show ++ ")"
+    ConSingleton(name, drepr, vrepr, tag) -> "ConSingleton(" ++ name.show ++ "," ++ show(drepr) ++ "," ++ show(vrepr) ++ "," ++ tag.show ++ ")"
+    ConSingle(name, drepr, vrepr, ctxPath, tag) -> "ConSingle(" ++ name.show ++ "," ++ show(drepr) ++ "," ++ show(vrepr) ++ "," ++ show(ctxPath) ++ "," ++ tag.show ++ ")"
+    ConAsJust(name, drepr, vrepr, asNothing, tag) -> "ConAsJust(" ++ name.show ++ "," ++ show(drepr) ++ "," ++ show(vrepr) ++ "," ++ asNothing.show ++ "," ++ tag.show ++ ")"
+    ConStruct(name, drepr, vrepr, tag) -> "ConStruct(" ++ name.show ++ "," ++ show(drepr) ++ "," ++ show(vrepr) ++ "," ++ tag.show ++ ")"
+    ConAsCons(name, drepr, vrepr, asNil, ctxPath, tag) -> "ConAsCons(" ++ name.show ++ "," ++ show(drepr) ++ "," ++ show(vrepr) ++ "," ++ asNil.show ++ "," ++ show(ctxPath) ++ "," ++ tag.show ++ ")"
+    ConOpen(name, drepr, vrepr, ctxPath) -> "ConOpen(" ++ name.show ++ "," ++ show(drepr) ++ "," ++ show(vrepr) ++ "," ++ show(ctxPath) ++ ")"
+    ConNormal(name, drepr, vrepr, ctxPath, tag) -> "ConNormal(" ++ name.show ++ "," ++ show(drepr) ++ "," ++ show(vrepr) ++ "," ++ show(ctxPath) ++ "," ++ tag.show ++ ")"
+
 type ctxPath
   CtxNone
   CtxField(name: tName)
+
+fun show(p: ctxPath): string
+  match p
+    CtxNone -> "CtxNone"
+    CtxField(name) -> "CtxField(" ++ name.show ++ ")"
 
 // Value data is not heap allocated and needs no header
 fun hasCtxPath(repr: conRepr): bool

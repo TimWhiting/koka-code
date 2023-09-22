@@ -15,9 +15,26 @@ pub type ktype
   TApp(t: ktype, args: list<ktype>)
   TSyn(syn: typeSyn, args: list<ktype>, t: ktype)
 
+fun show(tps: list<ktype>): div string
+  tps.show-list(show)
+
+fun show(tp: ktype): div string
+  match tp
+    TForAll(vars, preds, t) -> "forall " ++ vars.show-list(show) ++ " . " ++ preds.show-list(show) ++ " => " ++ t.show
+    TFun(args, eff, t) -> "(" ++ args.show-list(fn((name, tp1)) name.show ++ tp1.unsafe-decreasing.show) ++ " -> " ++ eff.show ++ " " ++ t.show ++ ")"
+    TCon(c) -> c.name.show
+    TVar(v) -> v.tid.show
+    TApp(t, args) -> t.show ++ " " ++ args.show
+    TSyn(syn, args, t) -> syn.name.show ++ " " ++ args.show ++ " " ++ t.show
+
 type pred
   PredSub(a: ktype, b: ktype)
   PredIFace(n: name, tps: list<ktype>)
+
+fun show(p: pred): div string
+  match p
+    PredSub(a, b) -> a.show ++ " <: " ++ b.show
+    PredIFace(n, tps) -> n.show ++ " " ++ tps.show
 
 // Various synonyms of types
 pub alias scheme = ktype
@@ -35,6 +52,9 @@ pub value struct typeVar
   tid: id
   kind: kind
   flavour: flavour;
+
+fun show(t: typeVar): string
+  t.tid.show ++ "::" ++ t.kind.show
 
 fun (==)(t1: typeVar, t2: typeVar): bool
   id/(==)(t1.tid, t2.tid)

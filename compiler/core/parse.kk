@@ -9,6 +9,7 @@ import compiler/common/name-prim
 import compiler/kind/synonyms
 import compiler/kind/importmap
 import compiler/type/type
+import compiler/type/assumption
 import core
 
 fun parseCore(fname: path)

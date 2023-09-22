@@ -574,27 +574,27 @@ fun getEffect(e: expr): keffect
 
 // Generic traversals
 
-fun foldMap(e: expr, acc: expr -> e ctx<a>): e ctx<a>
-  match e
-    Lam(_, _, b) -> acc(e) ++ foldMap(b, acc)
-    Var -> acc(e)
-    App(f, args) -> args.foldl(acc(e) ++ foldMap(f, acc), fn(s, a) s ++ acc(a))
-    TypeLam(_, b) -> acc(e) ++ foldMap(b, acc)
-    TypeApp(f, _) -> acc(e) ++ foldMap(f, acc)
-    Con -> acc(e)
-    ELit -> acc(e)
-    Let(binders, body) -> binders.flatten.foldl(acc(e), fn(s, a) s ++ acc(a.expr)) ++ foldMap(body, acc)
-    Case(cases, branches) -> branches.foldl(cases.foldl(acc(e), fn(s, a) s ++ acc(a)), fn(s, b) b.guards.foldl(s, fn(s', g) s' ++ acc(g.test) ++ acc(g.expr)))
+// fun foldMap(e: expr, acc: expr -> e ctx<a>): e ctx<a>
+//   match e
+//     Lam(_, _, b) -> acc(e) ++ foldMap(b, acc)
+//     Var -> acc(e)
+//     App(f, args) -> args.foldl(acc(e) ++ foldMap(f, acc), fn(s, a) s ++ acc(a))
+//     TypeLam(_, b) -> acc(e) ++ foldMap(b, acc)
+//     TypeApp(f, _) -> acc(e) ++ foldMap(f, acc)
+//     Con -> acc(e)
+//     ELit -> acc(e)
+//     Let(binders, body) -> binders.flatten.foldl(acc(e), fn(s, a) s ++ acc(a.expr)) ++ foldMap(body, acc)
+//     Case(cases, branches) -> branches.foldl(cases.foldl(acc(e), fn(s, a) s ++ acc(a)), fn(s, b) b.guards.foldl(s, fn(s', g) s' ++ acc(g.test) ++ acc(g.expr)))
 
-effect efind
-  final ctl found(e: expr): a
+// effect efind
+//   final ctl found(e: expr): a
 
-fun anySubExpr(e, f)
-  with handler 
-    final ctl found(ex) Just(ex)
-    return(x) Nothing
-  val c = ctx _
-  e.foldMap(fn(a) if f(a) then found(e) else c)
+// fun anySubExpr(e, f)
+//   with handler 
+//     final ctl found(ex) Just(ex)
+//     return(x) Nothing
+//   val c = ctx _
+//   e.foldMap(fn(a) if f(a) then found(e) else c)
 
 
 // TODO: More here

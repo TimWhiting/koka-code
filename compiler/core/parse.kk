@@ -3,6 +3,9 @@ import compiler/common/parse
 import compiler/syntax/lexeme
 import compiler/common/range
 import compiler/common/name
+import compiler/common/name-collections
+import compiler/syntax/syntax
+import compiler/common/name-prim
 import core
 
 fun parseCore(fname: path)
@@ -72,5 +75,19 @@ fun pModule()
     val (imps, impAliases) = semis("", pImportDecl).unzip
     ()
 
-fun pImportDecl(): <ast> (kimport, (name, name))
+fun pImportDecl(): <ast> (compiler/core/core/kimport, (name, name))
   unimplemented()
+
+
+effect eenv
+  fun setEnv(e: env): ()
+  fun getEnv(): env;
+
+struct env
+  bound: name-map<typeVar>
+  syns: synonyms
+  modName: name
+  imports: importMap
+  unique: int
+  gamma: gamma
+  locals: name-map<ktype>

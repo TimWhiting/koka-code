@@ -35,7 +35,7 @@ fun next(): ast lexeme
     Nothing -> astError("unexpected end of file", rangeNull)
 
 alias ast = <astParse, astError, pure, fsys>
-fun lexParse(insSemi: bool, preprocess: list<lexeme> -> list<lexeme>, p: () -> <console,ast|e> a, sourceName: string, input: string): <console,astError,fsys,pure|e> a
+fun lexParse(insSemi: bool, preprocess: list<lexeme> -> list<lexeme>, p: () -> <console,ast> a, sourceName: string, input: string): <console,astError,fsys,pure|e> a
   val src = Source(sourceName, input)
   val lexes = lex(src, 0, input)
   var lexemes := preprocess(layout(insSemi, lexes))
@@ -120,7 +120,7 @@ fun pmanyend1(kind: string, l: () -> <ast> a, p: () -> <ast> b): <ast> list<a>
       match maybe("sep " ++ kind, p)
         Just(_) -> Cons(r, pmanyend(kind, l, p))
 
-fun token(msg: string, f: (lexeme) -> <ast|e> maybe<a>): <ast|e> a
+fun token(msg: string, f: (lexeme) -> <ast> maybe<a>): <ast> a
   val t = peek()
   match f(t) 
     Just(a) -> 
@@ -241,7 +241,7 @@ fun parensCommas(p)
   parens
     pSepBy("comma", p, pComma)
 
-fun parseRange(msg: string, f: (lexeme) -> <ast|e> bool): <ast|e> range
+fun parseRange(msg: string, f: (lexeme) -> <ast> bool): <ast> range
   token(msg, fn(x) if f(x) then Just(x) else Nothing).range
 
 inline fun pLapp()

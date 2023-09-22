@@ -11,6 +11,10 @@ fun (==)(a: kind, b: kind): bool
     (KApp(a1, b1), KApp(a2, b2)) -> unsafe-decreasing(a1) == a2 && unsafe-decreasing(b1) == b2
     _ -> False
 
+fun show(k: kind): string
+  match k
+    KCon(c) -> c.show
+    KApp(a, b) -> show(a) ++ " " ++ show(b)
 
 // Kind constant
 alias kindCon = name

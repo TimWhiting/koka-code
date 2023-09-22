@@ -95,6 +95,12 @@ pub struct dataInfo
   vis: visibility
   doc: string
 
+fun (==)(d1: dataInfo, d2: dataInfo): bool
+  name/(==)(d1.name, d2.name)
+
+fun show(d: dataInfo): string
+  d.name.show
+
 pub fun isRec(d: dataInfo): bool
   d.def.isRec
 
@@ -124,6 +130,9 @@ pub struct conInfo
   vis: visibility
   doc: string;
 
+fun (==)(c1: conInfo, c2: conInfo): bool
+  name/(==)(c1.name, c2.name)
+
 fun show(c: conInfo): string
   c.name.show
 
@@ -143,6 +152,12 @@ pub struct synInfo
   range: range
   pub vis: visibility
   doc: string;
+
+fun (==)(s1: synInfo, s2: synInfo): bool
+  name/(==)(s1.name, s2.name)
+
+fun show(s: synInfo): string
+  s.name.show
 
 fun isBound(t: typeVar): bool
   t.flavour == Bound

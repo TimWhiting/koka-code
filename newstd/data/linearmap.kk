@@ -66,3 +66,9 @@ pub fun foldr(m: linearMap<k,v>, acc: a, f: (k, v, a) -> e a): e a
 pub fun map(m: linearMap<k,v>, f: (k, v) -> e (k, v)): e linearMap<k,v>
   m(list=m.list.map(fn((k,v)) f(k,v)))
 
+pub fun unions(l: list<linearMap<k,v>>): <exn|e> linearMap<k,v>
+  val fst = l.head.unjust
+  l.foldl(fst, fn(x, y) x.addAll(y.list))}
+
+pub fun filter(m: linearMap<k,v>, f: (k, v) -> e bool): e linearMap<k,v>
+  m(list=m.list.filter(fn((k,v)) f(k,v)))

@@ -6,6 +6,9 @@ import compiler/common/name
 import compiler/common/name-collections
 import compiler/syntax/syntax
 import compiler/common/name-prim
+import compiler/kind/synonyms
+import compiler/kind/importmap
+import compiler/type/type
 import core
 
 fun parseCore(fname: path)
@@ -85,9 +88,8 @@ effect eenv
 
 struct env
   bound: name-map<typeVar>
-  syns: synonyms
   modName: name
-  imports: importMap
+  imports: importmap
   unique: int
   gamma: gamma
   locals: name-map<ktype>

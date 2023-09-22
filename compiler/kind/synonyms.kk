@@ -17,7 +17,7 @@ effect synonyms
   fun synonymsDiff(syns1: name-map<synInfo>, syns2: name-map<synInfo>): name-map<synInfo>
   fun synonymsFilter(modName: name): name-map<synInfo>
 
-fun withNewtypes(synonyms0: name-map<synInfo>, f: () -> <synonyms,exn,compFlags|e> a): <exn,compFlags|e> a
+fun withSynonyms(synonyms0: name-map<synInfo>, f: () -> <synonyms,exn,compFlags|e> a): <exn,compFlags|e> a
   var synonyms := synonyms0
   with handler
     fun synonymsExtend(name: name, k: synInfo)

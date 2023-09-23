@@ -123,11 +123,11 @@ type external
     format: list<(target, string)>
     visibility: visibility
     fipT: fipT
-    range: range
+    rng: range
     doc: string
   ExternalImport
     imports: list<(target,list<(string, string)>)>
-    range: range
+    rng: range
 
 fun vis(e: external)
   match e

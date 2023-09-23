@@ -1,6 +1,5 @@
 import compiler/type/type
 import newstd/data/linearset
-import compiler/common/range
 import compiler/core/core
 
 alias tvs = linearSet<typeVar>

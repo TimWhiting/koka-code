@@ -706,7 +706,7 @@ fun withEnvInitial(modName, imports0, f)
         Left(amb) -> 
           trace("core/parse qualify: unable to expand name: " ++ n.show ++ ": " ++ amb.show-list(show))
           n
-    else qualify(mname, n)
+    else name/qualify(mname, n)
   with handler
     val modname = modName
     fun envExtendLocal(n, k)

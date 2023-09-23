@@ -131,7 +131,7 @@ fun token(msg: string, f: (lexeme) -> <ast|e> maybe<a>): <ast|e> a
       astError("expecting " ++ msg, peek().range)
 
 // Version of maybe that does backtrack
-fun maybe(str: string, p: () -> <ast|e> a): <ast|e> maybe<a>
+fun maybe<e>(str: string, p: () -> <ast|e> a): <ast|e> maybe<a>
   with override
     return(r) 
       Just(r)

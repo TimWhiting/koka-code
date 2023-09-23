@@ -12,6 +12,7 @@ import compiler/kind/synonyms
 import compiler/kind/importmap
 import compiler/type/type
 import compiler/type/assumption
+import compiler/platform/config
 import core
 
 fun parseCore(fname: path)
@@ -247,7 +248,7 @@ fun pExternalBody()
 fun pExternalEntry()
   val target = pExternalTarget()
   maybe("", {specialId("inline")})
-  val (s, _) = pStringLit()
+  val s = pStringLit().fst
   (target, s)
 
 fun pExternalTarget()
@@ -518,8 +519,8 @@ fun pKindAnnotFull()
 fun pKindAnnot()
   maybe("", {pSpecialOp("::"); pKind()}).default(kindStar)
 
-fun pType()
-  pTypeX(False)
+fun pType(): <ast,eenv,compFlags> ktype
+  pTypeX(False).fst
 
 fun pDefType()
   val (tp, pinfos) = pTypeX(True)
@@ -538,7 +539,7 @@ fun pTForall()
 fun pQualifier()
   maybe("", {pKeyword("with"); pmany1("", pPredicate)}).default([])
 
-fun pPredicate()
+fun pPredicate(): <ast,eenv,compFlags> pred
   try("predicate") 
     val (name, _) = pQVarId()
     val tps = maybe("", {angles({pSepBy("", pType, pComma)}).fst}).default([])
@@ -568,7 +569,7 @@ fun pTResult(params)
     Just(tp) -> tp
     Nothing -> TFun(params, typeTotal, tp1)
 
-fun pTAtom()
+fun pTAtom(): <ast,eenv,compFlags> ktype
   val etp = pTAtomParamsEx(False, False)
   match etp
     Left((params, _)) -> pTypeApp(extract(params, "expecting single type"))
@@ -623,8 +624,8 @@ fun pSynonym(tp, tps)
     match tp
       TCon(TypeCon(name, kind)) ->
         match synonymsLookup(name)
-          Just(info as SynInfo(synname, kind, params, syntp, rank)) ->
-            TSyn(TypeSyn(name, kind, rank, Just(info)), tps, body)
+          Just(info as SynInfo(_, kind', _, _, rank')) ->
+            TSyn(TypeSyn(name, kind', rank', Just(info)), tps, body)
           _ -> TSyn(TypeSyn(name, kind, rank, Nothing), tps, body)
       TSyn | tps.is-empty -> tp
       _ -> fail("illegal type alias expression " ++ tp.show)
@@ -639,13 +640,13 @@ fun pTEffect()
   pRangle()
   labels.foldr(ext, shallowEffectExtend)
 
-fun pTExtend()
+fun pTExtend(): <ast,eenv,compFlags> ktype
   maybe("", {pBar(); pTAtom()}).default(effectEmpty)
 
 fun pTLabel()
   pTypeApp(pTAtom())
 
-fun pTId()
+fun pTId(): <ast,eenv,compFlags> ktype
   val (name, _) = choices("", [pQVarId, pQIdOp, pWildcard])
   val kind = maybe("", pKindAnnotFull).default(kindStar)
   envType(name, kind)

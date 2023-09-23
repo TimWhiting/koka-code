@@ -9,8 +9,7 @@ import newstd/data/linearmap
 
 effect synonyms
   fun synonymsExtend(name: name, newtp: synInfo): ()
-  fun synonymsLookupAny(name: name): maybe<synInfo>
-  fun synonymsLookupPublic(name: name): maybe<synInfo>
+  fun synonymsLookup(name: name): maybe<synInfo>
   fun synonymsFind(name: name): synInfo
   fun synonymsList(): list<(name, synInfo)>
   fun synonymsCompose(syns1: name-map<synInfo>, syns2: name-map<synInfo>): name-map<synInfo>
@@ -22,12 +21,8 @@ fun withSynonyms(synonyms0: name-map<synInfo>, f: () -> <synonyms,exn,compFlags|
   with handler
     fun synonymsExtend(name: name, k: synInfo)
       synonyms := synonyms.set(name, k)
-    fun synonymsLookupAny(name: name)
+    fun synonymsLookup(name: name)
       synonyms.maybeGet(name)
-    fun synonymsLookupPublic(name: name)
-      match synonyms.maybeGet(name)
-        Just(di) | di.vis.is-public -> Just(di)
-        _ -> Nothing
     fun synonymsFind(name: name)
       match synonyms.maybeGet(name)
         Just(di) -> di

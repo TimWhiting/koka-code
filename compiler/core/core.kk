@@ -35,11 +35,11 @@ val patTrue = pETrue.fst
 val exprTrue = pETrue.snd
 
 fun patExprBool(n: name, t: int): (pattern, expr)
-  val tname = TName(n, typeBool)
+  val tn = TName(n, typeBool)
   val conEnum = ConEnum(nameTpBool, DataEnum, valueReprZero, t)
   val conInfo = ConInfo(n, nameTpBool, [], [], [], TFun([], typeTotal, typeBool), Inductive, rangeNull, [], [], False, [], valueReprZero, Public, "")
-  val pat = PatCon(tname, [], conEnum, [], [], typeBool, conInfo, False)
-  val expr = Con(tname, conEnum)
+  val pat = PatCon(tn, [], conEnum, [], [], typeBool, conInfo, False)
+  val expr = Con(tn, conEnum)
   (pat, expr)
 
 fun makeIfExpr(p: expr, t: expr, f: expr): expr
@@ -80,7 +80,7 @@ fun makeDefsLet(defs0: list<def>, expr0: expr)
   fun make(defs, e)
     match defs
       Nil -> e
-      Cons(def, rdefs) | e.isUnit && name(def:def) == nameNil && expr(def:def).isUnit -> make(rdefs, def.expr)
+      Cons(d, rdefs) | e.isUnit && name(d:def) == nameNil && expr(d:def).isUnit -> make(rdefs, d.expr)
       _ -> makeLet(defs.reverse.map(DefNonRec), e)
   make(defs0.reverse, expr0)
 
@@ -352,16 +352,16 @@ fun flatten(dgs: list<defGroups>): list<def>
 fun flatten(dg: defGroup): list<def>
   match dg
     DefRec(defs) -> defs 
-    DefNonRec(def) -> [def]
+    DefNonRec(d) -> [d]
 
 fun map(dg: defGroup, f: (def) -> e def): e defGroup
   match dg
     DefRec(defs) -> DefRec(defs.map(f))
-    DefNonRec(def) -> DefNonRec(f(def))
+    DefNonRec(d) -> DefNonRec(f(d))
 
 type defGroup
   DefRec(defs: list<def>)
-  DefNonRec(def: def)
+  DefNonRec(d: def)
 
 // A value definition
 struct def
@@ -462,8 +462,8 @@ value struct tName
 fun show(name: tName): string
   name.getName.show
 
-fun defTName(def: def): tName
-  TName(def.name, def.ktype)
+fun defTName(d: def): tName
+  TName(d.name, d.ktype)
 
 fun defsTNames(defs: list<def>): list<tName>
   defs.map(defTName)
@@ -471,7 +471,7 @@ fun defsTNames(defs: list<def>): list<tName>
 fun defGroupTNames(dg: defGroup): list<tName>
   match dg
     DefRec(defs) -> defsTNames(defs)
-    DefNonRec(def) -> [defTName(def)]
+    DefNonRec(d) -> [defTName(d)]
 
 fun defGroupsTNames(dgs: list<defGroup>): list<tName>
   dgs.map(defGroupTNames).concat()
@@ -580,7 +580,7 @@ fun cost(dg: defGroup): div int
 
 fun cost(expr: expr): div int
   match expr
-    Var(tname) | tname.getName.isHiddenExternalName -> costInf
+    Var(tn) | tn.getName.isHiddenExternalName -> costInf
     Lam(_, _, b) -> 0 + b.cost
     Var -> 0
     App(e, args) -> 1 + e.cost + args.map(cost).sum
@@ -746,27 +746,27 @@ fun makeSizeT(i: int)
 fun typeOf(d: def): ktype
   d.ktype
 
-fun typeOf(tname: tName): ktype
-  tname.tNameType
+fun typeOf(tn: tName): ktype
+  tn.tNameType
 
 fun typeOf(expr: expr): pure ktype
   match expr
     Lam(pars, eff, expr) -> TFun(pars.map(fn((TName(name, tp))) (name, tp)), eff, expr.typeOf)
-    Var(tname) -> typeOf(tname)
-    Con(tname) -> typeOf(tname)
+    Var(tn) -> typeOf(tn)
+    Con(tn) -> typeOf(tn)
     App(f, args) -> match f.typeOf.splitFunScheme
       Just((_, _, targs, eff, tres)) 
         | args.length == targs.length || targs.length == 0 -> tres
         | args.length > targs.length -> typeOf(App(Var(TName("tmp".newName, tres), InfoNone), args.drop(targs.length)))
         | True -> TFun(targs.drop(args.length), eff, tres)
       _ -> throw("core/core typeOf(App..) Expected function TODO: Show real type")
-    TypeLam(xs, expr) -> TForAll(xs, [], expr.typeOf)
-    TypeApp(expr, []) -> expr.typeOf
+    TypeLam(xs, e) -> TForAll(xs, [], e.typeOf)
+    TypeApp(e, []) -> e.typeOf
     // TypeApp(expr, tps) ->
     //   val (tvs, tp1) = expr.typeOf.splitTForall
     //   tvs.zip(tps).subNew(tp1)
     ELit(l) -> l.typeOf
-    Let(_, expr) -> expr.typeOf
+    Let(_, e) -> e.typeOf
     Case(_, branches) -> branches.head.unjust.typeOf
 
 fun typeOf(Branch(_, guards): branch): pure ktype
@@ -842,12 +842,12 @@ fun dep(d: def): div deps
 
 fun dep(e: expr): div deps
   match e
-    Var(tname) -> tname.dep
+    Var(tn) -> tn.dep
     Lam(_, eff, body) -> eff.dep + body.dep
     App(e, args) -> depsUnions(Cons(e.dep, args.map(dep)))
     TypeLam(_, body) -> body.dep
     TypeApp(e, tps) -> e.dep + depsUnions(tps.map(dep))
-    Con(tname) -> tname.dep
+    Con(tn) -> tn.dep
     ELit(_) -> namesEmpty
     Let(defs, body) -> depsUnions(Cons(body.dep, defs.flatten.map(dep)))
     Case(exprs, branches) -> depsUnions(exprs.map(dep) ++ branches.map(dep))
@@ -860,6 +860,6 @@ fun dep(g: guard): div deps
 
 fun dep(p: pattern): div deps
   match p
-    PatCon(tname, pats) -> tname.dep + depsUnions(pats.map(dep))
+    PatCon(tn, pats) -> tn.dep + depsUnions(pats.map(dep))
     PatVar(_, p) -> p.dep
     _ -> namesEmpty

@@ -17,7 +17,7 @@ fun freeVars(l: list<expr>): pure linearSet<tName>
 fun freeVars(expr: expr): pure linearSet<tName>
   match expr
     Lam(tnames, _, e) -> e.freeVars - tnames
-    Var(tname) -> tnamesEmpty + tname
+    Var(tn) -> tnamesEmpty + tn
     App(e1, e2) -> e1.freeVars + e2.freeVars
     TypeLam(_, e) -> e.freeVars
     TypeApp(e) -> e.freeVars
@@ -35,7 +35,7 @@ fun freeVars(Guard(test, expr): guard): pure linearSet<tName>
 fun boundVars(p: pattern): pure linearSet<tName>
   match p
     PatCon(_, args) -> args.map(boundVars).unions
-    PatVar(tname) -> tnamesEmpty + tname
+    PatVar(tn) -> tnamesEmpty + tn
     PatLit -> tnamesEmpty
     PatWild -> tnamesEmpty
 

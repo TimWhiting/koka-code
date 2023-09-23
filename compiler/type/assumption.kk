@@ -171,16 +171,16 @@ fun extractTypeDef(isValue: (dataInfo -> bool), updateVis, td: typeDef)
     Data(dataInfo, _) -> zip(dataInfo.constrs, dataInfo.dataRepr(isValue).snd).map(extractConInfo).gammaUnions
     _ -> assumption/empty
 
-fun extractDefGroup(def, updateVis)
-  match def
+fun extractDefGroup(d: defGroup, updateVis)
+  match d
     DefRec(defs) -> defs.map(fn(v) extractDef(v, updateVis)).gammaUnions
     DefNonRec(v) -> extractDef(v, updateVis)
 
-fun extractDef(def: def, updateVis)
-  single(def.name.nonCanonicalName, createNameInfoX(updateVis(def.vis), def.name, def.sort, def.nameRange, def.ktype))
+fun extractDef(d: def, updateVis)
+  single(d.name.nonCanonicalName, createNameInfoX(updateVis(d.vis), d.name, d.sort, d.nameRange, d.ktype))
 
-fun coreDefInfo(def: def)
-  (def.name.nonCanonicalName, createNameInfoX(def.vis, def.name, if def.sort.is-defFun && !def.isTopLevel then DefVal else def.sort, def.nameRange, def.ktype))
+fun coreDefInfo(d: def)
+  (d.name.nonCanonicalName, createNameInfoX(d.vis, d.name, if d.sort.is-defFun && !d.isTopLevel then DefVal else d.sort, d.nameRange, d.ktype))
 
 fun createNameInfoX(vis, name, sort, rng, tp)
   match sort

@@ -87,25 +87,25 @@ alias typeDefGroups<t,k> = list<typeDefGroup<t,k>>;
 
 value type typeDefGroup<t,k>
   TypeDefRec(defs: list<typeDef<t,t,k>>)
-  TypeDefNonRec(def: typeDef<t,t,k>)
+  TypeDefNonRec(tdef: typeDef<t,t,k>)
 
 fun show(t: typeDefGroup<t,k>, showT: (t) -> div string, showK: (k) -> div string): div string
   match t
     TypeDefRec(defs) -> "TypeDefRec " ++ defs.show-list(fn(t') t'.show(showT, showT, showK))
-    TypeDefNonRec(def) -> "TypeDefNonRec " ++ def.show(showT, showT, showK)
+    TypeDefNonRec(d) -> "TypeDefNonRec " ++ d.show(showT, showT, showK)
 
 type typeDef<t,u,k>
   Synonym(binder: typeBinder<k>, params: list<typeBinder<k>>, synonym: t, range: range, vis: visibility, doc: string)
-  DataType(binder: typeBinder<k>, params: list<typeBinder<k>>, constrs: list<userCon<t,u,k>>, range: range, vis: visibility, sort: dataKind, def: dataDef, isExtend: bool, doc: string)
+  DataType(binder: typeBinder<k>, params: list<typeBinder<k>>, constrs: list<userCon<t,u,k>>, range: range, vis: visibility, sort: dataKind, ddef: dataDef, isExtend: bool, doc: string)
 
 fun show(td: typeDef<t,u,k>, showT: (t) -> div string, showU: (u) -> div string, showK: (k) -> div string): div string
   match td
     Synonym(binder, params, synonym, range, vis, doc) -> "Synonym " ++ binder.show(showK) ++ " " ++ params.show-list(fn(b) b.show(showK)) ++ " " ++ synonym.showT ++ " " ++ range.showFullRange ++ " " ++ vis.show ++ " " ++ doc.show
-    DataType(binder, params, constrs, range, vis, sort, def, isExtend, doc) -> 
+    DataType(binder, params, constrs, range, vis, sort, ddef, isExtend, doc) -> 
       "DataType " ++ binder.show(showK) ++ " " ++ 
       params.show-list(fn(b) b.show(fn(k) k.showK)) ++ " " ++ 
       constrs.show-list(fn(c) c.show(showT, showU, showK)) ++ " " ++ 
-      range.showFullRange ++ " " ++ vis.show ++ " " ++ sort.show ++ " " ++ def.show ++ " " ++ isExtend.show ++ " " ++ doc.show
+      range.showFullRange ++ " " ++ vis.show ++ " " ++ sort.show ++ " " ++ ddef.show ++ " " ++ isExtend.show ++ " " ++ doc.show
 
 struct typeBinder<k>
   name: name
@@ -133,12 +133,12 @@ alias defGroups<t> = list<defGroup<t>>;
   
 type defGroup<t>
   DefRec(defs: list<def<t>>)
-  DefNonRec(def: def<t>)
+  DefNonRec(d: def<t>)
 
 fun show(d: defGroup<t>, showT: (t) -> e string): e string
   match d
     DefRec(defs) -> "DefRec " ++ defs.show-list(fn(d') d'.show(showT))
-    DefNonRec(def) -> "DefNonRec " ++ def.show(showT)
+    DefNonRec(d) -> "DefNonRec " ++ d.show(showT)
 
 alias defs<t> = list<def<t>>;
 
@@ -172,8 +172,8 @@ val guardTrue = Var(nameTrue, False, rangeNull)
 
 type expr<t>
   Lam(binder: list<valueBinder<maybe<t>,maybe<expr<t>>>>, e: expr<t>, range: range)
-  Let(def: defGroup<t>, e: expr<t>, range: range)
-  Bind(def: def<t>, e: expr<t>, range: range)
+  Let(d: defGroup<t>, e: expr<t>, range: range)
+  Bind(d: def<t>, e: expr<t>, range: range)
   App(e: expr<t>, args: list<(maybe<(name, range)>, expr<t>)>, range: range)
   Var(name: name, isOp: bool, range: range)
   Literal(l: lit, range: range = l.range)

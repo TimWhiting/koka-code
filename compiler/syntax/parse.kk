@@ -84,15 +84,6 @@ fun pImportDecl(): <ast> kimport
   val (asname, name, rng) = pImportAlias()
   Kimport(asname, name, Range(vrng.start, rng.end), vis)
 
-fun pImportAlias()
-  val (name1, rng1) = pModulePath()
-  val r = maybe("import alias")
-    pKeyword("=")
-    pModulePath()
-  match r
-    Just((name2, rng2)) -> (name1, name2, rng2)
-    Nothing -> (name1, name1, rng1)
-
 fun pVisibility(vis=Private)
   choices("visibility", [{
     val rng = pKeyword("pub", ["public"])
@@ -388,9 +379,6 @@ fun pConBinder(dvis: visibility)
   val (name, rng, tp) = pParamType()
   val (opt, drng) = pDefaultExpr()
   (vis, ValueBinder(name, tp, opt, rng, vrng.combine(rng).combine(tp.range).combine(drng)))
-
-fun pConstructorId()
-  choices("constructor", [pTTuple, pTList, pConId])
 
 alias param = (visibility, valueBinder<userType, maybe<userExpr>>);
 
@@ -799,7 +787,7 @@ fun pDefaultExpr()
 
 fun anyStatVar(l: list<statement>): maybe<userDef>
   match l
-    Cons(StatVar(def), _) -> Just(def)
+    Cons(StatVar(def'), _) -> Just(def')
     Cons(_, tl) -> tl.anyStatVar
     Nil -> Nothing
 
@@ -809,11 +797,11 @@ fun combine(e1: statement, e2: userExpr)
     StatExpr(e) ->
       val r = e.range
       Bind(Def(ValueBinder("_".newName, (), e, r, r), r, Private, DefVal, InlineAuto, ""), e2, r)
-    StatVar(def) ->
-      val ValueBinder(name, (), expr, nameRng, rng) = def.binder
+    StatVar(def') ->
+      val ValueBinder(name, (), expr, nameRng, rng) = def'.binder
       App(Var(nameLocal, False, rng), 
        [(Nothing, expr), 
-        (Nothing, Parens(Lam([ValueBinder(name, Nothing, Nothing, nameRng, nameRng)], e2, range/combine(def.range,e2.range)), name, rng))],
+        (Nothing, Parens(Lam([ValueBinder(name, Nothing, Nothing, nameRng, nameRng)], e2, range/combine(def'.range,e2.range)), name, rng))],
        range/combine(rng, e2.range))
 
 fun localScope(vdef: userDef, exp: userExpr): userExpr
@@ -1425,20 +1413,6 @@ fun pBinder(pre: range)
   val ann = pTypeAnnotation()
   fn(e) ValueBinder(name, (), ann(e), range, pre.combine(range))
 
-fun pFunId()
-  choicesnb("function id", [
-    {pIdentifier()},
-    {
-      val rng1 = pSpecialId("[")
-      val rng2 = pSpecialId("]")
-      (nameIndex, Range(rng1.start, rng2.end))
-    },
-    {
-      val (s, rng) = pStringLit()
-      (newName(s), rng)
-    }
-    ])
-
 inline fun pPattern(): <ast> userPattern
   pPatAnn()
 
@@ -1701,33 +1675,6 @@ fun makeEffectExtend(rng: range, label: kUserType<k>, ext: kUserType<k>, rK: (k)
 fun pTBinderDef()
   val (id, rng) = pTBinderId()
   fn(k) TypeBinder(id, k, rng, rng)
-
-fun pTBinderId()
-  choicesnb("", [pTypeId, pTList, pTTuple, pTEmptyOrExtend])
-
-fun pTList(): <ast> (name, range)
-  val rng1 = pSpecial("[")
-  val rng2 = pSpecial("]")
-  (nameTpList.unqualify, rng1.combine(rng2))
-
-fun pTTuple(): <ast> (name, range)
-  val rng1 = pLparen()
-  val cs = pmany("comma", pComma)
-  val rng2 = pRparen()
-  (nameTuple(cs.length + 1).unqualify, rng1.combine(rng2))
-
-fun pTEmptyOrExtend()
-  val rng1 = pLangle()
-  choicesnb("", [
-    {
-      pBar()
-      val rng2 = pRangle()
-      (nameEffectEmpty, rng1.combine(rng2))
-    },{
-      val rng2 = pRangle()
-      (nameEffectEmpty, rng1.combine(rng2))
-    }
-  ])
 
 fun pTBinders()
   pSepBy("type binder", pTBinder, pComma)

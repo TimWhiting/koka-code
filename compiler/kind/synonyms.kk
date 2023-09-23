@@ -46,13 +46,13 @@ fun single(name: name, s: synInfo): name-map<synInfo>
   linearMap([(name, s)], (==), eqS, show, showS)
 val empty:name-map<synInfo> = linearMap([], fn(n1: name, n2: name) n1 == n2, eqS, show, showS)
 
-fun extractNewtypes(c: core): <pure,compFlags> name-map<synInfo>
+fun extractSynonyms(c: core): <pure,compFlags> name-map<synInfo>
   c.typeDefs.map(extractTypeDefGroup).unions
 
 fun extractTypeDefGroup(g: typeDefGroup): <pure,compFlags> name-map<synInfo>
-  g.map(extractTypeDef).unions
+  g.map(extractSynonyms).unions
 
-fun extractTypeDef(d: typeDef): <pure,compFlags> name-map<synInfo>
+fun extractSynonyms(d: typeDef): <pure,compFlags> name-map<synInfo>
   match d
     Synonym(synInfo) -> single(synInfo.name, synInfo)
     _ -> empty

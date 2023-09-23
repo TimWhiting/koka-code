@@ -74,8 +74,8 @@ fun insertSome((i, (name, eitherTp)): (int, (name, either<userType, range>)))
   match eitherTp
     Left(t) -> ([], (name, t))
     Right(r) ->
-      val tname = i.newImplicitTypeVarName
-      ([tname], (name, TpVar(tname, r)))
+      val tn = i.newImplicitTypeVarName
+      ([tn], (name, TpVar(tn, r)))
 
 fun isSomeVar(n: name)
   n.isWildcard

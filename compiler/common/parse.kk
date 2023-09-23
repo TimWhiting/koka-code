@@ -284,6 +284,45 @@ fun pLcurly()
 fun pRcurly()
   parseRange("}", fn(x) x.lex.is-rcurly)
 
+fun pTBinderId()
+  choicesnb("", [pTypeId, pTList, pTTuple, pTEmptyOrExtend])
+
+fun pTEmptyOrExtend()
+  val rng1 = pLangle()
+  choicesnb("", [
+    {
+      pBar()
+      val rng2 = pRangle()
+      (nameEffectEmpty, rng1.combine(rng2))
+    },{
+      val rng2 = pRangle()
+      (nameEffectEmpty, rng1.combine(rng2))
+    }
+  ])
+
+fun pConstructorId()
+  choices("constructor", [pTTuple, pTList, pConId])
+
+fun pTList(): <ast> (name, range)
+  val rng1 = pSpecial("[")
+  val rng2 = pSpecial("]")
+  (nameTpList.unqualify, rng1.combine(rng2))
+
+fun pTTuple(): <ast> (name, range)
+  val rng1 = pLparen()
+  val cs = pmany("comma", pComma)
+  val rng2 = pRparen()
+  (nameTuple(cs.length + 1).unqualify, rng1.combine(rng2))
+
+fun pImportAlias()
+  val (name1, rng1) = pModulePath()
+  val r = maybe("import alias")
+    pKeyword("=")
+    pModulePath()
+  match r
+    Just((name2, rng2)) -> (name1, name2, rng2)
+    Nothing -> (name1, name1, rng1)
+
 fun pParamId()
   choices("param id", [pIdentifier, pWildcard])
 
@@ -337,6 +376,20 @@ inline fun pQConstructor()
 
 inline fun pQOperator()
   pQOp()
+
+fun pFunId()
+  choicesnb("function id", [
+    {pIdentifier()},
+    {
+      val rng1 = pSpecialId("[")
+      val rng2 = pSpecialId("]")
+      (nameIndex, Range(rng1.start, rng2.end))
+    },
+    {
+      val (s, rng) = pStringLit()
+      (newName(s), rng)
+    }
+    ])
 
 fun pVarId()
   ensureUnqualified("variable id", pQVarId)

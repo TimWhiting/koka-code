@@ -407,19 +407,19 @@ fun pPattern()
   maybe("as", {pKeyword("as"); pPatVar(pat)}).default(pat)
 
 fun pPatternBasic()
-  choices("pattern", [pPatCon, pPatVar, pPatLit, pPatWild, {parens(pPattern).fst}])
+  choices("pattern", [pPatCon, {pPatVar(PatWild)}, pPatLit, pPatWild, {parens(pPattern).fst}])
 
 fun pPatCon()
   val skip = maybe(".skip", {pSpecialId(".skip")}).is-just
   val cname = pQualifiedConId()
   val exists0 = pTypeParams()
-  val args = {pLparen(); val x = pPatternArgs0(); pRparen(); x}
+  val args = try("", {pLparen(); val x = pPatternArgs0(); pRparen(); x})
   val (patArgs, argTypes) = args.unzip
   val resTp = pTypeAnnot()
   val InfoCon(_, typ, repr, cons) = envLookupCon(cname)
   PatCon(TName(cname, typ), patArgs, repr, argTypes, exists0, resTp, cons, skip)
 
-fun pPatternArgs0()
+fun pPatternArgs0(): <ast,eenv,compFlags,synonyms> list<(pattern, ktype)>
   maybe("", {pPatternArgs1()}).default([])
 
 fun pPatternArgs1()
@@ -458,9 +458,9 @@ fun pQualifiedConId()
   ])
 
 fun pParameters()
-  val iparams = maybe("", {parenCommas({pParameter(False)})}).default([])
-  val (params, pinfos) = iparams.unzip
-  params.map(envExtendLocal)
+  val iparams = maybe("", {parensCommas({pParameter(False)}).fst}).default([])
+  val (params, _) = iparams.unzip
+  params.map(fn((n, t)) envExtendLocal(n, t))
   params
 
 fun pParameter(allowBorrow: bool)
@@ -519,7 +519,7 @@ fun pKindAnnotFull()
 fun pKindAnnot()
   maybe("", {pSpecialOp("::"); pKind()}).default(kindStar)
 
-fun pType(): <ast,eenv,compFlags> ktype
+fun pType(): <ast,eenv,compFlags,synonyms> ktype
   pTypeX(False).fst
 
 fun pDefType()
@@ -539,7 +539,7 @@ fun pTForall()
 fun pQualifier()
   maybe("", {pKeyword("with"); pmany1("", pPredicate)}).default([])
 
-fun pPredicate(): <ast,eenv,compFlags> pred
+fun pPredicate(): <ast,eenv,compFlags,synonyms> pred
   try("predicate") 
     val (name, _) = pQVarId()
     val tps = maybe("", {angles({pSepBy("", pType, pComma)}).fst}).default([])
@@ -569,7 +569,7 @@ fun pTResult(params)
     Just(tp) -> tp
     Nothing -> TFun(params, typeTotal, tp1)
 
-fun pTAtom(): <ast,eenv,compFlags> ktype
+fun pTAtom(): <ast,eenv,compFlags,synonyms> ktype
   val etp = pTAtomParamsEx(False, False)
   match etp
     Left((params, _)) -> pTypeApp(extract(params, "expecting single type"))
@@ -616,7 +616,7 @@ fun pTypeApp(tp)
   val tps = maybe("", {angles({pSepBy("", pType, pComma)}).fst}).default([])
   pSynonym(tp, tps)
 
-fun pSynonym(tp, tps)
+fun pSynonym(tp, tps): <ast,eenv,compFlags,synonyms> ktype
   val res = maybe("Env")
     pSpecialOp("==")
     val rank = maybe("", {pInteger().fst}).default(0)
@@ -640,13 +640,13 @@ fun pTEffect()
   pRangle()
   labels.foldr(ext, shallowEffectExtend)
 
-fun pTExtend(): <ast,eenv,compFlags> ktype
+fun pTExtend(): <ast,eenv,compFlags,synonyms> ktype
   maybe("", {pBar(); pTAtom()}).default(effectEmpty)
 
 fun pTLabel()
   pTypeApp(pTAtom())
 
-fun pTId(): <ast,eenv,compFlags> ktype
+fun pTId(): <ast,eenv,compFlags,synonyms> ktype
   val (name, _) = choices("", [pQVarId, pQIdOp, pWildcard])
   val kind = maybe("", pKindAnnotFull).default(kindStar)
   envType(name, kind)

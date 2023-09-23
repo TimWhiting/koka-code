@@ -308,7 +308,7 @@ fun pBody()
   e
 
 fun pExpr()
-  choice("expr", [pFun, pForall, pMatch, pLet, pApp])
+  choices("expr", [pFun, pForall, pMatch, pLet, pApp])
 
 fun pApp()
   val expr = pAtom()

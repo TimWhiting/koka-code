@@ -457,7 +457,7 @@ fun shallowExtractEffectExtend(t: tau): (list<tau>, tau)
       (Cons(l, ls), tl)
     _ -> ([], t)
 
-fun shallowEffextExtend(label: tau, eff: tau): pure tau
+fun shallowEffectExtend(label: tau, eff: tau): pure tau
   // We do not expand type synonyms in the label here by using the 'shallow' version of extract
   // this means that type synonyms of kind E (ie. a fixed effect row) could stay around in
   // the label (which should have kind X).

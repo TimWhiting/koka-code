@@ -35,7 +35,7 @@ fun next(): ast lexeme
     Nothing -> astError("unexpected end of file", rangeNull)
 
 alias ast = <astParse, astError, pure, fsys>
-fun lexParse(insSemi: bool, preprocess: list<lexeme> -> list<lexeme>, p: () -> <console,ast> a, sourceName: string, input: string): <console,astError,fsys,pure|e> a
+fun lexParse(insSemi: bool, preprocess: list<lexeme> -> list<lexeme>, p: () -> <console,ast|e> a, sourceName: string, input: string): <console,astError,fsys,pure|e> a
   val src = Source(sourceName, input)
   val lexes = lex(src, 0, input)
   var lexemes := preprocess(layout(insSemi, lexes))
@@ -96,17 +96,17 @@ fun lexParse(insSemi: bool, preprocess: list<lexeme> -> list<lexeme>, p: () -> <
   mask<local>{p()}
 
 
-fun pmany(kind: string, l: () -> <ast> a): <ast> list<a>
+fun pmany(kind: string, l: () -> <ast|e> a): <ast|e> list<a>
   match maybe("many " ++ kind, l)
     Just(r) -> Cons(r, pmany(kind, l))
     Nothing -> Nil
 
-fun pmany1(kind: string, l: () -> <ast> a): <ast> list<a>
+fun pmany1(kind: string, l: () -> <ast|e> a): <ast|e> list<a>
   match maybe("many " ++ kind, l)
     Just(r) -> Cons(r, pmany(kind, l))
     Nothing -> astError("at least 1 of " ++ kind, peek().range)
 
-fun pmanyend(kind: string, l: () -> <ast> a, p: () -> <ast> b): <ast> list<a>
+fun pmanyend(kind: string, l: () -> <ast|e> a, p: () -> <ast|e> b): <ast|e> list<a>
   match maybe("many " ++ kind, l)
     Just(r) -> 
       match maybe("sep " ++ kind, p)
@@ -114,13 +114,13 @@ fun pmanyend(kind: string, l: () -> <ast> a, p: () -> <ast> b): <ast> list<a>
         Nothing -> Cons(r, Nil)
     Nothing -> Nil
 
-fun pmanyend1(kind: string, l: () -> <ast> a, p: () -> <ast> b): <ast> list<a>
+fun pmanyend1(kind: string, l: () -> <ast|e> a, p: () -> <ast|e> b): <ast|e> list<a>
   match maybe("many " ++ kind, l)
     Just(r) -> 
       match maybe("sep " ++ kind, p)
         Just(_) -> Cons(r, pmanyend(kind, l, p))
 
-fun token(msg: string, f: (lexeme) -> <ast> maybe<a>): <ast> a
+fun token(msg: string, f: (lexeme) -> <ast|e> maybe<a>): <ast|e> a
   val t = peek()
   match f(t) 
     Just(a) -> 
@@ -131,7 +131,7 @@ fun token(msg: string, f: (lexeme) -> <ast> maybe<a>): <ast> a
       astError("expecting " ++ msg, peek().range)
 
 // Version of maybe that does backtrack
-fun maybe(str: string, p: () -> <ast> a): <ast> maybe<a>
+fun maybe(str: string, p: () -> <ast|e> a): <ast|e> maybe<a>
   with override
     return(r) 
       Just(r)
@@ -143,12 +143,12 @@ fun maybe(str: string, p: () -> <ast> a): <ast> maybe<a>
   commit()
   x
 
-fun maybeList(p: () -> <ast> list<a>): <ast> list<a>
+fun maybeList(p: () -> <ast|e> list<a>): <ast|e> list<a>
   match maybe("list", p)
     Just(r) -> r
     Nothing -> []
 
-fun try(str: string, p: () -> <ast> a): <ast> a
+fun try(str: string, p: () -> <ast|e> a): <ast|e> a
   with override
     return(r) r
     final ctl astError(e, r) 
@@ -160,7 +160,7 @@ fun try(str: string, p: () -> <ast> a): <ast> a
   x
 
 // Version of maybe that doesn't backtrack
-fun optionMaybe(str: string, p: () -> <ast> a): <ast> maybe<a>
+fun optionMaybe(str: string, p: () -> <ast|e> a): <ast|e> maybe<a>
   with override
     return(r) 
       Just(r)
@@ -172,8 +172,8 @@ fun optionMaybe(str: string, p: () -> <ast> a): <ast> maybe<a>
   pdelimit(str)
   p()
 
-fun choicesnb(str: string, ps: list<() -> <ast> a>): <ast> a
-  fun find(ps': list<() -> <ast> a>): <ast> a
+fun choicesnb(str: string, ps: list<() -> <ast|e> a>): <ast|e> a
+  fun find(ps': list<() -> <ast|e> a>): <ast|e> a
     match ps'
       Cons(p, rst) -> 
         match optionMaybe(str, p)
@@ -190,7 +190,7 @@ fun choicesnb(str: string, ps: list<() -> <ast> a>): <ast> a
   x
 
 // TODO: Add a choices with default, which will never backtrack?
-fun choices(str: string, ps: list<() -> <ast> a>): <ast> a
+fun choices(str: string, ps: list<() -> <ast|e> a>): <ast|e> a
   match ps.find-maybe(fn(p) maybe(str, p)) // TODO Capture error from below for better error message expected one of...
     Just(r) -> r
     Nothing -> astError("expected " ++ str, peek().range)
@@ -241,7 +241,7 @@ fun parensCommas(p)
   parens
     pSepBy("comma", p, pComma)
 
-fun parseRange(msg: string, f: (lexeme) -> <ast> bool): <ast> range
+fun parseRange(msg: string, f: (lexeme) -> <ast|e> bool): <ast|e> range
   token(msg, fn(x) if f(x) then Just(x) else Nothing).range
 
 inline fun pLapp()
@@ -283,6 +283,15 @@ fun pLcurly()
 
 fun pRcurly()
   parseRange("}", fn(x) x.lex.is-rcurly)
+
+fun pParamId()
+  choices("param id", [pIdentifier, pWildcard])
+
+fun pParamInfo()
+  choices("param info", [{
+    pSpecialOp("^")
+    Borrow
+  }, {Own}])
 
 fun pIdentifier()
   ensureUnqualified("identifier", pQIdentifier)

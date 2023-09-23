@@ -314,11 +314,11 @@ fun pApp()
   fun parseApplies(e)
     choices("app", [
       {
-        val args = parensCommas(pExpr)
+        val args = parensCommas(pExpr).fst
         parseApplies(App(e, args))
       },
       {
-        val tps = angles({pSepBy("", pType, pComma)})
+        val tps = angles({pSepBy("", pType, pComma)}).fst
         parseApplies(TypeApp(e, tps))
       },
       {e}
@@ -326,7 +326,7 @@ fun pApp()
   parseApplies(expr)
 
 fun pAtom()
-  choices("atom", [pCon, pVar, {ELit(pLit())}, {parens(pExpr)}])
+  choices("atom", [pCon, pVar, {ELit(pLit())}, {parens(pExpr).fst}])
 
 fun pLet()
   val dgs = pDefGroups()
@@ -339,14 +339,14 @@ fun pForall()
 
 fun pFun()
   pKeyword("fn")
-  val eff = maybe("", angles(pType)).default(typeTotal)
+  val eff = maybe("", {angles(pType).fst}).default(typeTotal)
   val params = pParameters()
   val body = semiBraces("body", pExpr)
   Lam(params.map(fn((n, t)) TName(n, t)), eff, body)
 
 fun pMatch()
   pKeyword("match")
-  val args = parensCommas(pExpr)
+  val args = parensCommas(pExpr).fst
   val branches = semiBraces("", pBranch)
   Case(args, branches)
 
@@ -389,7 +389,7 @@ fun pDefGroup()
 
 fun pBranch()
   val patts = pPatterns1()
-  val guards = pmany1(pGuard)
+  val guards = pmany1("", pGuard)
   Branch(patts, guards)
 
 fun pPatterns1()
@@ -406,7 +406,7 @@ fun pPattern()
   maybe("as", {pKeyword("as"); pPatVar(pat)}).default(pat)
 
 fun pPatternBasic()
-  choices("pattern", [pPatCon, pPatVar, pPatLit, pPatWild, {parens(pPattern)}])
+  choices("pattern", [pPatCon, pPatVar, pPatLit, pPatWild, {parens(pPattern).fst}])
 
 fun pPatCon()
   val skip = maybe(".skip", {pSpecialId(".skip")}).is-just
@@ -491,15 +491,14 @@ fun pTypeParams()
   maybe("", pTypeParams1).default([])
 
 fun pTypeParams1()
-  angles
-    pTBinders()
+  angles(pTBinders).fst
 
 fun pTBinders()
   val bs = pSepBy("quantifiers", pTBinder, pComma)
   bs.map fn((name, kind)) 
     match envType(name, kind)
       TVar(tv) -> tv
-      _ -> error("core/parse pTBinders: expecting type variable")
+      _ -> fail("core/parse pTBinders: expecting type variable")
 
 fun pTBinder()
   choices("quantifier", [
@@ -509,7 +508,7 @@ fun pTBinder()
       (id, kind)
     },
     {
-      parens(pTBinder)
+      parens(pTBinder).fst
     }
   ])
 
@@ -528,25 +527,25 @@ fun pDefType()
 
 fun pTypeX(allowBorrow: bool)
   try("type")
-    val quantify = pForall()
+    val quantify = pTForall()
     val (tp, pinfos) = pTArrow(allowBorrow)
     val preds = pQualifier()
     (quantify(preds, tp), pinfos)
 
-fun pForall()
+fun pTForall()
   maybe("", {pKeyword("forall"); val params = pTypeParams1(); fn(ps, rho) TForAll(params, ps, rho)}).default(fn(ps, rho) if ps.is-nil then rho else TForAll([], ps, rho))
 
 fun pQualifier()
-  maybe("", {pKeyword("with"); pmany1(pPredicate)}).default([])
+  maybe("", {pKeyword("with"); pmany1("", pPredicate)}).default([])
 
 fun pPredicate()
   try("predicate") 
     val (name, _) = pQVarId()
-    val tps = maybe("", angles("", pSepBy("", pType, pComma))).default([])
+    val tps = maybe("", {angles({pSepBy("", pType, pComma)}).fst}).default([])
     PredIFace(envQualify(name), tps)  
 
 fun pTArrow(allowBorrow: bool)
-  val etp = pTAtom(allowBorrow)
+  val etp = pTAtomParams(allowBorrow)
   match etp
     Left((params, pinfos)) ->
       choices("", [
@@ -613,13 +612,13 @@ fun pTAtomParamsEx(allowParams: bool, allowBorrow: bool)
   ])
 
 fun pTypeApp(tp)
-  val tps = maybe("", angles({pSepBy("", pType, pComma)})).default([])
+  val tps = maybe("", {angles({pSepBy("", pType, pComma)}).fst}).default([])
   pSynonym(tp, tps)
 
 fun pSynonym(tp, tps)
   val res = maybe("Env")
     pSpecialOp("==")
-    val (rank, _) = maybe("", pInteger).default((0, rangeNull))
+    val rank = maybe("", {pInteger().fst}).default(0)
     val body = pType()
     match tp
       TCon(TypeCon(name, kind)) ->
@@ -653,13 +652,13 @@ fun pTId()
 
 fun pKind()
   choices("kind", [
-    {val params = parensCommas("", pKind); pKeyword("->"); val res = pKind(); params.foldr(res, kindFun)},
+    {val params = parensCommas(pKind).fst; pKeyword("->"); val res = pKind(); params.foldr(res, kindFun)},
     {val k = pKatom(); choices("", [{pKeyword("->"); val res = pKind(); kindFun(k, res)}, {k}])}
   ])
 
 fun pKatom()
   choices("kind", [
-    {parens(pKind)},
+    {parens(pKind).fst},
     {pSpecialConId("V"); kindStar},
     {pSpecialConId("X"); kindLabel},
     {pSpecialConId("E"); kindEffect},

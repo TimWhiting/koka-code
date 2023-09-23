@@ -628,15 +628,6 @@ fun pDeclParams(allowBorrow: bool, allowDefaults: bool)
   val (pars, pinfos) = ipars.unzip
   (pars, pinfos, rng)
 
-fun pParamInfo()
-  choices("param info", [{
-    pSpecialOp("^")
-    Borrow
-  }, {Own}])
-
-fun makeOptional(tp: userType)
-  TpApp(TpCon(nameTpOptional, tp.range), [tp], tp.range)
-
 fun operationDecl(opCount, vis, forallsScoped:list<userTypeBinder>, forallsNonScoped, docEffect, hndName, effName, mbInstanceUmb:maybe<list<userType>>, effTp, hndTp, hndTpVars, extraEffects, (opIndex, op))
   val foralls = forallsScoped ++ forallsNonScoped
   val OpDecl(_doc, id, _kwrng, idrng, _lin, sort, exists0, pars, _prng, _mbTeff, tRes) = op
@@ -800,8 +791,8 @@ fun pParameter(allowBorrow: bool, allowDefaults: bool)
           _ -> astError("Syntax.Parse.parameter: unexpected function expression in parameter match transform", rng)
       (binder(name, rng), pinfo, transform)
 
-fun pParamId()
-  choices("param id", [pIdentifier, pWildcard])
+fun makeOptional(tp: userType)
+  TpApp(TpCon(nameTpOptional, tp.range), [tp], tp.range)
 
 fun pDefaultExpr()
   maybe("default", {val krng = pKeyword("="); val e = pExpr(); (Just(e), krng.combine(e.range))}).default((Nothing, rangeNull))

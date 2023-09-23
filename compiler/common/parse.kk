@@ -287,6 +287,39 @@ fun pRcurly()
 fun pIdentifier()
   ensureUnqualified("identifier", pQIdentifier)
 
+fun pFipAlloc()
+  parens
+    choices("alloc", [
+      { val (i, _) = pInteger(); AllocAtMost(i) },
+      { val _ = pSpecialId("n"); AllocFinitely },
+      { AllocAtMost(0) }
+    ])
+
+fun pFip()
+  val isTail = choices("tail", [{pSpecialId("tail"); True}, {False}])
+  choices("fip", [{
+    val rng = pSpecialId("fip")
+    val (alloc, _) = pFipAlloc()
+    if isTail then
+      addWarning("fip function already implies 'tail'", rng)
+    Fip(alloc)
+    }, 
+    {
+    pSpecialId("fbip")
+    val (alloc, _) = pFipAlloc()
+    Fbip(alloc, isTail)
+    }, 
+    {NoFip(isTail)}])
+
+fun pInline()
+  choicesnb("inline", [{
+    pSpecialId("inline")
+    InlineAlways
+  }, {
+    pSpecialId("noinline")
+    InlineNever
+  }, {InlineAuto}])
+
 inline fun pQIdentifier()
   choices("qidentifier", [pQVarId, pQIdOp])
 

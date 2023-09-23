@@ -104,16 +104,6 @@ fun pVisibility(vis=Private)
     (Private, rng)
   },{(vis, rangeNull)}])
 
-fun pInline()
-  choices("inline", [{
-    pSpecialId("inline")
-    InlineAlways
-  }, {
-    pSpecialId("noinline")
-    InlineNever
-  }, {InlineAuto}])
-
-
 fun typeFromPars(rng:range, pars: list<valueBinder<userType, maybe<userExpr>>>, teff: userType, tres: userType): div userType
   promoteType(TpFun(pars.map(fn(p) (p.name, p.binderType)), teff, tres, rng))
 
@@ -734,30 +724,6 @@ fun pPureDecl(dvis: visibility)
     {val f = pFip(); val (rng, doc) = pDocKeywordFun(); pFunDecl(vrng.combine(rng), doc, vis, inl, f)},
     {pKeyword("fn"); astError("hint: use 'fun' to start a named function definition (and 'fn' for anonymous functions)", peek().range)}
   ])
-
-fun pFipAlloc()
-  parens
-    choices("alloc", [
-      { val (i, _) = pInteger(); AllocAtMost(i) },
-      { val _ = pSpecialId("n"); AllocFinitely },
-      { AllocAtMost(0) }
-    ])
-
-fun pFip()
-  val isTail = choices("tail", [{pSpecialId("tail"); True}, {False}])
-  choices("fip", [{
-    val rng = pSpecialId("fip")
-    val (alloc, _) = pFipAlloc()
-    if isTail then
-      addWarning("fip function already implies 'tail'", rng)
-    Fip(alloc)
-    }, 
-    {
-    pSpecialId("fbip")
-    val (alloc, _) = pFipAlloc()
-    Fbip(alloc, isTail)
-    }, 
-    {NoFip(isTail)}])
 
 fun pFunctionDecl(vrng: range, vis: visibility)
   val inl = pInline()

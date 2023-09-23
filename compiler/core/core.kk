@@ -445,7 +445,7 @@ type pattern
 type lit
   LitInt(i: int)
   LitFloat(d: float64)
-  LitChar(c: char)
+  LitChar(c: string)
   LitString(s: string)
 
 type varInfo

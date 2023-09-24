@@ -72,7 +72,7 @@ fun coreVarInfo(info: nameInfo)
     assumption/InfoExternal(format=f) -> compiler/core/core/InfoExternal(f)
     _ -> throw("type/assumption coreVarInfo")
 
-fun coreExpr(qname: name, info: nameInfo)
+fun coreExpr(info: nameInfo, qname: name)
   match info
     InfoVal(_, cname, tp) -> Var(TName(cname, tp), InfoNone)
     InfoFun(_, cname, tp, (m, n), _) -> Var(TName(cname, tp), InfoArity(m ,n))
@@ -177,10 +177,10 @@ fun extractDefGroup(d: defGroup, updateVis)
     DefNonRec(v) -> extractDef(v, updateVis)
 
 fun extractDef(d: def, updateVis)
-  single(d.name.nonCanonicalName, createNameInfoX(updateVis(d.vis), d.name, d.sort, d.nameRange, d.ktype))
+  single(d.defName.nonCanonicalName, createNameInfoX(updateVis(d.vis), d.defName, d.sort, d.nameRange, d.ktype))
 
 fun coreDefInfo(d: def)
-  (d.name.nonCanonicalName, createNameInfoX(d.vis, d.name, if d.sort.is-defFun && !d.isTopLevel then DefVal else d.sort, d.nameRange, d.ktype))
+  (d.defName.nonCanonicalName, createNameInfoX(d.vis, d.defName, if d.sort.is-defFun && !d.isTopLevel then DefVal else d.sort, d.nameRange, d.ktype))
 
 fun createNameInfoX(vis, name, sort, rng, tp)
   match sort

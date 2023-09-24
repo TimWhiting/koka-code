@@ -1,6 +1,8 @@
 import std/os/path
+import std/os/file
 import newstd/data/linearMap
 import compiler/common/parse
+import compiler/common/id
 import compiler/syntax/lexeme
 import compiler/common/range
 import compiler/common/name
@@ -14,21 +16,23 @@ import compiler/kind/importmap
 import compiler/type/type
 import compiler/type/assumption
 import compiler/platform/config
-import core
+import compiler/core/core
+import compiler/type/typevar
 
 fun parseCore(fname: path)
-  lexParse(False, fn(lexes) lexes.allowDotIds.requalify, pProgram, fname.string, read-text-file(fname))
+  val input = read-text-file(fname)
+  lexParse(False, fn(lexes) lexes.allowDotIds.requalify, {pProgram(Source(fname.string, input))}, fname.string, input)
 
 fun requalify(lexes: list<lexeme>): div list<lexeme>
   match lexes
-    Cons(Lexeme(r1, LexId(mod)), Cons(Lexeme(_, LexOp(slash)), Cons(Lexeme(r2, LexId(name)), lexx)))  | slash.nameId  == "/"
-      -> requalify(Cons(Lexeme(r1.combine(r2), LexId(qualify(newName(mod.showPlain), name))), lexx))
-    Cons(Lexeme(r1, LexId(mod)), Cons(Lexeme(_, LexOp(slash)), Cons(Lexeme(r2, LexIdOp(name)), lexx)))  | slash.nameId  == "/"
-      -> requalify(Cons(Lexeme(r1.combine(r2), LexId(qualify(newName(mod.showPlain), name))), lexx))
-    Cons(Lexeme(r1, LexId(mod)), Cons(Lexeme(_, LexOp(slash)), Cons(Lexeme(r2, LexOp(name)), lexx)))  | slash.nameId  == "/"
-      -> requalify(Cons(Lexeme(r1.combine(r2), LexId(qualify(newName(mod.showPlain), name))), lexx))
-    Cons(Lexeme(r1, LexId(mod)), Cons(Lexeme(_, LexOp(slash)), Cons(Lexeme(r2, LexCons(name)), lexx)))  | slash.nameId  == "/"
-      -> requalify(Cons(Lexeme(r1.combine(r2), LexCons(qualify(newName(mod.showPlain), name))), lexx))
+    Cons(Lexeme(r1, LexId(modName)), Cons(Lexeme(_, LexOp(slash)), Cons(Lexeme(r2, LexId(nm)), lexx)))  | slash.nameId  == "/"
+      -> requalify(Cons(Lexeme(r1.combine(r2), LexId(qualify(newName(modName.showPlain), nm))), lexx))
+    Cons(Lexeme(r1, LexId(modName)), Cons(Lexeme(_, LexOp(slash)), Cons(Lexeme(r2, LexIdOp(nm)), lexx)))  | slash.nameId  == "/"
+      -> requalify(Cons(Lexeme(r1.combine(r2), LexId(qualify(newName(modName.showPlain), nm))), lexx))
+    Cons(Lexeme(r1, LexId(modName)), Cons(Lexeme(_, LexOp(slash)), Cons(Lexeme(r2, LexOp(nm)), lexx)))  | slash.nameId  == "/"
+      -> requalify(Cons(Lexeme(r1.combine(r2), LexId(qualify(newName(modName.showPlain), nm))), lexx))
+    Cons(Lexeme(r1, LexId(modName)), Cons(Lexeme(_, LexOp(slash)), Cons(Lexeme(r2, LexCons(nm)), lexx)))  | slash.nameId  == "/"
+      -> requalify(Cons(Lexeme(r1.combine(r2), LexCons(qualify(newName(modName.showPlain), nm))), lexx))
     Cons(lex, lexx)
       -> Cons(lex, requalify(lexx))
     [] -> []
@@ -36,29 +40,29 @@ fun requalify(lexes: list<lexeme>): div list<lexeme>
 fun allowDotIds(lexes: list<lexeme>): div list<lexeme>
   match lexes
     // Identifier
-    Cons(Lexeme(r1, LexKeyword(".")), Cons(Lexeme(r2, LexId(name)), lexx)) -> allowDotIds(Cons(Lexeme(r1.combine(r2), LexId(prepend(".", name))), lexx))
-    Cons(Lexeme(r1, LexKeyword(".")), Cons(Lexeme(r2, LexWildCard(name)), lexx))
-      -> allowDotIds(Cons(Lexeme(r1.combine(r2),  LexWildCard (".".prepend(name))), lexx))
-    Cons(Lexeme(r1, LexId(name)),Cons(Lexeme(_, LexKeyword(".")), Cons(Lexeme(r3, LexInt(i)), lexx)))
-      -> allowDotIds(Cons(Lexeme(r1.combine(r3), LexId (postpend("." ++ i.show, name))), lexx))
+    Cons(Lexeme(r1, LexKeyword(".")), Cons(Lexeme(r2, LexId(nm)), lexx)) -> allowDotIds(Cons(Lexeme(r1.combine(r2), LexId(prepend(".", nm))), lexx))
+    Cons(Lexeme(r1, LexKeyword(".")), Cons(Lexeme(r2, LexWildCard(nm)), lexx))
+      -> allowDotIds(Cons(Lexeme(r1.combine(r2),  LexWildCard (".".prepend(nm))), lexx))
+    Cons(Lexeme(r1, LexId(nm)),Cons(Lexeme(_, LexKeyword(".")), Cons(Lexeme(r3, LexInt(i)), lexx)))
+      -> allowDotIds(Cons(Lexeme(r1.combine(r3), LexId (postpend("." ++ i.show, nm))), lexx))
     // operator
-    Cons(Lexeme(r1, LexKeyword(".")),Cons(Lexeme(r2, LexOp(name)), lexx))
-      -> allowDotIds(Cons(Lexeme(r1.combine(r2), LexId(".".prepend(name))), lexx))
-    Cons(Lexeme(r1, LexOp(name)),Cons(Lexeme(_, LexKeyword(".")), Cons(Lexeme(r3, LexInt(i)), lexx)))
-      -> allowDotIds(Cons(Lexeme(r1.combine(r3), LexId(postpend("." ++ i.show, name))), lexx))
+    Cons(Lexeme(r1, LexKeyword(".")),Cons(Lexeme(r2, LexOp(nm)), lexx))
+      -> allowDotIds(Cons(Lexeme(r1.combine(r2), LexId(".".prepend(nm))), lexx))
+    Cons(Lexeme(r1, LexOp(nm)),Cons(Lexeme(_, LexKeyword(".")), Cons(Lexeme(r3, LexInt(i)), lexx)))
+      -> allowDotIds(Cons(Lexeme(r1.combine(r3), LexId(postpend("." ++ i.show, nm))), lexx))
 
     // constructor
-    Cons(Lexeme(r1, LexKeyword(".")), Cons(Lexeme(r2, LexCons(name)), lexx))
-      -> allowDotIds(Cons(Lexeme(r1.combine(r2), LexCons(".".prepend(name))), lexx))
-    Cons(Lexeme(r1, LexCons(name)), Cons(Lexeme(_, LexKeyword(".")), Cons(Lexeme(r3, LexInt(i)), lexx)))
-      -> allowDotIds(Cons(Lexeme(r1.combine(r3), LexCons(postpend("." ++ i.show, name))), lexx))
+    Cons(Lexeme(r1, LexKeyword(".")), Cons(Lexeme(r2, LexCons(nm)), lexx))
+      -> allowDotIds(Cons(Lexeme(r1.combine(r2), LexCons(".".prepend(nm))), lexx))
+    Cons(Lexeme(r1, LexCons(nm)), Cons(Lexeme(_, LexKeyword(".")), Cons(Lexeme(r3, LexInt(i)), lexx)))
+      -> allowDotIds(Cons(Lexeme(r1.combine(r3), LexCons(postpend("." ++ i.show, nm))), lexx))
 
     // (-.4), (++.2)
-    Cons(Lexeme(r1, LexSpecial("(")), Cons(Lexeme(_, LexOp(name)), Cons(Lexeme(_,LexInt(i)),Cons(Lexeme(r5,LexSpecial(")")), lexx)))) // | last (nameId name) == '.'
-      -> allowDotIds(Cons(Lexeme(r1.combine(r5), LexId(postpend(i.show, name))), lexx))
+    Cons(Lexeme(r1, LexSpecial("(")), Cons(Lexeme(_, LexOp(nm)), Cons(Lexeme(_,LexInt(i)),Cons(Lexeme(r5,LexSpecial(")")), lexx)))) // | last (nmId nm) == '.'
+      -> allowDotIds(Cons(Lexeme(r1.combine(r5), LexId(postpend(i.show, nm))), lexx))
     // (/.4)
-    Cons(Lexeme(r1, LexSpecial("(")), Cons(Lexeme(_, LexOp(name)), Cons(Lexeme(_, LexKeyword(".")), Cons(Lexeme(_, LexInt(i)),Cons(Lexeme(r5, LexSpecial(")")), lexx))))) // | last (nameId name) == '.'
-      -> allowDotIds(Cons(Lexeme(r1.combine(r5), LexId(postpend("." ++ i.show, name))), lexx))
+    Cons(Lexeme(r1, LexSpecial("(")), Cons(Lexeme(_, LexOp(nm)), Cons(Lexeme(_, LexKeyword(".")), Cons(Lexeme(_, LexInt(i)),Cons(Lexeme(r5, LexSpecial(")")), lexx))))) // | last (nmId nm) == '.'
+      -> allowDotIds(Cons(Lexeme(r1.combine(r5), LexId(postpend("." ++ i.show, nm))), lexx))
     // ([].1)
     Cons(Lexeme(r1, LexSpecial("(")), Cons(Lexeme(_,LexSpecial("[")),Cons(Lexeme(_, LexSpecial("]")),Cons(Lexeme(_, LexKeyword(".")),Cons(Lexeme(_, LexInt(i)),Cons(Lexeme(r2, LexSpecial(")")), lexx))))))
       -> allowDotIds(Cons(Lexeme(r1.combine(r2), LexId(postpend("." ++ i.show, "[]".newName))), lexx))
@@ -68,14 +72,22 @@ fun allowDotIds(lexes: list<lexeme>): div list<lexeme>
     Cons(l, lx) -> Cons(l, allowDotIds(lx))
     Nil -> Nil
 
-fun pProgram()
+fun parseInlines(prog: core, s: source, env: envv, inlines: list<lexeme>, gamma: gamma)
+  with parseLexemes(s, inlines)
+  with withEnvInitial(prog.coreName, emptyImports)
+  setEnv(env(gamma=gamma))
+  val idefs = pmany("", pInlineDef)
+  peof()
+  idefs
+
+fun pProgram(s: source)
   pmany("semis", pSemicolon)
   val (prog, env, inlines) = pModule()
   peof()
-  (prog, pInlines(prog, source, env, inlines))
+  (prog, fn(gamma) parseInlines(prog, s, env, inlines, gamma))
 
 fun pModule()
-  val (rng, doc) = pDocKeyword("module")
+  val (_, doc) = pDocKeyword("module")
   pKeyword("interface")
   val (name0, _) = pModulePath()
   pmany("semis", pSemicolon)
@@ -88,14 +100,14 @@ fun pModule()
     val externImports = semis("", pExternImportDecl)
     val fixs = semis("", pFixDecl)
     with withEnvInitial(name0, impMap)
-    val impsyns = semis(pLocalAlias)
-    val tdefs = semis(pTypeDecl)
-    val defs = semis(pDefDecl)
-    val externs = semis(externDecl)
-    val inlines = maybe("", {pSpecial("//.inline-section"); []}).default([]) // TODO: Read rest
-    val tdefGroups = tdefs.map(fn(tdef) TypeDefGroup([tdef]))
+    val impsyns = semis("", pLocalAlias)
+    val tdefs = semis("", pTypeDecl)
+    val defs = semis("", pDefDecl)
+    val externs = semis("", pExternDecl)
+    val inlines = maybe("", {pSpecial("//.inline-section"); val rest = takeAll(); putAll([]); rest}).default([]) // TODO: Read rest
+    val tdefGroups = tdefs.map(fn(tdef) [tdef])
     val defGroups = defs.map(DefNonRec)
-    Core(name0, imps, fixs.concat, tdefGroups, defGroups, externImports ++ externs, doc)
+    (Core(name0, imps, fixs.concat, tdefGroups, defGroups, externImports ++ externs, doc), getEnv(), inlines)
 
 fun pLocalAlias()
   try("", {pSpecialId("local"); pKeyword("alias")})
@@ -227,28 +239,28 @@ fun pDefSort()
   ])
 
 fun pInlineDef()
-  val (sort, inl, isRec, specArgs, doc) = pInlineDefSort()
+  val (sort, inl, isRec, specArgs, _) = pInlineDefSort()
   val (name, _) = pFunId()
   val e = pBody()
   InlineDef(envQualify(name), e, isRec, inl, if inl.is-inlineAlways then 0 else e.cost, sort, specArgs)
 
 fun pExternDecl()
-  val (vis, fipT, doc) = try("", {(pVisPub(), pFib(), pDocKeyword("extern").snd)})
-  val (name, _) = pFunId()
+  val (vis, fipT, doc) = try("", {(pVisPub(), pFip(), pDocKeyword("extern").snd)})
+  val (name, rng) = pFunId()
   pKeyword(":")
   val (tp, pinfos) = pDefType()
   val formats = pExternalBody()
-  External(qualify(modname, name), tp, pinfos, formats, vis, fipT, doc)
+  External(qualify(modname, name), tp, pinfos, formats, vis, fipT, rng, doc)
 
 fun pExternalBody()
   choices("", [
     {pKeyword("="); [pExternalEntry()]},
-    {semiBraces("", pExternalEntry)}
+    {semiBraces("", pExternalEntry).fst}
   ])
 
 fun pExternalEntry()
   val target = pExternalTarget()
-  maybe("", {specialId("inline")})
+  maybe("", {pSpecialId("inline")})
   val s = pStringLit().fst
   (target, s)
 
@@ -691,8 +703,18 @@ effect eenv
   fun envLookupCon(name: name): nameInfo
   fun envLookupVar(name: name): expr
   val modname : name
+  fun getEnv(): envv;
+  fun setEnv(env: envv): ()
 
-fun withEnvInitial(modName, imports0, f)
+struct envv
+  bound: linearMap<name, typeVar>
+  imports: importmap
+  unique: int
+  gamma: gamma
+  locals: linearMap<name, ktype>
+  synonyms: name-map<synInfo>;
+
+fun withEnvInitial(modName: name, imports0, f: () -> <eenv,ast,compFlags,synonyms> a): <compFlags,ast> a
   with withSynonyms(synonyms/empty)
   var bound := linearMap([], fn(x: name, y: name) x == y, fn(x: typeVar, y: typeVar) x == y, fn(x) x.show, fn(x) x.show)
   var imports := imports0
@@ -706,54 +728,64 @@ fun withEnvInitial(modName, imports0, f)
         Left(amb) -> 
           trace("core/parse qualify: unable to expand name: " ++ n.show ++ ": " ++ amb.show-list(show))
           n
-    else name/qualify(mname, n)
+    else name/qualify(modName, n)
   with handler
+    fun getEnv()
+      Envv(bound, imports, unique, gamma, locals, getSynonyms())
+    fun setEnv(e)
+      val Envv(b, i, u, g, l, s) = e
+      bound := b
+      imports := i
+      unique := u
+      gamma := g
+      locals := l
+      setSynonyms(s)
     val modname = modName
-    fun envExtendLocal(n, k)
+    fun envExtend(n, k)
       val id = newId(unique)
       unique := unique + 1
       val tv = TypeVar(id, k, Bound)
-      bound := bound.insert(n, tv)
+      bound := bound.add(n, tv)
+    fun envExtendLocal(n, k)
+      unique := unique + 1
+      locals := locals.set(n, k)
     fun envType(n, k)
       match bound.maybeGet(n)
-        Just(tv) -> tv
+        Just(tv) -> TVar(tv)
         Nothing ->
           val qname = qualify(n)
-          match synonyms.lookup(qname)
+          match synonymsLookup(qname)
             Just(info as SynInfo(name, kind, params, tp, rank)) | params.is-empty ->
-              TSyn(TypeSyn(name, kind, rank, Just(info), [], tp))
+              TSyn(TypeSyn(name, kind, rank, Just(info)), [], tp)
             _ -> TCon(TypeCon(qname, k))
     fun envQualify(n)
       qualify(n)
     fun envExtendSynonym(synInfo)
-      synonymsExtend(synInfo)
-    fun envTypeApp(tp, args)
+      synonymsExtend(synInfo.name, synInfo)
+    fun envTypeApp(tp, tps)
       match tp
-        TCon(TypeCon(name0, kind0)) ->
+        TCon(TypeCon(name0, _)) ->
           match synonymsLookup(name0)
             Just(synInfo as SynInfo(name, kind, params, syntp, rank)) | params.length == tps.length ->
-              TSyn(TypeSyn(name, kind, rank, Just(synInfo)), tps, subNew(params.zip(tps) |-> syntp))
+              TSyn(TypeSyn(name, kind, rank, Just(synInfo)), tps, subNew(params.zip(tps)) |-> syntp)
             _ -> typeApp(tp, tps)
         _ -> typeApp(tp, tps)
-    fun extendLocal(n, tp)
-      unique := unique + 1
-      locals := locals.set(n, tp)
     fun envLookupLocal(n)
       match locals.maybeGet(n)
         Just(tp) -> tp
-        Nothing -> error("core/parse unbound local: " ++ n.show)
+        Nothing -> fail("core/parse unbound local: " ++ n.show)
     fun envLookupCon(n)
-      match g.gammaLookupExactCon(n)
+      match gamma.gammaLookupExactCon(n)
         [c as InfoCon] -> c
-        res -> fail("unkown constructor " ++ n.show ++ ": " ++ res.show)
+        res -> fail("unknown constructor " ++ n.show ++ ": " ++ res.show-list(show))
     fun envLookupVar(n)
-      match g.gammaLookupCanonical(n)
-        [f as InfoFun] -> f.coreExpr(n)
+      match gamma.gammaLookupCanonical(n)
+        [fnct as InfoFun] -> fnct.coreExpr(n)
         [v as InfoVal] -> v.coreExpr(n)
         [ex as assumption/InfoExternal] -> ex.coreExpr(n)
-        [] | name == nameFieldAddrOf -> 
+        [] | n == nameFieldAddrOf -> 
           val a = TypeVar(0, kindStar, Bound)
           val fType = TForAll([a], [], TFun([(nameNil, TVar(a)), (nameNil, typeString), (nameNil, typeString)], typeTotal, TApp(typeFieldAddr, [TVar(a)])))
           Var(TName(nameFieldAddrOf, fType), compiler/core/core/InfoExternal([]))
-        res -> fail("unknown identifier: " ++ n.showPlain ++ ": " ++ res.show) 
+        res -> fail("unknown identifier: " ++ n.showPlain ++ ": " ++ res.show-list(show)) 
   f()

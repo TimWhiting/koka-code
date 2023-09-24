@@ -8,7 +8,7 @@
       "name": "(lldb) Launch",
       "type": "cppdbg",
       "request": "launch",
-      "program": "${workspaceRoot}/.koka/v2.4.3/clang-debug/testcompiler_syntax_parse",
+      "program": "${workspaceRoot}/.koka/v2.4.3/clang-debug/testcompiler_core_parser",
       "args": [],
       "stopAtEntry": false,
       "cwd": "${workspaceRoot}/.koka/v2.4.3/clang-debug",

@@ -15,10 +15,16 @@ effect synonyms
   fun synonymsCompose(syns1: name-map<synInfo>, syns2: name-map<synInfo>): name-map<synInfo>
   fun synonymsDiff(syns1: name-map<synInfo>, syns2: name-map<synInfo>): name-map<synInfo>
   fun synonymsFilter(modName: name): name-map<synInfo>
+  fun getSynonyms(): name-map<synInfo>
+  fun setSynonyms(syns: name-map<synInfo>): ()
 
 fun withSynonyms(synonyms0: name-map<synInfo>, f: () -> <synonyms,exn,compFlags|e> a): <exn,compFlags|e> a
   var synonyms := synonyms0
   with handler
+    fun getSynonyms()
+      synonyms
+    fun setSynonyms(syns: name-map<synInfo>)
+      synonyms := syns
     fun synonymsExtend(name: name, k: synInfo)
       synonyms := synonyms.set(name, k)
     fun synonymsLookup(name: name)

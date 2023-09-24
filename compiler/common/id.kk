@@ -22,11 +22,11 @@ alias ids = list<id>
 /// Identifiers are unique compiler generated identities
 alias id = int;
 
-fun (==)(id1: id, id2: id): bool
-  core/(==)(id1, id2)
+// fun (==)(id1: id, id2: id): bool
+//   core/(==)(id1, id2)
 
-fun (<)(id1: id, id2: id): bool
-  core/(<)(id1, id2)
+// fun (<)(id1: id, id2: id): bool
+//   core/(<)(id1, id2)
 
 /// Show quotes around the id
 fun showId(id: id): <> string

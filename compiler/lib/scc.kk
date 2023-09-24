@@ -1,5 +1,6 @@
 import newstd/data/linearmap
 import newstd/data/linearset
+import compiler/common/name-collections
 
 alias graph<v> = linearMap<v, list<v>>;
 alias edge<v> = (v,v)
@@ -8,8 +9,8 @@ alias node<v> = (v,list<v>)
 fun nodes(g: graph<v>): list<node<v>>
   g.list
 
-fun graph(es: list<node<v>>, eq: (v, v) -> bool): graph<v>
-  linearMap(es, eq)
+fun graph(es: list<node<v>>, eq: (v, v) -> div bool, showV: (v) -> div string): graph<v>
+  linearMap(es, eq, fn(v1, v2) (==)(v1, v2, eq), showV, fn(v) v.show-list(showV))
 
 fun edges(g: graph<v>): list<edge<v>>
   with v <- g.nodes.flatmap
@@ -23,8 +24,8 @@ fun successors(g: graph<v>, v: v): list<v>
   g.getDefault(v, [])
 
 fun transpose(g: graph<v>): <> graph<v>
-  fun add(e: edge<v> ,m:graph<v>): <> graph<v>
-    m.update(e.snd, fn(r) Cons(e.fst, r), [])
+  fun add(e: edge<v>, m:graph<v>): <> graph<v>
+    m.update(e.snd,  [], fn(o, r) Cons(e.fst, r))
   g.edges.foldr(g.map(fn (k, v) (k, [])), add)
 
 rec type tree<v>
@@ -41,7 +42,7 @@ fun dff(g: graph<v>): forest<v>
 
 fun dfs(g: graph<v>, vs: list<v>): forest<v>
   with unsafe-total
-  Forest(vs.map(fn(v) g.tree(v, ref(linearSet([v], g.eq))))).prune(g.eq)
+  Forest(vs.map(fn(v) g.tree(v, ref(linearSet([v], g.eq, g.showK))))).prune(g.eq, g.showK)
 
 fun tree(g: graph<v>, v: v, visited: ref<h, linearSet<v>>): <div,read<h>,write<h>> tree<v>
   val f = g.successors(v).flatmap fn(v')
@@ -53,7 +54,7 @@ fun tree(g: graph<v>, v: v, visited: ref<h, linearSet<v>>): <div,read<h>,write<h
 
 alias vset<v> = linearSet<v>;
 
-fun prune(fs: forest<v>, eq: (v,v) -> bool): forest<v>
+fun prune(fs: forest<v>, eq: (v,v) -> div bool, showV: (v) -> div string): forest<v>
   fun chop(ms: vset<v>, fs1: forest<v>): (vset<v>, forest<v>)
     match fs1.list
       [] -> (ms, Forest([]))
@@ -64,7 +65,7 @@ fun prune(fs: forest<v>, eq: (v,v) -> bool): forest<v>
           val (ms1, vs') = chop(ms0.unsafe-decreasing, vs.unsafe-decreasing)
           val (ms2, fs2') = chop(ms1.unsafe-decreasing, Forest(fs2).unsafe-decreasing)
           (ms2, Forest(Cons(Tree(v, vs'), fs2'.list)))
-  linearSet([], eq).chop(fs).snd
+  linearSet([], eq, showV).chop(fs).snd
 
 fun preorder(g: graph<v>): list<v>
   with unsafe-total
@@ -91,8 +92,8 @@ fun postorderF'(ts: list<tree<v>>, vs: list<v>): div list<v>
     [] -> vs
     Cons(t, ts') -> postorderT'(t, postorderF'(ts', vs))
 
-fun scc(nodes: list<node<v>>, eq: (v, v) -> bool): list<list<v>>
-  sccG(nodes.graph(eq))
+fun scc(nodes: list<node<v>>, eq: (v, v) -> div bool, showV: (v) -> div string): list<list<v>>
+  sccG(nodes.graph(eq, showV))
 
 fun sccG(g: graph<v>): list<list<v>>
   with unsafe-total

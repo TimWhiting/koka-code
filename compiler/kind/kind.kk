@@ -11,6 +11,9 @@ fun (==)(a: kind, b: kind): bool
     (KApp(a1, b1), KApp(a2, b2)) -> unsafe-decreasing(a1) == a2 && unsafe-decreasing(b1) == b2
     _ -> False
 
+fun (!=)(a: kind, b: kind): bool
+  !(a == b)
+
 fun show(k: kind): string
   match k
     KCon(c) -> c.show

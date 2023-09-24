@@ -11,17 +11,17 @@ import compiler/common/name-collections
 
 fun isUnit(e: expr): bool
   match e
-    Con(name) | name.getName == nameTuple(0) -> True
+    Con(tn) | tn.getName == nameTuple(0) -> True
     _ -> False
 
 fun isTrue(e: expr): bool
   match e
-    Con(name) | name.getName == nameTrue -> True
+    Con(tn) | tn.getName == nameTrue -> True
     _ -> False
 
 fun isFalse(e: expr): bool
   match e
-    Con(name) | name.getName == nameFalse -> True
+    Con(tn) | tn.getName == nameFalse -> True
     _ -> False
 
 val exprUnit = Con(TName(nameUnit, typeUnit), ConEnum(nameTpUnit, DataEnum, valueReprZero, 0))
@@ -57,15 +57,15 @@ fun makeList(tp: ktype, exprs: list<expr>): expr
   val nil = TypeApp(nilCon, [tp])
   val consTp = TForAll([a], [], TFun([(nameNil, TVar(a)), (nameNil, TApp(typeList, [TVar(a)]))], typeTotal, TApp(typeList, [TVar(a)])))
   val consCon = Con(TName(nameCons, consTp), ConAsCons(nameTpList, DataAsList, valueReprScan(2), nameNil, CtxNone, 2))
-  fun cons(expr, xs)
-    App(TypeApp(consCon, [tp]), [expr, xs])
+  fun cons(e, xs)
+    App(TypeApp(consCon, [tp]), [e, xs])
   exprs.foldr(nil, cons)
 
-fun makeDef(name: name, expr: expr): pure def
-  Def(name, typeOf(expr), expr, Private, DefVal, InlineNever, rangeNull, "")
+fun makeDef(nm: name, e: expr): pure def
+  Def(nm, typeOf(e), e, Private, DefVal, InlineNever, rangeNull, "")
 
-fun makeTDef(TName(name, tp): tName, expr: expr): pure def
-  Def(name, tp, expr, Private, DefVal, InlineNever, rangeNull, "")
+fun makeTDef(TName(nm, tp): tName, e: expr): pure def
+  Def(nm, tp, e, Private, DefVal, InlineNever, rangeNull, "")
 
 fun makeDefExpr(expr: expr)
   makeDef(nameNil, expr)
@@ -80,7 +80,7 @@ fun makeDefsLet(defs0: list<def>, expr0: expr)
   fun make(defs, e)
     match defs
       Nil -> e
-      Cons(d, rdefs) | e.isUnit && name(d:def) == nameNil && expr(d:def).isUnit -> make(rdefs, d.expr)
+      Cons(d, rdefs) | e.isUnit && defName(d:def) == nameNil && defExpr(d:def).isUnit -> make(rdefs, d.defExpr)
       _ -> makeLet(defs.reverse.map(DefNonRec), e)
   make(defs0.reverse, expr0)
 
@@ -95,7 +95,7 @@ fun makeDropSpecial(y: tName, xUnique: expr, xShared: expr, xDecRef: expr)
   App(Var(TName(nameDropSpecial, tp), InfoExternal([])), [Var(y, InfoNone), xUnique, xShared, xDecRef])
 
 struct core
-  name: name
+  coreName: name
   imports: kimports = []
   fixDefs: fixDefs = []
   typeDefs: typeDefGroups = []
@@ -103,21 +103,32 @@ struct core
   externals: externals = []
   doc: string = ""
 
+fun show(c: core): div string
+  "Core(" ++ c.coreName.show ++ "," ++ c.imports.show-list(show) ++ "," ++ c.fixDefs.show-list(show) ++ 
+  "," ++ c.typeDefs.show-list(fn(g) g.show-list(show)) ++ "," ++ c.defs.show-list(show) ++ "," ++ c.externals.show-list(show) ++ "," ++ c.show ++ ")"
+
 alias fixDefs = list<fixDef>;
 value type fixDef
-  FixDef(name: name, fixity: fixity);
+  FixDef(defName: name, f: fixity);
+
+fun show(f: fixDef): string
+  match f
+    FixDef(defName, f) -> "FixDef(" ++ defName.show ++ "," ++ show(f) ++ ")"
 
 alias kimports = list<kimport>;
 struct kimport
-  name: name
+  importName: name
   package: string
   visibility: visibility
   doc: string;
 
+fun show(i: kimport): string
+  "Kimport(" ++ i.importName.show ++ "," ++ i.package.show ++ "," ++ i.visibility.show ++ "," ++ i.doc.show ++ ")"
+
 alias externals = list<external>;
 type external
   External
-    name: name
+    externName: name
     typeScheme: ktype //scheme
     params: list<paramInfo>
     format: list<(target, string)>
@@ -128,6 +139,14 @@ type external
   ExternalImport
     imports: list<(target,list<(string, string)>)>
     rng: range
+
+fun show(e: external): div string
+  match e
+    External(name, typeScheme, params, format, visibility, fipT, rng, doc) -> 
+      "External(" ++ name.show ++ "," ++ typeScheme.show ++ "," ++ params.show-list(show) ++ "," ++ 
+      format.show-list(fn(f) f.show-tuple(show, show)) ++ "," ++ visibility.show ++ "," ++ fipT.show ++ "," ++ rng.showFullRange ++ "," ++ doc.show ++ ")"
+    ExternalImport(imports, rng) -> 
+      "ExternalImport(" ++ imports.show-list(fn((t, ls)) t.show ++ ":" ++ ls.show-list(fn((s1, s2)) s1.show ++ ":" ++ s2.show)) ++ "," ++ rng.showFullRange ++ ")"
 
 fun vis(e: external)
   match e
@@ -167,6 +186,11 @@ pub fun lookupTarget(t: target, ims: list<(target, a)>): maybe<a>
 type typeDef
   Synonym(i: synInfo) // name, synonym info, and the visibility
   Data(info: dataInfo, isExtend: bool) //  name, info, visibility, and the visibilities of the constructors, the isExtend is true if this is an extension of the datatype.
+
+fun show(t: typeDef): string
+  match t
+    Synonym(i) -> "Synonym(" ++ i.show ++ ")"
+    Data(i, b) -> "Data(" ++ i.show ++ "," ++ b.show ++ ")"
 
 alias typeDefGroups = list<typeDefGroup>
 alias typeDefGroup = typeDefs
@@ -220,27 +244,27 @@ fun show(d: dataRepr): string
     DataOpen -> "DataOpen"
 
 type conRepr
-  ConEnum(name: name, repr: dataRepr, valueRepr: valueRepr, tag: int) // part of enumeration (none has fields)
-  ConIso(name: name, repr: dataRepr, valueRepr: valueRepr, tag: int) // one constructor with one field
-  ConSingleton(name: name, repr: dataRepr, valueRepr: valueRepr, tag: int) // constructor without fields (and not part of an enum)
-  ConSingle(name: name, repr: dataRepr, valueRepr: valueRepr, ctxPath: ctxPath, tag: int) // there is only one constructor and it is not iso or singleton (and this is it)
-  ConAsJust(name: name, repr: dataRepr, valueRepr: valueRepr, asNothing: name, tag: int) // constructor is the just node of a maybe-like datatype  (only use for DataAsMaybe, not for DataStructAsMaybe)
-  ConStruct(name: name, repr: dataRepr, valueRepr: valueRepr, tag: int) // constructor as value type
-  ConAsCons(name: name, repr: dataRepr, valueRepr: valueRepr, asNil: name, ctxPath: ctxPath, tag: int) // constructor is the cons node of a list-like datatype  (may have one or more fields)
-  ConOpen(name: name, repr: dataRepr, valueRepr: valueRepr, ctxPath: ctxPath) // constructor of open data type
-  ConNormal(name: name, repr: dataRepr, valueRepr: valueRepr, ctxPath: ctxPath, tag: int); // a regular constructor
+  ConEnum(n: name, repr: dataRepr, vrepr: valueRepr, tag: int) // part of enumeration (none has fields)
+  ConIso(n: name, repr: dataRepr, vrepr: valueRepr, tag: int) // one constructor with one field
+  ConSingleton(n: name, repr: dataRepr, vrepr: valueRepr, tag: int) // constructor without fields (and not part of an enum)
+  ConSingle(n: name, repr: dataRepr, vrepr: valueRepr, ctxPath: ctxPath, tag: int) // there is only one constructor and it is not iso or singleton (and this is it)
+  ConAsJust(n: name, repr: dataRepr, vrepr: valueRepr, asNothing: name, tag: int) // constructor is the just node of a maybe-like datatype  (only use for DataAsMaybe, not for DataStructAsMaybe)
+  ConStruct(n: name, repr: dataRepr, vrepr: valueRepr, tag: int) // constructor as value type
+  ConAsCons(n: name, repr: dataRepr, vrepr: valueRepr, asNil: name, ctxPath: ctxPath, tag: int) // constructor is the cons node of a list-like datatype  (may have one or more fields)
+  ConOpen(n: name, repr: dataRepr, vrepr: valueRepr, ctxPath: ctxPath) // constructor of open data type
+  ConNormal(n: name, repr: dataRepr, vrepr: valueRepr, ctxPath: ctxPath, tag: int); // a regular constructor
 
 fun show(r: conRepr): string
   match r
-    ConEnum(name, drepr, vrepr, tag) -> "ConEnum(" ++ name.show ++ "," ++ show(drepr) ++ "," ++ show(vrepr) ++ "," ++ tag.show ++ ")"
-    ConIso(name, drepr, vrepr, tag) -> "ConIso(" ++ name.show ++ "," ++ show(drepr) ++ "," ++ show(vrepr) ++ "," ++ tag.show ++ ")"
-    ConSingleton(name, drepr, vrepr, tag) -> "ConSingleton(" ++ name.show ++ "," ++ show(drepr) ++ "," ++ show(vrepr) ++ "," ++ tag.show ++ ")"
-    ConSingle(name, drepr, vrepr, ctxPath, tag) -> "ConSingle(" ++ name.show ++ "," ++ show(drepr) ++ "," ++ show(vrepr) ++ "," ++ show(ctxPath) ++ "," ++ tag.show ++ ")"
-    ConAsJust(name, drepr, vrepr, asNothing, tag) -> "ConAsJust(" ++ name.show ++ "," ++ show(drepr) ++ "," ++ show(vrepr) ++ "," ++ asNothing.show ++ "," ++ tag.show ++ ")"
-    ConStruct(name, drepr, vrepr, tag) -> "ConStruct(" ++ name.show ++ "," ++ show(drepr) ++ "," ++ show(vrepr) ++ "," ++ tag.show ++ ")"
-    ConAsCons(name, drepr, vrepr, asNil, ctxPath, tag) -> "ConAsCons(" ++ name.show ++ "," ++ show(drepr) ++ "," ++ show(vrepr) ++ "," ++ asNil.show ++ "," ++ show(ctxPath) ++ "," ++ tag.show ++ ")"
-    ConOpen(name, drepr, vrepr, ctxPath) -> "ConOpen(" ++ name.show ++ "," ++ show(drepr) ++ "," ++ show(vrepr) ++ "," ++ show(ctxPath) ++ ")"
-    ConNormal(name, drepr, vrepr, ctxPath, tag) -> "ConNormal(" ++ name.show ++ "," ++ show(drepr) ++ "," ++ show(vrepr) ++ "," ++ show(ctxPath) ++ "," ++ tag.show ++ ")"
+    ConEnum(n, drepr, vrepr, tag) -> "ConEnum(" ++ n.show ++ "," ++ show(drepr) ++ "," ++ show(vrepr) ++ "," ++ tag.show ++ ")"
+    ConIso(n, drepr, vrepr, tag) -> "ConIso(" ++ n.show ++ "," ++ show(drepr) ++ "," ++ show(vrepr) ++ "," ++ tag.show ++ ")"
+    ConSingleton(n, drepr, vrepr, tag) -> "ConSingleton(" ++ n.show ++ "," ++ show(drepr) ++ "," ++ show(vrepr) ++ "," ++ tag.show ++ ")"
+    ConSingle(n, drepr, vrepr, ctxPath, tag) -> "ConSingle(" ++ n.show ++ "," ++ show(drepr) ++ "," ++ show(vrepr) ++ "," ++ show(ctxPath) ++ "," ++ tag.show ++ ")"
+    ConAsJust(n, drepr, vrepr, asNothing, tag) -> "ConAsJust(" ++ n.show ++ "," ++ show(drepr) ++ "," ++ show(vrepr) ++ "," ++ asNothing.show ++ "," ++ tag.show ++ ")"
+    ConStruct(n, drepr, vrepr, tag) -> "ConStruct(" ++ n.show ++ "," ++ show(drepr) ++ "," ++ show(vrepr) ++ "," ++ tag.show ++ ")"
+    ConAsCons(n, drepr, vrepr, asNil, ctxPath, tag) -> "ConAsCons(" ++ n.show ++ "," ++ show(drepr) ++ "," ++ show(vrepr) ++ "," ++ asNil.show ++ "," ++ show(ctxPath) ++ "," ++ tag.show ++ ")"
+    ConOpen(n, drepr, vrepr, ctxPath) -> "ConOpen(" ++ n.show ++ "," ++ show(drepr) ++ "," ++ show(vrepr) ++ "," ++ show(ctxPath) ++ ")"
+    ConNormal(n, drepr, vrepr, ctxPath, tag) -> "ConNormal(" ++ n.show ++ "," ++ show(drepr) ++ "," ++ show(vrepr) ++ "," ++ show(ctxPath) ++ "," ++ tag.show ++ ")"
 
 type ctxPath
   CtxNone
@@ -265,13 +289,13 @@ fun ctxPath(repr: conRepr): maybe<ctxPath>
     _ -> Nothing
 
 fun scanCount(repr: conRepr)
-  syntax/scanCount(repr.valueRepr)
+  syntax/scanCount(repr.vrepr)
 
 fun allocSize(c: conRepr, p: platform)
   c.allocSizeScan(p).fst
 
 fun allocSizeScan(c: conRepr, p: platform)
-  val (size, scan) = p.sizeScan(c.valueRepr)
+  val (size, scan) = p.sizeScan(c.vrepr)
   if c.isValue then (0, scan) else (size, scan)
 
 fun isValue(d: dataRepr): bool
@@ -363,19 +387,28 @@ type defGroup
   DefRec(defs: list<def>)
   DefNonRec(d: def)
 
+fun show(d: defGroup): div string
+  match d
+    DefRec(defs) -> "DefRec(" ++ defs.show-list(show) ++ ")"
+    DefNonRec(d) -> "DefNonRec(" ++ d.show ++ ")"
+
 // A value definition
 struct def
-  name: name
+  defName: name
   ktype: ktype
-  expr: expr
+  defExpr: expr
   vis: visibility // private public
   sort: defSort // fun / val / var
   kinline: defInline // auto / always, never
   nameRange: range
   doc: string;
 
+fun show(d: def): div string
+  "Def(" ++ d.defName.show ++ "," ++ d.ktype.show ++ "," ++ d.defExpr.show ++ "," ++ d.vis.show ++ "," ++
+  d.sort.show ++ "," ++ d.kinline.show ++ "," ++ d.nameRange.showFullRange ++ "," ++ d.doc.show ++ ")"
+
 struct inlineDef
-  name: name
+  defName: name
   expr: expr
   rec: bool
   kind: defInline
@@ -408,45 +441,79 @@ effect corePhase
 type expr
   // Core lambda calculus
   Lam(names: list<tName>, eff: ktype, e: expr)
-  Var(name: tName, info: varInfo) // typed name and possible typeArity/parameter arity tuple for top-level functions
+  Var(n: tName, info: varInfo) // typed name and possible typeArity/parameter arity tuple for top-level functions
   App(f: expr, args: list<expr>) // always fully applied!
   TypeLam(args: list<typeVar>, e: expr) // Type (universal) abstraction/application
   TypeApp(f: expr, types: list<ktype>)
   // Literals, constants and labels
-  Con(name: tName, repr: conRepr) // typed name and its representation
+  Con(n: tName, repr: conRepr) // typed name and its representation
   ELit(lit: lit)
   // Let
   Let(defs: list<defGroup>, e: expr)
   // Case expressions
   Case(exprs: list<expr>, branches: list<branch>);
 
+fun show(e0: expr): div string
+  match e0
+    Lam(names, eff, e) -> "Lam(" ++ names.show-list(show) ++ "," ++ eff.show ++ "," ++ e.show ++ ")"
+    Var(n, info) -> "Var(" ++ n.show ++ "," ++ info.show ++ ")"
+    App(f, args) -> "App(" ++ f.show ++ "," ++ args.show-list(show) ++ ")"
+    TypeLam(args, e) -> "TypeLam(" ++ args.show-list(show) ++ "," ++ e.show ++ ")"
+    TypeApp(f, types) -> "TypeApp(" ++ f.show ++ "," ++ types.show-list(show) ++ ")"
+    Con(n, repr) -> "Con(" ++ n.show ++ "," ++ repr.show ++ ")"
+    ELit(lit) -> "ELit(" ++ lit.show ++ ")"
+    Let(defs, e) -> "Let(" ++ defs.show-list(show) ++ "," ++ e.show ++ ")"
+    Case(exprs, branches) -> "Case(" ++ exprs.show-list(show) ++ "," ++ branches.show-list(show) ++ ")"
+
 struct branch
   patterns: list<pattern> // length = length exprs in the match
   guards: list<guard>; // any number (>= 1) of guarded expressions
 
+fun show(b: branch): div string
+  "Branch(" ++ b.patterns.show-list(show) ++ "," ++ b.guards.show-list(show) ++ ")"
+
 struct guard
   test: expr // boolean
-  expr: expr; // bdoy of the branch
+  body: expr; // body of the branch
+
+fun show(g: guard): div string
+  "Guard(" ++ g.test.show ++ "," ++ g.body.show ++ ")"
 
 type pattern
   PatCon
-    name: tName // names the constructor with full signature.
+    patName: tName // names the constructor with full signature.
     pattern: list<pattern> // sub-patterns. fully materialized to match arity.
-    pepr: conRepr // representation of ctor in backend.
+    repr: conRepr // representation of ctor in backend.
     typeArgs: list<ktype> // zipped with patConPatterns
     kexists: list<typeVar> // closed under existentials here
     typeRes: ktype // result type
     info: conInfo // other constructor info
     skip: bool // skip testing for this constructor (as it should match already)
-  PatVar(name: tName, pattern: pattern) // name / type of variable and named subpattern
+  PatVar(varName: tName, pattern: pattern) // name / type of variable and named subpattern
   PatLit(lit: lit)
   PatWild
+
+fun show(p: pattern): div string
+  match p
+    PatCon(name, pattern, repr, typeArgs, kexists, typeRes, info, skip) -> 
+      "PatCon(" ++ name.show ++ "," ++ pattern.show-list(show) ++ "," ++ repr.show ++ "," ++ 
+      typeArgs.show-list(show) ++ "," ++ kexists.show-list(show) ++ "," ++ typeRes.show ++ "," ++ info.show ++ "," ++ skip.show ++ ")"
+    PatVar(name, pattern) -> "PatVar(" ++ name.show ++ "," ++ pattern.show ++ ")"
+    PatLit(lit) -> "PatLit(" ++ lit.show ++ ")"
+    PatWild -> "PatWild"
 
 type lit
   LitInt(i: int)
   LitFloat(d: float64)
   LitChar(c: string)
   LitString(s: string)
+
+fun show(l: lit): string
+  match l
+    LitInt(i) -> "LitInt(" ++ i.show ++ ")"
+    LitFloat(d) -> "LitFloat(" ++ d.show ++ ")"
+    LitChar(c) -> "LitChar(" ++ c.show ++ ")"
+    LitString(s) -> "LitString(" ++ s.show ++ ")"
 
 type varInfo
   InfoNone
@@ -459,11 +526,11 @@ value struct tName
   getName: name
   tNameType: ktype
 
-fun show(name: tName): string
-  name.getName.show
+fun show(n: tName): string
+  n.getName.show
 
 fun defTName(d: def): tName
-  TName(d.name, d.ktype)
+  TName(d.defName, d.ktype)
 
 fun defsTNames(defs: list<def>): list<tName>
   defs.map(defTName)
@@ -519,7 +586,7 @@ fun isTotal(b: branch): div bool
   b.guards.all(isTotal)
 
 fun isTotal(g: guard): div bool
-  g.expr.isTotal
+  g.body.isTotal
 
 fun isTotalFun(e: expr): pure bool
   match e
@@ -537,10 +604,10 @@ fun isTotalFun(b: branch): pure bool
   b.guards.all(isTotalFun)
 
 fun isTotalFun(g: guard): pure bool
-  g.expr.isTotalFun
+  g.body.isTotalFun
 
 fun isTotal(d: def): div bool
-  d.expr.isTotal
+  d.defExpr.isTotal
 
 fun hasTotalEffect(tp: ktype): bool
   match tp.splitFunScheme
@@ -558,11 +625,11 @@ fun isMonEffect(eff: ktype): pure bool
   val (ls, tl) = eff.extractEffectExtend
   !tl.isEffectEmpty || ls.any(fn(l) match l.getHandledEffect([]) {Just((ResumeMany, _)) -> True; _ -> False})
 
-fun isInlineable(max: int, def: def): div bool
-  match def.kinline
+fun isInlineable(max: int, d: def): div bool
+  match d.kinline
     InlineAlways -> True
     InlineNever -> False
-    _ -> def.cost <= max
+    _ -> d.cost <= max
 
 val costInf = 1000
 
@@ -571,15 +638,15 @@ fun cost(d: def): div int
   if d.isVal then if n == 0 then 0 else costInf else n
 
 fun costLocal(d: def): div int
-  d.expr.cost
+  d.defExpr.cost
 
 fun cost(dg: defGroup): div int
   match dg
     DefRec(defs) -> defs.map(cost).sum
     DefNonRec(def) -> cost(def)
 
-fun cost(expr: expr): div int
-  match expr
+fun cost(e0: expr): div int
+  match e0
     Var(tn) | tn.getName.isHiddenExternalName -> costInf
     Lam(_, _, b) -> 0 + b.cost
     Var -> 0
@@ -595,7 +662,7 @@ fun cost(b: branch): div int
   b.guards.map(cost).sum
 
 fun cost(g: guard): div int
-  g.expr.cost
+  g.body.cost
 
 fun typeArity(e: expr): pure int
   e.typeOf.typeArities.fst
@@ -821,7 +888,7 @@ fun deps(l: list<inlineDef>): div deps
   depsUnions(l.map(fn(i) i.expr.dep))
 
 fun deps(c: core): div deps
-  (depsUnions(c.defs.flatten.map(dep)) + depsUnions(c.typeDefs.flatten.map(dep)) + c.imports.filter(fn(i) i.visibility.is-public).map(fn(i) i.name)) - c.name
+  (depsUnions(c.defs.flatten.map(dep)) + depsUnions(c.typeDefs.flatten.map(dep)) + c.imports.filter(fn(i) i.visibility.is-public).map(fn(i) i.importName)) - c.coreName
 
 fun dep(td: typeDef): div deps
   match td
@@ -838,7 +905,7 @@ fun dep(t: ktype): div deps
     TSyn(_, args, tp) -> tp.dep + depsUnions(args.map(dep))
 
 fun dep(d: def): div deps
-  depsUnions([d.ktype.dep, d.expr.dep])
+  depsUnions([d.ktype.dep, d.defExpr.dep])
 
 fun dep(e: expr): div deps
   match e
@@ -856,7 +923,7 @@ fun dep(b: branch): div deps
   depsUnions(b.patterns.map(dep)) + depsUnions(b.guards.map(dep))
 
 fun dep(g: guard): div deps
-  g.expr.dep
+  g.body.dep
 
 fun dep(p: pattern): div deps
   match p

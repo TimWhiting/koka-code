@@ -2,6 +2,16 @@ import std/os/env
 
 pub effect val compFlags: compilerFlags;
 
+fun ".default-compFlags"(f){
+  with handler val compFlags = CompilerFlags(
+    programName = "koka",
+    version = "0.9.0",
+    compiler = "koka",
+    buildVariant = "release"
+  )
+  f()
+}
+
 struct compilerFlags
   programName: string
   version: string

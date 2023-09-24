@@ -4,18 +4,18 @@ import compiler/common/name
 import compiler/type/typevar
 
 fun isTopLevel(d: def)
-  val freeVar = d.expr.freeVars.list.map(fn(TName(nm)) nm).filter(fn(nm) !nm.isQualified && d.name.unqualify != nm)
-  val freeTv = d.expr.freeTypeVars
+  val freeVar = d.defExpr.freeVars.list.map(fn(TName(nm)) nm).filter(fn(nm) !nm.isQualified && d.defName.unqualify != nm)
+  val freeTv = d.defExpr.freeTypeVars
   freeVar.is-nil && freeTv.is-empty
 
-fun freeLocals(expr: expr)
-  expr.freeVars.filter(fn(TName(nm)) !nm.isQualified)
+fun freeLocals(e: expr)
+  e.freeVars.filter(fn(TName(nm)) !nm.isQualified)
 
 fun freeVars(l: list<expr>): pure linearSet<tName>
   l.map(freeVars).unions
 
-fun freeVars(expr: expr): pure linearSet<tName>
-  match expr
+fun freeVars(e0: expr): pure linearSet<tName>
+  match e0
     Lam(tnames, _, e) -> e.freeVars - tnames
     Var(tn) -> tnamesEmpty + tn
     App(e1, e2) -> e1.freeVars + e2.freeVars
@@ -39,10 +39,10 @@ fun boundVars(p: pattern): pure linearSet<tName>
     PatLit -> tnamesEmpty
     PatWild -> tnamesEmpty
 
-fun freeVars(defGroups: defGroups, expr: expr): pure linearSet<tName>
+fun freeVars(defGroups: defGroups, e: expr): pure linearSet<tName>
   match defGroups
-    [] -> expr.freeVars
-    Cons(dg, dgs) -> dg.freeVars + (freeVars(dgs, expr) - dg.boundVars)
+    [] -> e.freeVars
+    Cons(dg, dgs) -> dg.freeVars + (freeVars(dgs, e) - dg.boundVars)
 
 fun freeVars(defg: defGroup): pure linearSet<tName>
   defg.flatten.map(freeVars).unions
@@ -50,8 +50,8 @@ fun freeVars(defg: defGroup): pure linearSet<tName>
 fun boundVars(defg: defGroup): pure linearSet<tName>
   defg.flatten.map(boundVars).unions
 
-fun boundVars(Def(name, tp): def): pure linearSet<tName>
-  tnamesEmpty + TName(name, tp)
+fun boundVars(Def(nm, tp): def): pure linearSet<tName>
+  tnamesEmpty + TName(nm, tp)
 
-fun freeVars(Def(_, _, expr): def): pure linearSet<tName>
-  expr.freeVars
+fun freeVars(Def(_, _, e): def): pure linearSet<tName>
+  e.freeVars

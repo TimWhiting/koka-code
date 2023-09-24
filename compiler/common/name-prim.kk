@@ -124,7 +124,7 @@ val nameCCtxSetCtxPath = ".cctx-setcp".cfieldName
 val nameCCtxApply = "([])".cfieldName
 val nameCCtxCompose = "(++)".cfieldName
 val nameTpFieldAddr = "field-addr".cfieldName
-val nameTpFieldAddrOf = ".field-addr-of".cfieldName
+val nameFieldAddrOf = ".field-addr-of".cfieldName
 
 
 // std/core/hnd

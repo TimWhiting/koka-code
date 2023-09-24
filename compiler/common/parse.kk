@@ -21,6 +21,8 @@ effect astParse
   fun peof(): ()
   fun tookInput(): bool
   fun ptrace(s: string): ()
+  fun takeAll(): list<lexeme>
+  fun putAll(lexemes: list<lexeme>): ()
 
 fun peek(): ast lexeme
   val p = ppeek()
@@ -35,10 +37,14 @@ fun next(): ast lexeme
     Nothing -> astError("unexpected end of file", rangeNull)
 
 alias ast = <astParse, astError, pure, fsys>
-fun lexParse(insSemi: bool, preprocess: list<lexeme> -> list<lexeme>, p: () -> <console,ast|e> a, sourceName: string, input: string): <console,astError,fsys,pure|e> a
+fun lexParse(insSemi: bool, preprocess: list<lexeme> -> pure list<lexeme>, p: () -> <console,ast|e> a, sourceName: string, input: string): <console,astError,fsys,pure|e> a
   val src = Source(sourceName, input)
   val lexes = lex(src, 0, input)
-  var lexemes := preprocess(layout(insSemi, lexes))
+  with parseLexemes(src, preprocess(layout(insSemi, lexes)))
+  p()
+  
+fun parseLexemes(src: source, lexemes0: list<lexeme>, p: () -> <console,ast|e> a): <console,astError,fsys,pure|e> a
+  var lexemes := lexemes0
   var history := Cons((ctx _, "top", 0), Nil)
   val debug = False
   with override
@@ -46,6 +52,14 @@ fun lexParse(insSemi: bool, preprocess: list<lexeme> -> list<lexeme>, p: () -> <
       astError("Got error: " ++ e ++ "\n" ++ history.map(fn(x) "\tWhen parsing " ++ x.snd).join("\n"), r)
   with handler
     val sourceInfo = src
+    fun takeAll()
+      val l = lexemes
+      lexemes := Nil
+      history := Cons((ctx _, "top", 0), Nil)
+      l
+    fun putAll(lexemes': list<lexeme>)
+      lexemes := lexemes'
+      history := Cons((ctx _, "top", 0), Nil)
     fun addWarning(w: string, r: range)
       ()
     fun pnext()

@@ -57,10 +57,10 @@ fun show(t: typeVar): string
   t.tid.show ++ "::" ++ t.kind.show
 
 fun (==)(t1: typeVar, t2: typeVar): bool
-  id/(==)(t1.tid, t2.tid)
+  t1.tid == t2.tid
 
 fun (<)(t1: typeVar, t2: typeVar)
-  id/(<)(t1.tid, t2.tid)
+   core/(<)(t1.tid, t2.tid)
 
 // Type constants have a name and a kind
 value struct typeCon
@@ -428,7 +428,7 @@ val tconEffectExtend = TypeCon(nameEffectExtend, kindFun(kindLabel, kindFun(kind
 fun effectExtends(labels: list<tau>, eff: tau): pure tau
   match labels
     Cons(lab as TSyn(TypeSyn(_, kind)), _) | eff.isEffectEmpty && kind == kindEffect -> lab
-    Nil -> labels.foldr(eff, effectExtend)
+    _ -> labels.foldr(eff, effectExtend)
 
 fun effectFixed(labels: list<tau>): pure tau
   effectExtends(labels, effectEmpty)
@@ -468,9 +468,14 @@ fun shallowEffectExtend(label: tau, eff: tau): pure tau
     Nil -> TApp(TCon(tconEffectExtend), [label, eff])
     _ -> effectExtends(ls, eff)
 
-val typeDivergent = unsafe-total{singleEff(nameTpDiv)}
-fun singleEff(name:name)
-  effectExtend(TCon(TypeCon(name, kindEffect)), effectEmpty)
+fun unsafe-type(f: () -> pure tau): tau
+  unsafe-total
+    try(f) fn(e)
+      TCon(TypeCon("error".newName, kindStar))
+
+val typeDivergent = unsafe-type({singleEff(nameTpDiv)})
+fun singleEff(nm:name)
+  effectExtend(TCon(TypeCon(nm, kindEffect)), effectEmpty)
 val typeTotal = TCon(tconTotal)
 val tconTotal = TypeCon(nameEffectEmpty, kindEffect)
 
@@ -479,7 +484,7 @@ fun isTypeTotal(t: tau): bool
     TCon(c) -> c == tconTotal
     _ -> False
 
-val typePure = unsafe-total{effectFixed([typePartial, typeDivergent])}
+val typePure = unsafe-type({effectFixed([typePartial, typeDivergent])})
 val typeBool = TCon(tconBool)
 fun isTypeBool(t: tau): bool
   match t

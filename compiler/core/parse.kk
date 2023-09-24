@@ -1,6 +1,6 @@
 import std/os/path
 import std/os/file
-import newstd/data/linearMap
+import newstd/data/linearmap
 import compiler/common/parse
 import compiler/common/id
 import compiler/syntax/lexeme
@@ -76,7 +76,7 @@ fun parseInlines(prog: core, s: source, env: envv, inlines: list<lexeme>, gamma:
   with parseLexemes(s, inlines)
   with withEnvInitial(prog.coreName, emptyImports)
   setEnv(env(gamma=gamma))
-  val idefs = pmany("", pInlineDef)
+  val idefs = pmany("inline", pInlineDef)
   peof()
   idefs
 
@@ -92,19 +92,19 @@ fun pModule()
   val (name0, _) = pModulePath()
   pmany("semis", pSemicolon)
   braced
-    val (imps, impAliases) = semis("", pImportDecl).unzip
+    val (imps, impAliases) = semis("import", pImportDecl).unzip
     val impMap = impAliases.foldr(emptyImports) fn((asname, name'), m) 
       match m.importsExtend(asname, name')
         Just(imp') -> imp'
         Nothing -> m
-    val externImports = semis("", pExternImportDecl)
-    val fixs = semis("", pFixDecl)
+    val externImports = semis("extern imports", pExternImportDecl)
+    val fixs = semis("fix decls", pFixDecl)
     with withEnvInitial(name0, impMap)
-    val impsyns = semis("", pLocalAlias)
-    val tdefs = semis("", pTypeDecl)
-    val defs = semis("", pDefDecl)
-    val externs = semis("", pExternDecl)
-    val inlines = maybe("", {pSpecial("//.inline-section"); val rest = takeAll(); putAll([]); rest}).default([]) // TODO: Read rest
+    val impsyns = semis("import synonyms", pLocalAlias)
+    val tdefs = semis("type decls", pTypeDecl)
+    val defs = semis("fun decls", pDefDecl)
+    val externs = semis("externs", pExternDecl)
+    val inlines = maybe("inlines", {pSpecial("//.inline-section"); val rest = takeAll(); putAll([]); rest}).default([]) // TODO: Read rest
     val tdefGroups = tdefs.map(fn(tdef) [tdef])
     val defGroups = defs.map(DefNonRec)
     (Core(name0, imps, fixs.concat, tdefGroups, defGroups, externImports ++ externs, doc), getEnv(), inlines)
@@ -253,7 +253,7 @@ fun pExternDecl()
   External(qualify(modname, name), tp, pinfos, formats, vis, fipT, rng, doc)
 
 fun pExternalBody()
-  choices("", [
+  choices("external body", [
     {pKeyword("="); [pExternalEntry()]},
     {semiBraces("", pExternalEntry).fst}
   ])
@@ -332,7 +332,7 @@ fun pApp(): <ast,eenv,compFlags,synonyms> expr
         parseApplies(App(e, args))
       },
       {
-        val tps = angles({pSepBy("", pType, pComma)}).fst
+        val tps = angles({pSepBy("expr args", pType, pComma)}).fst
         parseApplies(TypeApp(e, tps))
       },
       {e}
@@ -351,11 +351,11 @@ fun pForall()
   val tvars = pTypeParams1()
   TypeLam(tvars, pExpr())
 
-fun semiBraced(p)
+fun semiBraced(n, p)
   pLcurly()
-  pmany("", pSemicolon)
+  pmany(n, pSemicolon)
   val x = p()
-  pmany("", pSemicolon)
+  pmany(n, pSemicolon)
   pRcurly()
   x
 
@@ -363,7 +363,7 @@ fun pFun()
   pKeyword("fn")
   val eff = maybe("", {angles(pType).fst}).default(typeTotal)
   val params = pParameters()
-  val body = semiBraced(pExpr)
+  val body = semiBraced("fun", pExpr)
   Lam(params.map(fn((n, t)) TName(n, t)), eff, body)
 
 fun pMatch()
@@ -471,7 +471,7 @@ fun pQualifiedConId()
       pModulePath()
       pSpecialOp("/")
       pSpecial("(")
-      val cs = pmany("", pComma)
+      val cs = pmany("comma", pComma)
       pSpecial(")")
       nameTuple(cs.length + 1)
     },
@@ -563,7 +563,7 @@ fun pQualifier()
 fun pPredicate(): <ast,eenv,compFlags,synonyms> pred
   try("predicate") 
     val (name, _) = pQVarId()
-    val tps = maybe("", {angles({pSepBy("", pType, pComma)}).fst}).default([])
+    val tps = maybe("", {angles({pSepBy("predicates", pType, pComma)}).fst}).default([])
     PredIFace(envQualify(name), tps)  
 
 fun pTArrow(allowBorrow: bool)
@@ -615,13 +615,13 @@ fun pTAtomParamsEx(allowParams: bool, allowBorrow: bool)
       pSpecial("(")
       choices("", [
         {
-          val iparams = pSepBy("", {pParameter(allowBorrow)}, pComma)
+          val iparams = pSepBy("type params", {pParameter(allowBorrow)}, pComma)
           pSpecial(")")
           val (params, pinfos) = iparams.unzip
           Left((params, pinfos))
         },
         {
-          val cs = pmany1("", pComma)
+          val cs = pmany1("tuple commas", pComma)
           pSpecial(")")
           val tp = pTypeApp(typeTuple(cs.length + 1))
           Right(tp)
@@ -634,7 +634,7 @@ fun pTAtomParamsEx(allowParams: bool, allowBorrow: bool)
   ])
 
 fun pTypeApp(tp)
-  val tps = maybe("", {angles({pSepBy("", pType, pComma)}).fst}).default([])
+  val tps = maybe("", {angles({pSepBy("type params", pType, pComma)}).fst}).default([])
   pSynonym(tp, tps)
 
 fun pSynonym(tp, tps): <ast,eenv,compFlags,synonyms> ktype
@@ -656,7 +656,7 @@ fun pSynonym(tp, tps): <ast,eenv,compFlags,synonyms> ktype
 
 fun pTEffect()
   pLangle()
-  val labels = pSepBy("", pTLabel, pComma)
+  val labels = pSepBy("effect type", pTLabel, pComma)
   val ext = pTExtend()
   pRangle()
   labels.foldr(ext, shallowEffectExtend)

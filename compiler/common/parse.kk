@@ -46,7 +46,7 @@ fun lexParse(insSemi: bool, preprocess: list<lexeme> -> pure list<lexeme>, p: ()
 fun parseLexemes(src: source, lexemes0: list<lexeme>, p: () -> <console,ast|e> a): <console,astError,fsys,pure|e> a
   var lexemes := lexemes0
   var history := Cons((ctx _, "top", 0), Nil)
-  val debug = False
+  val debug = True
   with override
     final ctl astError(e: string, r: range)
       astError("Got error: " ++ e ++ "\n" ++ history.map(fn(x) "\tWhen parsing " ++ x.snd).join("\n"), r)
@@ -106,32 +106,32 @@ fun parseLexemes(src: source, lexemes0: list<lexeme>, p: () -> <console,ast|e> a
           False
     fun ptrace(s: string)
       if debug then
-        trace(s ++ "\n" ++ history.map(fn(x) "\tWhen parsing " ++ x.snd).join("\n") ++ "\n\n Next tokens: " ++ lexemes.head.map(show).default("eof"))
+        trace(s ++ "\n" ++ history.map(fn(x) "When parsing " ++ x.snd).join("\n\t") ++ "\n\t\tNext tokens: " ++ lexemes.take(10).map(show).join(","))
   mask<local>{p()}
 
 
 fun pmany(kind: string, l: () -> <ast|e> a): <ast|e> list<a>
-  match maybe("many " ++ kind, l)
+  match optionMaybe("many " ++ kind, l)
     Just(r) -> Cons(r, pmany(kind, l))
     Nothing -> Nil
 
 fun pmany1(kind: string, l: () -> <ast|e> a): <ast|e> list<a>
-  match maybe("many " ++ kind, l)
+  match optionMaybe("many " ++ kind, l)
     Just(r) -> Cons(r, pmany(kind, l))
     Nothing -> astError("at least 1 of " ++ kind, peek().range)
 
 fun pmanyend(kind: string, l: () -> <ast|e> a, p: () -> <ast|e> b): <ast|e> list<a>
-  match maybe("many " ++ kind, l)
+  match optionMaybe("many " ++ kind, l)
     Just(r) -> 
-      match maybe("sep " ++ kind, p)
+      match optionMaybe("sep " ++ kind, p)
         Just(_) -> Cons(r, pmanyend(kind, l, p))
         Nothing -> Cons(r, Nil)
     Nothing -> Nil
 
 fun pmanyend1(kind: string, l: () -> <ast|e> a, p: () -> <ast|e> b): <ast|e> list<a>
-  match maybe("many " ++ kind, l)
+  match optionMaybe("many " ++ kind, l)
     Just(r) -> 
-      match maybe("sep " ++ kind, p)
+      match optionMaybe("sep " ++ kind, p)
         Just(_) -> Cons(r, pmanyend(kind, l, p))
 
 fun token(msg: string, f: (lexeme) -> <ast|e> maybe<a>): <ast|e> a
@@ -176,9 +176,11 @@ fun try(str: string, p: () -> <ast|e> a): <ast|e> a
 // Version of maybe that doesn't backtrack
 fun optionMaybe(str: string, p: () -> <ast|e> a): <ast|e> maybe<a>
   with override
-    return(r) 
+    return(r)
+      commit()
       Just(r)
     final ctl astError(e, r)
+      commit()
       if tookInput() then
         astError(e, r)
       else

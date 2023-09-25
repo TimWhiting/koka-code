@@ -90,8 +90,11 @@ fun pModule()
   val (_, doc) = pDocKeyword("module")
   pKeyword("interface")
   val (name0, _) = pModulePath()
+  trace("Start semis")
   pmany("semis", pSemicolon)
+  trace("Start braced")
   braced
+    trace("Start imports")
     val (imps, impAliases) = semis("import", pImportDecl).unzip
     val impMap = impAliases.foldr(emptyImports) fn((asname, name'), m) 
       match m.importsExtend(asname, name')
@@ -110,7 +113,7 @@ fun pModule()
     (Core(name0, imps, fixs.concat, tdefGroups, defGroups, externImports ++ externs, doc), getEnv(), inlines)
 
 fun pLocalAlias()
-  try("", {pSpecialId("local"); pKeyword("alias")})
+  try("local alias", {pSpecialId("local"); pKeyword("alias")})
   val qname = pQTypeId().fst
   val name = envQualify(qname)
   val params = pTypeParams()
@@ -126,9 +129,9 @@ fun pVisPub()
   maybe("visibility", {pKeyword("pub"); Public}).default(Private)
 
 fun pImportDecl(): <ast> (compiler/core/core/kimport, (name, name))
-  val (vis, doc) = try("", {(pVisPub(), pDocKeyword("import").snd)})
+  val (vis, doc) = try("import", {(pVisPub(), pDocKeyword("import").snd)})
   val (asname, name, _) = pImportAlias()
-  val pkg = maybe("", {pKeyword("="); pStringLit().fst}).default("")
+  val pkg = maybe("=", {pKeyword("="); pStringLit().fst}).default("")
   (compiler/core/core/Kimport(name, pkg, vis, doc), (asname, name))
 
 fun pFixDecl()
@@ -146,29 +149,29 @@ fun pFixity()
   FixInfix(prec, assoc)
 
 fun pTypeDecl()
-  choices("", [
+  choices("type decl", [
     {
-      val (vis, (ddef, isExtend, sort, doc)) = try("", {(pVisPub(), pTypeSort())})
+      val (vis, (ddef, isExtend, sort, doc)) = try("visibility", {(pVisPub(), pTypeSort())})
       val tn = if isExtend then
           pQTypeId().fst
         else
-          qualify(modname, choices("", [pTBinderId, pIdOp]).fst)
+          qualify(modname, choices("identifier", [pTBinderId, pIdOp]).fst)
       val params = pTypeParams()
       val kind = pKindAnnotFull()
-      val cons = maybe("", {semiBraces("", {pConDecl(tn, params, sort)}).fst}).default([])
+      val cons = maybe("constructor", {semiBraces("contructor args", {pConDecl(tn, params, sort)}).fst}).default([])
       val cons1 = match cons
         [con1] -> [con1(singleton=True)]
         _ -> cons
       val dataInfo = DataInfo(sort, tn, kind, params, cons1, rangeNull, ddef, vis, doc)
       Data(dataInfo, isExtend)
     },{
-      val (vis, doc) = try("", {(pVisPub(), pDocKeyword("alias").snd)})
+      val (vis, doc) = try("visibility", {(pVisPub(), pDocKeyword("alias").snd)})
       val name = pTBinderId().fst
       val params = pTypeParams()
       val kind = pKindAnnotFull()
       pKeyword("=")
       val tp = pType()
-      val rank = maybe("", {pKeyword("="); pInteger().fst}).default(0)
+      val rank = maybe("rank", {pKeyword("="); pInteger().fst}).default(0)
       val qname = qualify(modname, name)
       val syn = SynInfo(qname, kind, params, tp, rank, rangeNull, vis, doc)
       envExtendSynonym(syn)
@@ -177,7 +180,7 @@ fun pTypeDecl()
   ])
 
 fun pConDecl(tname0: name, foralls: list<typeVar>, sort: dataKind)
-  val (vis, doc) = try("", {(pVisPub(), pDocKeyword("con").snd)})
+  val (vis, doc) = try("visibility", {(pVisPub(), pDocKeyword("con").snd)})
   val name = pConstructorId().fst
   val exists0 = pTypeParams()
   val params = pParameters()
@@ -188,7 +191,7 @@ fun pConDecl(tname0: name, foralls: list<typeVar>, sort: dataKind)
   ConInfo(qualify(modname, name), tname0, foralls, exists0, params2, tp, sort, rangeNull, params2.map(fn(_) rangeNull), params2.map(fn(_) Public), False, orderedFields, vrepr, vis, doc)
 
 fun pTypeSort()
-  val isRec = maybe("", {pSpecialId("recursive")}).is-just
+  val isRec = maybe("recursive", {pSpecialId("recursive")}).is-just
   val (ddef0, isExtend, sort) = pTypeMod()
   val doc = pDocKeyword("type").snd
   val ddef = match (isRec, ddef0)
@@ -216,8 +219,8 @@ fun pValueRepr()
     ValueRepr(rraw, scan, align)
 
 fun pDefDecl()
-  val (vis, sort0, inl, doc) = try("", {val vis = pVisPub(); val (sort, inl, _, doc) = pDefSort(); (vis, sort, inl, doc)})
-  val (name, _) = choices("", [pFunId, pIdOp])
+  val (vis, sort0, inl, doc) = try("visibility and sort", {val vis = pVisPub(); val (sort, inl, _, doc) = pDefSort(); (vis, sort, inl, doc)})
+  val (name, _) = choices("decl name", [pFunId, pIdOp])
   pKeyword(":")
   val (tp, pinfos) = pDefType()
   val sort = match sort0
@@ -226,13 +229,13 @@ fun pDefDecl()
   Def(qualify(modname, name), tp, fail("core/parse " ++ name.show ++ ": cannot get the expression from an interface core file"), vis, sort, inl, rangeNull, doc)
 
 fun pDefSort()
-  val isRec = maybe("", {pSpecialId("recursive")}).is-just
+  val isRec = maybe("recursive", {pSpecialId("recursive")}).is-just
   val inl = pInline()
-  choices("", [
+  choices("fip info", [
     {
-      val fipT = try("", pFip)
+      val fipT = try("fip", pFip)
       val (_, doc) = pDocKeyword("fun")
-      choices("", [{pSpecialOp("**"); ()}, {pSpecialOp("*"); ()}, {()}])
+      choices("specialization", [{pSpecialOp("**"); ()}, {pSpecialOp("*"); ()}, {()}])
       (defFunEx([], fipT), inl, isRec, doc)
     },
     {(DefVal, inl, False, pDocKeyword("val").snd)}
@@ -245,7 +248,7 @@ fun pInlineDef()
   InlineDef(envQualify(name), e, isRec, inl, if inl.is-inlineAlways then 0 else e.cost, sort, specArgs)
 
 fun pExternDecl()
-  val (vis, fipT, doc) = try("", {(pVisPub(), pFip(), pDocKeyword("extern").snd)})
+  val (vis, fipT, doc) = try("visibility", {(pVisPub(), pFip(), pDocKeyword("extern").snd)})
   val (name, rng) = pFunId()
   pKeyword(":")
   val (tp, pinfos) = pDefType()
@@ -255,12 +258,12 @@ fun pExternDecl()
 fun pExternalBody()
   choices("external body", [
     {pKeyword("="); [pExternalEntry()]},
-    {semiBraces("", pExternalEntry).fst}
+    {semiBraces("external entry", pExternalEntry).fst}
   ])
 
 fun pExternalEntry()
   val target = pExternalTarget()
-  maybe("", {pSpecialId("inline")})
+  maybe("external inline", {pSpecialId("inline")})
   val s = pStringLit().fst
   (target, s)
 
@@ -284,7 +287,7 @@ fun pExternalImportKeyVal()
 
 fun pExternalImportEntry()
   val target = pExternalTarget()
-  (target, semiBraces("", pExternalImportKeyVal).fst)
+  (target, semiBraces("external key value", pExternalImportKeyVal).fst)
 
 fun pExternalImportBody()
   choices("external import body", [
@@ -293,16 +296,16 @@ fun pExternalImportBody()
       [pExternalImportEntry()]
     },
     {
-      semiBraces("",pExternalImportEntry).fst
+      semiBraces("external import entries",pExternalImportEntry).fst
     }
   ])
 
 fun pInlineDefSort()
-  val isRec = maybe("", {pSpecialId("recursive")}).is-just
+  val isRec = maybe("inline recursive", {pSpecialId("recursive")}).is-just
   val inl = pInline()
-  val spec = maybe("", {pSpecialId("specialize"); val (s,_) = pStringLit(); s.list.map(fn(c) c == '*')}).default([])
-  val pinfos = maybe("", {pSpecialId("borrow"); val (s, _) = pStringLit(); s.list.map(fn(c) if c == '^' then Borrow else Own)}).default([])
-  choices("", [
+  val spec = maybe("inline specialize", {pSpecialId("specialize"); val (s,_) = pStringLit(); s.list.map(fn(c) c == '*')}).default([])
+  val pinfos = maybe("inline borrow", {pSpecialId("borrow"); val (s, _) = pStringLit(); s.list.map(fn(c) if c == '^' then Borrow else Own)}).default([])
+  choices("fun or val inline", [
     {
       val f = pFip()
       val (_, doc) = pDocKeyword("fun")
@@ -317,7 +320,7 @@ fun pInlineDefSort()
 fun pBody()
   pKeyword("=")
   val e = pExpr()
-  pSemicolon()
+  optionMaybe("semis", pSemicolon)
   e
 
 fun pExpr()
@@ -361,7 +364,7 @@ fun semiBraced(n, p)
 
 fun pFun()
   pKeyword("fn")
-  val eff = maybe("", {angles(pType).fst}).default(typeTotal)
+  val eff = maybe("type parameters", {angles(pType).fst}).default(typeTotal)
   val params = pParameters()
   val body = semiBraced("fun", pExpr)
   Lam(params.map(fn((n, t)) TName(n, t)), eff, body)
@@ -369,7 +372,7 @@ fun pFun()
 fun pMatch()
   pKeyword("match")
   val args = parensCommas(pExpr).fst
-  val branches = semiBraces("", pBranch).fst
+  val branches = semiBraces("match branches", pBranch).fst
   Case(args, branches)
 
 fun pCon()
@@ -378,7 +381,7 @@ fun pCon()
   Con(TName(name, typ), repr)
 
 fun pVar()
-  val name = choices("", [pQVarId, pQIdOp]).fst
+  val name = choices("var identifier", [pQVarId, pQIdOp]).fst
   if name.isQualified then
     envLookupVar(name)
   else
@@ -399,11 +402,11 @@ fun pDefGroups()
   Cons(dg, dgs)
 
 fun pDefGroups0()
-  maybe("", {pDefGroups()}).default([])  
+  maybe("def groups", {pDefGroups()}).default([])  
 
 fun pDefGroup(): <ast,eenv,compFlags,synonyms> defGroup
   val (sort, inl, _, doc) = pDefSort()
-  val (name, _) = choices("", [pFunId, {pWildcard(); (nameNil, rangeNull)}])
+  val (name, _) = choices("def group", [pFunId, {pWildcard(); (nameNil, rangeNull)}])
   val tp = pTypeAnnot()
   val expr = pBody()
   envExtendLocal(name, tp)
@@ -411,15 +414,15 @@ fun pDefGroup(): <ast,eenv,compFlags,synonyms> defGroup
 
 fun pBranch()
   val patts = pPatterns1()
-  val guards = pmany1("", pGuard)
+  val guards = pmany1("guard", pGuard)
   Branch(patts, guards)
 
 fun pPatterns1()
   val pat = pPattern()
-  maybe("", {pComma(); Cons(pat, pPatterns1())}).default([])
+  maybe("pattern comma", {pComma(); Cons(pat, pPatterns1())}).default([])
 
 fun pGuard()
-  val grd = maybe("", {pBar(); try("guard", pExpr)}).default(exprTrue)
+  val grd = maybe("guard expr", {pBar(); try("guard", pExpr)}).default(exprTrue)
   pKeyword("->")
   Guard(grd, pExpr())
 
@@ -434,18 +437,18 @@ fun pPatCon()
   val skip = maybe(".skip", {pSpecialId(".skip")}).is-just
   val cname = pQualifiedConId()
   val exists0 = pTypeParams()
-  val args = try("", {pLparen(); val x = pPatternArgs0(); pRparen(); x})
+  val args = try("pattern args", {pLparen(); val x = pPatternArgs0(); pRparen(); x})
   val (patArgs, argTypes) = args.unzip
   val resTp = pTypeAnnot()
   val InfoCon(_, typ, repr, cons) = envLookupCon(cname)
   PatCon(TName(cname, typ), patArgs, repr, argTypes, exists0, resTp, cons, skip)
 
 fun pPatternArgs0(): <ast,eenv,compFlags,synonyms> list<(pattern, ktype)>
-  maybe("", {pPatternArgs1()}).default([])
+  maybe("pattern args", {pPatternArgs1()}).default([])
 
 fun pPatternArgs1()
   val pattp = pPatternArg()
-  maybe("", {pComma(); Cons(pattp, pPatternArgs1())}).default([])
+  maybe("pattern args", {pComma(); Cons(pattp, pPatternArgs1())}).default([])
 
 fun pPatternArg()
   val pat = pPattern()
@@ -466,7 +469,7 @@ fun pPatWild()
   PatWild
 
 fun pQualifiedConId()
-  choices("", [
+  choices("constructor id", [
     {
       pModulePath()
       pSpecialOp("/")
@@ -479,19 +482,19 @@ fun pQualifiedConId()
   ])
 
 fun pParameters()
-  val iparams = maybe("", {parensCommas({pParameter(False)}).fst}).default([])
+  val iparams = maybe("parameters", {parensCommas({pParameter(False)}).fst}).default([])
   val (params, _) = iparams.unzip
   params.map(fn((n, t)) envExtendLocal(n, t))
   params
 
 fun pParameter(allowBorrow: bool)
-  val (name, pinfo) = maybe("", {
+  val (name, pinfo) = maybe("parameter info", {
     val pinfo = if allowBorrow then pParamInfo() else Own
     val (name, _) = pParamId()
     pKeyword(":")
     (name, pinfo)
   }).default((nameNil, Own))
-  choices("", [
+  choices("optional type", [
     {
       pSpecialOp("?")
       ((name, makeOptional(pType())), pinfo)
@@ -510,7 +513,7 @@ fun pTypeAnnotFull()
   pType()
 
 fun pTypeParams()
-  maybe("", pTypeParams1).default([])
+  maybe("type parameters", pTypeParams1).default([])
 
 fun pTypeParams1()
   angles(pTBinders).fst
@@ -538,7 +541,7 @@ fun pKindAnnotFull()
   pKindAnnot()
 
 fun pKindAnnot()
-  maybe("", {pSpecialOp("::"); pKind()}).default(kindStar)
+  maybe("kind annotation", {pSpecialOp("::"); pKind()}).default(kindStar)
 
 fun pType(): <ast,eenv,compFlags,synonyms> ktype
   pTypeX(False).fst
@@ -555,22 +558,22 @@ fun pTypeX(allowBorrow: bool)
     (quantify(preds, tp), pinfos)
 
 fun pTForall()
-  maybe("", {pKeyword("forall"); val params = pTypeParams1(); fn(ps, rho) TForAll(params, ps, rho)}).default(fn(ps, rho) if ps.is-nil then rho else TForAll([], ps, rho))
+  maybe("type forall", {pKeyword("forall"); val params = pTypeParams1(); fn(ps, rho) TForAll(params, ps, rho)}).default(fn(ps, rho) if ps.is-nil then rho else TForAll([], ps, rho))
 
 fun pQualifier()
-  maybe("", {pKeyword("with"); pmany1("", pPredicate)}).default([])
+  maybe("qualifier", {pKeyword("with"); pmany1("qualifier predicates", pPredicate)}).default([])
 
 fun pPredicate(): <ast,eenv,compFlags,synonyms> pred
   try("predicate") 
     val (name, _) = pQVarId()
-    val tps = maybe("", {angles({pSepBy("predicates", pType, pComma)}).fst}).default([])
+    val tps = maybe("predicate type parameters", {angles({pSepBy("predicates", pType, pComma)}).fst}).default([])
     PredIFace(envQualify(name), tps)  
 
 fun pTArrow(allowBorrow: bool)
   val etp = pTAtomParams(allowBorrow)
   match etp
     Left((params, pinfos)) ->
-      choices("", [
+      choices("function type", [
         {
           pKeyword("->")
           (pTResult(params), pinfos)
@@ -584,7 +587,7 @@ fun pTArrow(allowBorrow: bool)
 
 fun pTResult(params)
   val tp1 = pTAtom()
-  val res = maybe("")
+  val res = maybe("result type")
     TFun(params, tp1, pTAtom())
   match res
     Just(tp) -> tp
@@ -613,7 +616,7 @@ fun pTAtomParamsEx(allowParams: bool, allowBorrow: bool)
   choices("type atom", [
     {
       pSpecial("(")
-      choices("", [
+      choices("type parameters", [
         {
           val iparams = pSepBy("type params", {pParameter(allowBorrow)}, pComma)
           pSpecial(")")
@@ -634,13 +637,13 @@ fun pTAtomParamsEx(allowParams: bool, allowBorrow: bool)
   ])
 
 fun pTypeApp(tp)
-  val tps = maybe("", {angles({pSepBy("type params", pType, pComma)}).fst}).default([])
+  val tps = maybe("type application", {angles({pSepBy("type params", pType, pComma)}).fst}).default([])
   pSynonym(tp, tps)
 
 fun pSynonym(tp, tps): <ast,eenv,compFlags,synonyms> ktype
   val res = maybe("Env")
     pSpecialOp("==")
-    val rank = maybe("", {pInteger().fst}).default(0)
+    val rank = maybe("synonym rank", {pInteger().fst}).default(0)
     val body = pType()
     match tp
       TCon(TypeCon(name, kind)) ->
@@ -662,20 +665,20 @@ fun pTEffect()
   labels.foldr(ext, shallowEffectExtend)
 
 fun pTExtend(): <ast,eenv,compFlags,synonyms> ktype
-  maybe("", {pBar(); pTAtom()}).default(effectEmpty)
+  maybe("effect extend", {pBar(); pTAtom()}).default(effectEmpty)
 
 fun pTLabel()
   pTypeApp(pTAtom())
 
 fun pTId(): <ast,eenv,compFlags,synonyms> ktype
-  val (name, _) = choices("", [pQVarId, pQIdOp, pWildcard])
-  val kind = maybe("", pKindAnnotFull).default(kindStar)
+  val (name, _) = choices("type id", [pQVarId, pQIdOp, pWildcard])
+  val kind = maybe("type kind", pKindAnnotFull).default(kindStar)
   envType(name, kind)
 
 fun pKind()
   choices("kind", [
     {val params = parensCommas(pKind).fst; pKeyword("->"); val res = pKind(); params.foldr(res, kindFun)},
-    {val k = pKatom(); choices("", [{pKeyword("->"); val res = pKind(); kindFun(k, res)}, {k}])}
+    {val k = pKatom(); choices("kind arrow", [{pKeyword("->"); val res = pKind(); kindFun(k, res)}, {k}])}
   ])
 
 fun pKatom()

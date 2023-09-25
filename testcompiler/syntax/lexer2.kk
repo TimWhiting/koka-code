@@ -7,7 +7,7 @@ import compiler/syntax/lexeme
 fun main()
   // Make sure to set $ulimit -s unlimited$ to allow more stack space
   val r = read-text-file("/Users/timwhiting/koka_code/compiler/syntax/lexer.kk".path)
-  val x = lexer("test", 0, r)
+  val x = lexer("test", 1, r)
   match x
     Right(u) -> 
       val _ = u.map(show).join(","); 

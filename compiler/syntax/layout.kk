@@ -20,7 +20,7 @@ fun testEx(fname: string, input: string)
 
 fun layout(semiInsert: bool, lexemes: list<lexeme>): list<lexeme>
   fun semi(v: list<lexeme>, f: (list<lexeme>) -> list<lexeme>) if semiInsert then f(v) else v
-  lexemes.semi(checkComments).combineLineComments.removeWhite.associateComments.removeWhite.semi(indentLayout)
+  lexemes.semi(checkComments).combineLineComments.removeWhitespace.associateComments.removeWhite.semi(indentLayout)
 
 fun isLexError(x)
   match x
@@ -29,6 +29,9 @@ fun isLexError(x)
 
 fun removeWhite(lexemes: list<lexeme>): list<lexeme>
   lexemes.filter(fn(x) !lexemeIsWhite(x))
+
+fun removeWhitespace(lexemes: list<lexeme>): list<lexeme>
+  lexemes.filter(fn(x) !lexemeIsWhitespace(x))
 
 fun endLine(r)
   r.end.line

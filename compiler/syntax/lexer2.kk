@@ -293,16 +293,11 @@ fun lex-rstringbegin()
     Cons(e, _) -> e
     Nil -> LexString(inner)
 
-val notNewlineRegex = "[^\\n]".regex()
+val notNewlineRegex = "^[^\\n]+".regex()
 fun lex-linecomment()
   with atomic
-  val start = token("//") ++ many(symbol).join
-  val inner = many({[linechar].ors})
-  val err = many({takePattern(notNewlineRegex)})
-  newline()
-  match err
-    Cons(_, __) -> LexError(err.join)
-    _ -> LexComment(start ++ inner.join)
+  val start = token("//") ++ takePattern(notNewlineRegex)
+  LexComment(start ++ newline())
 
 fun lex-charesc()
   with atomic
@@ -475,15 +470,17 @@ fun lexing(source: source, lineNo: int, input: string)
               val finalOffset = offset()
               val nlines = match e
                 LexWhite(w) -> w.count("\n")
+                LexComment(w) -> w.count("\n")
                 _ -> 0
               val ncols = match e
                 LexWhite(w) -> w.list.reverse.take-while(fn(c) c != '\n').length
+                LexComment(w) -> w.list.reverse.take-while(fn(c) c != '\n').length
                 _ -> finalOffset - startOff
               pos := Pos(source, finalOffset, start.line + nlines, col=start.col+ncols)
               result := Cons(Lexeme(Range(start, pos), e), result)
             Left(e) ->
               cont := False
-              println(e.show(fn(s:string) s, input))
+              throw("Lexing error: \n\n" ++ e.show(fn(s:string) s, input))
         Right ->
           cont := False
     result.reverse

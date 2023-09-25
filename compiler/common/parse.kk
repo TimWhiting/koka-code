@@ -1,5 +1,5 @@
 import compiler/syntax/layout
-import compiler/syntax/lexer
+import compiler/syntax/lexer2
 import compiler/syntax/lexeme
 import compiler/syntax/syntax
 import syntax
@@ -14,15 +14,24 @@ effect astParse
   val sourceInfo: source
   fun addWarning(w: string, r: range): ()
   fun ppeek(): maybe<lexeme>
-  fun commit(): ()
-  fun reset(): ()
-  fun pdelimit(msg: string): ()
+  fun undelimit(msg: string): ()
+  fun reset(msg: string): ()
+  fun delimit(msg: string): ()
   fun pnext(): maybe<lexeme>
   fun peof(): ()
-  fun tookInput(): bool
+  fun tookInput(msg: string): bool
   fun ptrace(s: string): ()
   fun takeAll(): list<lexeme>
   fun putAll(lexemes: list<lexeme>): ()
+
+fun pdelimit(msg: string, f: () -> <astParse,astError|e> a): <astParse,astError|e> a
+  with override
+    final ctl astError(e, r) 
+      astError("\nWhen parsing " ++ msg ++ e, r)
+    finally()
+      undelimit(msg)
+  delimit(msg)
+  f()
 
 fun peek(): ast lexeme
   val p = ppeek()
@@ -39,7 +48,7 @@ fun next(): ast lexeme
 alias ast = <astParse, astError, pure, fsys>
 fun lexParse(insSemi: bool, preprocess: list<lexeme> -> pure list<lexeme>, p: () -> <console,ast|e> a, sourceName: string, input: string): <console,astError,fsys,pure|e> a
   val src = Source(sourceName, input)
-  val lexes = lex(src, 0, input)
+  val lexes = lex(src, 1, input)
   with parseLexemes(src, preprocess(layout(insSemi, lexes)))
   p()
   
@@ -49,7 +58,7 @@ fun parseLexemes(src: source, lexemes0: list<lexeme>, p: () -> <console,ast|e> a
   val debug = True
   with override
     final ctl astError(e: string, r: range)
-      astError("Got error: " ++ e ++ "\n" ++ history.map(fn(x) "\tWhen parsing " ++ x.snd).join("\n"), r)
+      astError("Got error: " ++ e ++ "\n" ++ " when parsing:\n\t" ++ lexemes.take(2).map(show).join("\n\t"), r)
   with handler
     val sourceInfo = src
     fun takeAll()
@@ -73,19 +82,29 @@ fun parseLexemes(src: source, lexemes0: list<lexeme>, p: () -> <console,ast|e> a
               astError("unexpected top of context", rangeNull)
           Just(l)
         Nil -> Nothing
-    fun reset()
+    fun reset(msg)
       match history
         Cons((h, str, _), rst) -> 
-          lexemes := h ++. lexemes
-          history := rst
-          if debug then
-            trace("Resetting " ++ str ++ "\n" ++ history.map(fn(x) "\tWhen parsing " ++ x.snd).join("\n") ++ " at " ++ lexemes.head.map(show).default("eof"))
+          if str != msg then
+            trace("Resetting " ++ str ++ " but expected " ++ msg)
+            throw("Error")
+          else
+            lexemes := h ++. lexemes
+            history := rst
+            if debug then
+              trace("Resetting " ++ str ++ "\n" ++ history.map(fn(x) "\tWhen parsing " ++ x.snd).join("\n") ++ " at " ++ lexemes.head.map(show).default("eof"))
         Nil ->
           astError("mismatched reset", rangeNull)
-    fun pdelimit(msg)
+    fun delimit(msg)
       history := Cons((ctx _, msg, 0), history)
-    fun commit()
-      history := history.tail
+    fun undelimit(msg)
+      match history
+        Cons((_, str, _), rst) ->
+          if str == msg then
+            history := rst
+          else
+            trace("Undelimiting " ++ str ++ " but expected " ++ msg)
+            throw("Error")
     fun ppeek()
       match lexemes
         Cons(l, _) -> Just(l)
@@ -98,15 +117,19 @@ fun parseLexemes(src: source, lexemes0: list<lexeme>, p: () -> <console,ast|e> a
           astError("peof expected end of file", l.range)
         Nil ->
           ()
-    fun tookInput()
+    fun tookInput(str)
       match history
-        Cons((_, _, i), _) -> 
-          i != 0
+        Cons((_, msg, i), _) ->
+          if str != msg then
+            trace("Checking if input was taken for " ++ str ++ " but expected " ++ msg)
+            throw("Error")
+          else
+            i != 0
         Nil ->
           False
     fun ptrace(s: string)
       if debug then
-        trace(s ++ "\n" ++ history.map(fn(x) "When parsing " ++ x.snd).join("\n\t") ++ "\n\t\tNext tokens: " ++ lexemes.take(10).map(show).join(","))
+        trace(s ++ "\n  " ++ history.map(fn(x) "When parsing " ++ x.snd).join("\n\t") ++ " next token: " ++ lexemes.take(1).map(show).join(","))
   mask<local>{p()}
 
 
@@ -138,24 +161,23 @@ fun token(msg: string, f: (lexeme) -> <ast|e> maybe<a>): <ast|e> a
   val t = peek()
   match f(t) 
     Just(a) -> 
-      ptrace("Consuming " ++ t.show)
       next() 
+      ptrace("Consuming " ++ t.show)
       a
     Nothing ->
       astError("expecting " ++ msg, peek().range)
 
 // Version of maybe that does backtrack
 fun maybe<e>(str: string, p: () -> <ast|e> a): <ast|e> maybe<a>
+  delimit(str)
   with override
-    return(r) 
+    return(r)
+      undelimit(str)
       Just(r)
     final ctl astError(e, r) 
-      reset()
+      reset(str)
       Nothing
-  pdelimit(str)
-  val x = p()
-  commit()
-  x
+  p()
 
 fun maybeList(p: () -> <ast|e> list<a>): <ast|e> list<a>
   match maybe("list", p)
@@ -163,32 +185,36 @@ fun maybeList(p: () -> <ast|e> list<a>): <ast|e> list<a>
     Nothing -> []
 
 fun try(str: string, p: () -> <ast|e> a): <ast|e> a
+  delimit(str)
   with override
-    return(r) r
+    return(r) 
+      undelimit(str)
+      r
     final ctl astError(e, r) 
-      reset()
+      reset(str)
       astError(e,r)
-  pdelimit(str)
-  val x = p()
-  commit()
-  x
+  p()
+  
 
 // Version of maybe that doesn't backtrack
 fun optionMaybe(str: string, p: () -> <ast|e> a): <ast|e> maybe<a>
+  with pdelimit(str)
+  trace("Parsing for " ++ str)
   with override
     return(r)
-      commit()
       Just(r)
     final ctl astError(e, r)
-      commit()
-      if tookInput() then
+      trace("Failed to parse " ++ str ++ " " ++ e ++ " " ++ tookInput(str).show)
+      if tookInput(str) then
         astError(e, r)
       else
         Nothing 
-  pdelimit(str)
-  p()
+  val x = p()
+  trace("Done parsing for " ++ str)
+  x
 
 fun choicesnb(str: string, ps: list<() -> <ast|e> a>): <ast|e> a
+  with pdelimit(str)
   fun find(ps': list<() -> <ast|e> a>): <ast|e> a
     match ps'
       Cons(p, rst) -> 
@@ -196,26 +222,23 @@ fun choicesnb(str: string, ps: list<() -> <ast|e> a>): <ast|e> a
           Just(r) -> r
           Nothing -> find(rst)
       Nil -> astError("expected " ++ str, peek().range)
-  with override
-    final ctl astError(e, r) 
-      reset()
-      astError(e, r)
-  pdelimit(str)
-  val x = find(ps)
-  commit()
-  x
+  find(ps)
 
-// TODO: Add a choices with default, which will never backtrack?
 fun choices(str: string, ps: list<() -> <ast|e> a>): <ast|e> a
-  match ps.find-maybe(fn(p) maybe(str, p)) // TODO Capture error from below for better error message expected one of...
-    Just(r) -> r
-    Nothing -> astError("expected " ++ str, peek().range)
+  fun find(ps': list<() -> <ast|e> a>): <ast|e> a
+    match ps'
+      Cons(p, rst) -> 
+        match maybe(str, p)
+          Just(r) -> r
+          Nothing -> find(rst)
+      Nil -> astError("expected " ++ str, peek().range)
+  find(ps)
 
 fun makeParseError(r: range, e: string)
   astError("invalid syntax" ++ e.list.drop-while(fn(x) x != ':').string, r)
 
 fun braced(p)
-  val v = maybe("braced") 
+  val v = optionMaybe("braced") 
     pLcurly()
     pmany("semicolons", pSemicolon)
     val x = p()
@@ -301,11 +324,11 @@ fun pRcurly()
   parseRange("}", fn(x) x.lex.is-rcurly)
 
 fun pTBinderId()
-  choicesnb("", [pTypeId, pTList, pTTuple, pTEmptyOrExtend])
+  choicesnb("tBinderId", [pTypeId, pTList, pTTuple, pTEmptyOrExtend])
 
 fun pTEmptyOrExtend()
   val rng1 = pLangle()
-  choicesnb("", [
+  choicesnb("empty or extend effect", [
     {
       pBar()
       val rng2 = pRangle()
@@ -437,14 +460,9 @@ fun ensureUnqualified(str, p)
     (n, r)
 
 fun pQTypeId()
-  with override
-    final ctl astError(e, r) 
-      reset()
-      astError(e, r)
-  pdelimit("qualified typeId")
+  with try("qualified typeId")
   val (name, range) = choicesnb("qTypeId", [pQVarId, pTypeIdCtx])
   if !name.isTypeVar then 
-    commit()
     (name, range)
   else astError("type name (and not type variable)", range)
 

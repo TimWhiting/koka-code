@@ -4,8 +4,10 @@ import std/text/unicode
 import compiler/common/name
 import compiler/common/range
 
+val typeVarRegex = "^[a-z][0-9]*$".regex();
+
 pub fun isTypeVar(n: name): bool
-  !"[a-z][0-9]*".regex().exec(n.nameId).is-empty
+  !typeVarRegex.exec(n.nameId).is-empty
 
 pub struct lexeme ( pub range: range, pub lex: lex )
 
@@ -109,7 +111,16 @@ pub fun isError(l: lex)
 pub fun lexemeIsWhite(l: lexeme): <> bool
   l.lex.lexIsWhite
 
+pub fun lexemeIsWhitespace(l: lexeme): <> bool
+  l.lex.lexIsWhitespace
+
 pub fun lexIsWhite(l: lex): <> bool
+  match l
+    LexWhite(_) -> True
+    LexComment(_) -> True
+    _ -> False
+
+pub fun lexIsWhitespace(l: lex): <> bool
   match l
     LexWhite(_) -> True
     _ -> False

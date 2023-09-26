@@ -58,7 +58,7 @@ fun allowDotIds(lexes: list<lexeme>): div list<lexeme>
       -> allowDotIds(Cons(Lexeme(r1.combine(r3), LexCons(postpend("." ++ i.show, nm))), lexx))
 
     // (-.4), (++.2)
-    Cons(Lexeme(r1, LexSpecial("(")), Cons(Lexeme(_, LexOp(nm)), Cons(Lexeme(_,LexInt(i)),Cons(Lexeme(r5,LexSpecial(")")), lexx)))) // | last (nmId nm) == '.'
+    Cons(Lexeme(r1, LexSpecial("(")), Cons(Lexeme(_, LexOp(nm)), Cons(Lexeme(_,LexInt(i)), Cons(Lexeme(r5,LexSpecial(")")), lexx)))) // | last (nmId nm) == '.'
       -> allowDotIds(Cons(Lexeme(r1.combine(r5), LexId(postpend(i.show, nm))), lexx))
     // (/.4)
     Cons(Lexeme(r1, LexSpecial("(")), Cons(Lexeme(_, LexOp(nm)), Cons(Lexeme(_, LexKeyword(".")), Cons(Lexeme(_, LexInt(i)),Cons(Lexeme(r5, LexSpecial(")")), lexx))))) // | last (nmId nm) == '.'
@@ -90,11 +90,8 @@ fun pModule()
   val (_, doc) = pDocKeyword("module")
   pKeyword("interface")
   val (name0, _) = pModulePath()
-  trace("Start semis")
   pmany("semis", pSemicolon)
-  trace("Start braced")
   braced
-    trace("Start imports")
     val (imps, impAliases) = semis("import", pImportDecl).unzip
     val impMap = impAliases.foldr(emptyImports) fn((asname, name'), m) 
       match m.importsExtend(asname, name')
@@ -226,7 +223,7 @@ fun pDefDecl()
   val sort = match sort0
     DefFun(_, fipT) -> DefFun(pinfos, fipT)
     _ -> sort0
-  Def(qualify(modname, name), tp, fail("core/parse " ++ name.show ++ ": cannot get the expression from an interface core file"), vis, sort, inl, rangeNull, doc)
+  Def(qualify(modname, name), tp, ELit(LitString("core/parse " ++ name.show ++ ": cannot get the expression from an interface core file")), vis, sort, inl, rangeNull, doc)
 
 fun pDefSort()
   val isRec = maybe("recursive", {pSpecialId("recursive")}).is-just
@@ -521,6 +518,7 @@ fun pTypeParams1()
 fun pTBinders()
   val bs = pSepBy("quantifiers", pTBinder, pComma)
   bs.map fn((name, kind)) 
+    envExtend(name, kind)
     match envType(name, kind)
       TVar(tv) -> tv
       _ -> fail("core/parse pTBinders: expecting type variable")
@@ -558,7 +556,9 @@ fun pTypeX(allowBorrow: bool)
     (quantify(preds, tp), pinfos)
 
 fun pTForall()
-  maybe("type forall", {pKeyword("forall"); val params = pTypeParams1(); fn(ps, rho) TForAll(params, ps, rho)}).default(fn(ps, rho) if ps.is-nil then rho else TForAll([], ps, rho))
+  val params = maybe("type forall", {pKeyword("forall"); pTypeParams1()})
+  fn(ps, rho)
+    if ps.is-nil then rho else TForAll(params.default([]), ps, rho)
 
 fun pQualifier()
   maybe("qualifier", {pKeyword("with"); pmany1("qualifier predicates", pPredicate)}).default([])
@@ -658,6 +658,7 @@ fun pSynonym(tp, tps): <ast,eenv,compFlags,synonyms> ktype
     Nothing -> envTypeApp(tp, tps)
 
 fun pTEffect()
+  with try("typeEffect")
   pLangle()
   val labels = pSepBy("effect type", pTLabel, pComma)
   val ext = pTExtend()

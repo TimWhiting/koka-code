@@ -25,13 +25,14 @@ effect astParse
   fun putAll(lexemes: list<lexeme>): ()
 
 fun pdelimit(msg: string, f: () -> <astParse,astError|e> a): <astParse,astError|e> a
+  delimit(msg)
   with override
     final ctl astError(e, r) 
-      astError("\nWhen parsing " ++ msg ++ e, r)
-    finally()
       undelimit(msg)
-  delimit(msg)
-  f()
+      astError("\nWhen parsing " ++ msg ++ " " ++ e, r)
+  val x = f()
+  undelimit(msg)
+  x
 
 fun peek(): ast lexeme
   val p = ppeek()
@@ -55,7 +56,7 @@ fun lexParse(insSemi: bool, preprocess: list<lexeme> -> pure list<lexeme>, p: ()
 fun parseLexemes(src: source, lexemes0: list<lexeme>, p: () -> <console,ast|e> a): <console,astError,fsys,pure|e> a
   var lexemes := lexemes0
   var history := Cons((ctx _, "top", 0), Nil)
-  val debug = True
+  val debug = False
   with override
     final ctl astError(e: string, r: range)
       astError("Got error: " ++ e ++ "\n" ++ " when parsing:\n\t" ++ lexemes.take(2).map(show).join("\n\t"), r)
@@ -63,12 +64,12 @@ fun parseLexemes(src: source, lexemes0: list<lexeme>, p: () -> <console,ast|e> a
     val sourceInfo = src
     fun takeAll()
       val l = lexemes
-      lexemes := Nil
-      history := Cons((ctx _, "top", 0), Nil)
+      lexemes := Nil // TODO: This ruins the history -- especially with delimiting
+      // history := Cons((ctx _, "top", 0), Nil)
       l
     fun putAll(lexemes': list<lexeme>)
-      lexemes := lexemes'
-      history := Cons((ctx _, "top", 0), Nil)
+      lexemes := lexemes' // TODO: This ruins the history -- especially with delimiting
+      // history := Cons((ctx _, "top", 0), Nil)
     fun addWarning(w: string, r: range)
       ()
     fun pnext()
@@ -87,24 +88,26 @@ fun parseLexemes(src: source, lexemes0: list<lexeme>, p: () -> <console,ast|e> a
         Cons((h, str, _), rst) -> 
           if str != msg then
             trace("Resetting " ++ str ++ " but expected " ++ msg)
-            throw("Error")
+            throw("Reset error")
           else
             lexemes := h ++. lexemes
             history := rst
             if debug then
-              trace("Resetting " ++ str ++ "\n" ++ history.map(fn(x) "\tWhen parsing " ++ x.snd).join("\n") ++ " at " ++ lexemes.head.map(show).default("eof"))
+              trace("Resetting " ++ str ++ "\n" ++ history.map(fn(x) "\tWhen parsing " ++ x.snd).join("\n") ++ " at " ++ lexemes.head.map(show).default("eof") ++ "\nputting back:\n\t" ++ (h ++. Nil).map(show).join("\n\t"))
         Nil ->
           astError("mismatched reset", rangeNull)
     fun delimit(msg)
       history := Cons((ctx _, msg, 0), history)
     fun undelimit(msg)
       match history
-        Cons((_, str, _), rst) ->
+        Cons((lexes, str, _), Cons((lexes2, str2, i2), rst)) ->
           if str == msg then
-            history := rst
+            history := Cons((lexes2 ++ lexes, str2, i2), rst)
           else
             trace("Undelimiting " ++ str ++ " but expected " ++ msg)
-            throw("Error")
+            throw("Undelimit error")
+        _ ->
+          throw("Undelimiting from top")
     fun ppeek()
       match lexemes
         Cons(l, _) -> Just(l)
@@ -122,7 +125,7 @@ fun parseLexemes(src: source, lexemes0: list<lexeme>, p: () -> <console,ast|e> a
         Cons((_, msg, i), _) ->
           if str != msg then
             trace("Checking if input was taken for " ++ str ++ " but expected " ++ msg)
-            throw("Error")
+            throw("Take input error")
           else
             i != 0
         Nil ->
@@ -199,19 +202,16 @@ fun try(str: string, p: () -> <ast|e> a): <ast|e> a
 // Version of maybe that doesn't backtrack
 fun optionMaybe(str: string, p: () -> <ast|e> a): <ast|e> maybe<a>
   with pdelimit(str)
-  trace("Parsing for " ++ str)
   with override
     return(r)
       Just(r)
     final ctl astError(e, r)
-      trace("Failed to parse " ++ str ++ " " ++ e ++ " " ++ tookInput(str).show)
       if tookInput(str) then
         astError(e, r)
       else
         Nothing 
-  val x = p()
-  trace("Done parsing for " ++ str)
-  x
+  p()
+  
 
 fun choicesnb(str: string, ps: list<() -> <ast|e> a>): <ast|e> a
   with pdelimit(str)

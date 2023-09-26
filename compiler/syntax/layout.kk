@@ -1,5 +1,5 @@
 import compiler/syntax/lexeme
-import compiler/syntax/lexer
+import compiler/syntax/lexer2
 import compiler/syntax/syntax
 import compiler/common/range
 import compiler/common/name

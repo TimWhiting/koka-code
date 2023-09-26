@@ -105,7 +105,7 @@ struct core
 
 fun show(c: core): div string
   "Core(" ++ c.coreName.show ++ "," ++ c.imports.show-list(show) ++ "," ++ c.fixDefs.show-list(show) ++ 
-  "," ++ c.typeDefs.show-list(fn(g) g.show-list(show)) ++ "," ++ c.defs.show-list(show) ++ "," ++ c.externals.show-list(show) ++ "," ++ c.show ++ ")"
+  "," ++ c.typeDefs.show-list(fn(g) g.show-list(show)) ++ "," ++ c.defs.show-list(show) ++ "," ++ c.externals.show-list(show) ++ "," ++ c.doc.show ++ ")"
 
 alias fixDefs = list<fixDef>;
 value type fixDef
@@ -113,7 +113,7 @@ value type fixDef
 
 fun show(f: fixDef): string
   match f
-    FixDef(defName, f) -> "FixDef(" ++ defName.show ++ "," ++ show(f) ++ ")"
+    FixDef(defName, f') -> "FixDef(" ++ defName.show ++ "," ++ show(f') ++ ")"
 
 alias kimports = list<kimport>;
 struct kimport
@@ -390,7 +390,7 @@ type defGroup
 fun show(d: defGroup): div string
   match d
     DefRec(defs) -> "DefRec(" ++ defs.show-list(show) ++ ")"
-    DefNonRec(d) -> "DefNonRec(" ++ d.show ++ ")"
+    DefNonRec(d') -> "DefNonRec(" ++ d'.show ++ ")"
 
 // A value definition
 struct def

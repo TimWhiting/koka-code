@@ -116,6 +116,8 @@ fun stringraw()
 
 val idCharsRegex = "^[a-zA-Z0-9-_]+".regex()
 
+val wildCardRegex = "^_[a-zA-Z0-9-_]*".regex()
+
 val lowerIdRegex = "^[a-z][a-zA-Z0-9-_]*'*".regex()
 fun lowerid()
   takePattern(lowerIdRegex)
@@ -150,13 +152,13 @@ val hexLeadRegex = r"^0[xX]".regex();
 fun hexadecimal()
   takePattern(leadingRegex) ++ takePattern(hexLeadRegex) ++ takePattern(integerRegex)
 
-val leadingHexDotRegex = r"^.[0-9a-fA-F_]+([eEpP][+-]?[0-9a-fA-F_]+)?".regex() 
-val wholeHexFloatRegex = r"^[0-9a-fA-F_]+(\.[0-9a-fA-F_]+)?([eEpP][+-]?[0-9a-fA-F_]+)?".regex() 
+val leadingHexDotRegex = r"^\.[0-9a-fA-F_]+([eEpP][+-]?[0-9a-fA-F_]+)?".regex() 
+val wholeHexFloatRegex = r"^[0-9a-fA-F_]+((\.[0-9a-fA-F_]+)|([eEpP][+-]?[0-9a-fA-F_]+)|(\.[0-9a-fA-F_]+[eEpP][+-]?[0-9a-fA-F_]+)".regex() 
 val integerRegex = r"^[0-9a-fA-F_]+".regex() 
 fun integer()
   takePattern(leadingRegex) ++ takePattern(integerRegex)
 
-val leadingRegex = r"^[+-]".regex()
+val leadingRegex = r"^[+-]?".regex()
 fun exp()
   takePattern(leadingRegex) ++ integer()
   
@@ -217,15 +219,12 @@ fun lex-lowerid()
     LexId(l.newName)
 
 fun lex-conid()
-  with atomic
   LexCons(conid().newName)
 
-fun lex-idchars()
-  with atomic
-  LexWildCard(takePattern(idCharsRegex).newName)
+fun lex-wildcard()
+  LexWildCard(takePattern(wildCardRegex).newName)
 
 fun lex-special()
-  with atomic
   LexSpecial(special())
 
 fun lex-decfloat()
@@ -244,12 +243,14 @@ fun lex-integer()
   LexInt(d.parse-int.default(-1), d)
 
 fun lex-or()
-  with atomic
   LexOp(token("||").newName)
 
-fun lex-anglebar() // TODO: Fix this
+fun lex-anglebar()
   with atomic
-  val x = anglebar() ++ many1(anglebar).join
+  var x := anglebar()
+  val i = mark() 
+  many1(anglebar).join
+  reset(i)
   match x
     "|" -> LexKeyword(x, "")
     _ -> LexOp(x.newName)
@@ -339,7 +340,7 @@ fun lex-unknown()
 
 fun lex-default()
   with atomic
-  [lex-space,lex-newline,lex-linecomment,lex-qconid,lex-qvarid,lex-qidop,lex-lowerid,lex-conid,lex-idchars,lex-special,lex-charesc,lex-hexesc,lex-char,lex-decfloat,lex-hexfloat,lex-integer,lex-or,lex-idop,lex-symbols,lex-stringbegin,lex-rstringbegin].ors
+  [lex-space,lex-newline,lex-linecomment,lex-qconid,lex-qvarid,lex-qidop,lex-lowerid,lex-conid,lex-wildcard,lex-special,lex-charesc,lex-hexesc,lex-char,lex-decfloat,lex-hexfloat,lex-integer,lex-or,lex-anglebar,lex-idop,lex-symbols,lex-stringbegin,lex-rstringbegin].ors
 
 fun stripParens(s: list<char>)
   match s.reverse
@@ -417,9 +418,6 @@ val reservedNames =  ["infix", "infixr", "infixl", "prefix", "postfix"
     , ":="
     , "|"]
 
-val symbolsRegex = r"^[\$%&*+~!/\\^~=.:-?<>|]".regex()
-val psymbolsRegex = r"^[\$%&*+~!/\\^~=.:-?<>|]".regex()
-
 fun isReserved(name: string)
   reservedNames.any(fn(n) -> n == name) // TODO: Set
 
@@ -476,7 +474,7 @@ fun lexing(source: source, lineNo: int, input: string)
                 LexWhite(w) -> w.list.reverse.take-while(fn(c) c != '\n').length
                 LexComment(w) -> w.list.reverse.take-while(fn(c) c != '\n').length
                 _ -> finalOffset - startOff
-              pos := Pos(source, finalOffset, start.line + nlines, col=start.col+ncols)
+              pos := Pos(source, finalOffset, start.line + nlines, col=ncols)
               result := Cons(Lexeme(Range(start, pos), e), result)
             Left(e) ->
               cont := False

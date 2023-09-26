@@ -6,7 +6,7 @@ import compiler/syntax/lexeme
 
 fun main()
   // Make sure to set $ulimit -s unlimited$ to allow more stack space
-  val r = read-text-file("/Users/timwhiting/koka_code/compiler/syntax/lexer.kk".path)
+  val r = read-text-file(".koka/v2.4.3/clang-debug/compiler_common_failure.kki".path)
   val x = lexer("test", 1, r)
   match x
     Right(u) -> 

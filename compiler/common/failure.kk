@@ -8,7 +8,7 @@ fun raise(s: string): compilerEff a
   else throw(s)
 
 fun fail(s: string): compilerEff a
-  raise("*** internal compiler error" ++ s)
+  raise("*** internal compiler error " ++ s)
 
 fun assert(s: string, b: bool, a: a): compilerEff a
   if b then a else fail(s)

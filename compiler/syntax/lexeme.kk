@@ -59,11 +59,13 @@ fun is-lparen(l: lex): bool
 fun is-rangle(l: lex): bool
   match l
     LexSpecial(">") -> True
+    LexOp(nm) | nm.showPlain == ">" -> True
     _ -> False
 
 fun is-langle(l: lex): bool
   match l
     LexSpecial("<") -> True
+    LexOp(nm) | nm.showPlain == "<" -> True
     _ -> False
 
 fun is-rbracket(l: lex): bool
@@ -165,9 +167,9 @@ pub fun show(l: lexeme): <> string
 
 pub fun show(l: lex): <> string
   match l
-    LexInt(_, s) -> s
-    LexFloat(_, s) -> s
-    LexChar(c) -> c.show
+    LexInt(_, s) -> "int " ++ s.show
+    LexFloat(_, s) -> "float " ++ s.show
+    LexChar(c) -> "char " ++ c.show
     LexString(s) -> "string \"" ++ s ++ "\""
     LexId(n) -> "identifier \"" ++ n.show ++ "\""
     LexOp(n) -> "operator \"" ++ n.show ++ "\""

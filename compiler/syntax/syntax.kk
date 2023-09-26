@@ -18,12 +18,10 @@ pub struct program<t, k>
   fixDefs: fixDefs
   doc: string
 
-
 fun show(Program(_, n, _, typeDefs, defs, imports, externals, fixDefs, _):program<t,k>, showT: (t) -> div string, showK: (k) -> div string): div string
   name/show(n) ++ ":\n" ++ "typeDefs " ++ typeDefs.show-list(fn(t) t.show(showT, showK)) ++ "\n" ++ "defs " ++ defs.show-list(fn(d) d.show(showT)) ++ "\n" ++ 
   "imports " ++ imports.show-list(fn(i) i.show) ++ "\n" ++ "externals " ++ externals.show-list(fn(e) e.show) ++ "\n" ++ 
   "fixDefs " ++ fixDefs.show-list(fn(f) f.show) ++ "\n"
-
   
 alias userProgram = program<userType, userKind>;
 alias userExpr = expr<userType>;

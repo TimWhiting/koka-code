@@ -56,7 +56,7 @@ fun lexParse(insSemi: bool, preprocess: list<lexeme> -> pure list<lexeme>, p: ()
 fun parseLexemes(src: source, lexemes0: list<lexeme>, p: () -> <console,ast|e> a): <console,astError,fsys,pure|e> a
   var lexemes := lexemes0
   var history := Cons((ctx _, "top", 0), Nil)
-  val debug = False
+  val debug = True
   with override
     final ctl astError(e: string, r: range)
       astError("Got error: " ++ e ++ "\n" ++ " when parsing:\n\t" ++ lexemes.take(2).map(show).join("\n\t"), r)
@@ -75,7 +75,7 @@ fun parseLexemes(src: source, lexemes0: list<lexeme>, p: () -> <console,ast|e> a
     fun pnext()
       match lexemes
         Cons(l, rst) ->
-          lexemes := rst
+          lexemes := rst 
           match history
             Cons((h, msg, i), tl) ->
               history := Cons((h ++ ctx Cons(l, _), msg, i + 1), tl)

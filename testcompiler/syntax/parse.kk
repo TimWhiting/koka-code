@@ -10,6 +10,6 @@ fun main()
   with handler
     final ctl astError(s: string, r: range)
       println("ast error: " ++ s ++ " at " ++ r.showFullRange)
-  val x = parseProgramFromString(True, "public module hello; import hello = hi;", "test.kk".path)
+  val x = parseProgramFromFile(True, "/home/tim/koka_code/testcompiler/syntax/parse.kk".path)
   println(x.show(show, show))
   

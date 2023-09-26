@@ -20,6 +20,7 @@ fun testEx(fname: string, input: string)
 
 fun layout(semiInsert: bool, lexemes: list<lexeme>): list<lexeme>
   fun semi(v: list<lexeme>, f: (list<lexeme>) -> list<lexeme>) if semiInsert then f(v) else v
+  lexemes.map(show).join("\n").trace
   lexemes.semi(checkComments).combineLineComments.removeWhitespace.associateComments.removeWhite.semi(indentLayout)
 
 fun isLexError(x)

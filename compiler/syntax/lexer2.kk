@@ -471,9 +471,9 @@ fun lexing(source: source, lineNo: int, input: string)
                 LexComment(w) -> w.count("\n")
                 _ -> 0
               val ncols = match e
-                LexWhite(w) | w.contains("\n") -> w.list.reverse.take-while(fn(c) c != '\n').length 
-                LexComment(w) | w.contains("\n") -> w.list.reverse.take-while(fn(c) c != '\n').length
-                _ -> finalOffset - startOff
+                LexWhite(w) | w.contains("\n") -> w.list.reverse.take-while(fn(c) c != '\n').length  + 1
+                LexComment(w) | w.contains("\n") -> w.list.reverse.take-while(fn(c) c != '\n').length + 1
+                _ -> (finalOffset - startOff) + pos.col
               pos := Pos(source, finalOffset, start.line + nlines, col=ncols)
               result := Cons(Lexeme(Range(start, pos), e), result)
             Left(e) ->

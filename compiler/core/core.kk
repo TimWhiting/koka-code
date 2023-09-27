@@ -538,6 +538,14 @@ type lit
   LitChar(c: string)
   LitString(s: string)
 
+fun (==)(l1: lit, l2: lit): bool
+  match (l1, l2)
+    (LitInt(i1), LitInt(i2)) -> i1 == i2
+    (LitFloat(d1), LitFloat(d2)) -> d1 == d2
+    (LitChar(c1), LitChar(c2)) -> c1 == c2
+    (LitString(s1), LitString(s2)) -> s1 == s2
+    _ -> False
+
 fun show(l: lit): string
   match l
     LitInt(i) -> "LitInt(" ++ i.show ++ ")"

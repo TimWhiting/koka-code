@@ -4,6 +4,7 @@ import newstd/data/linearmap
 import compiler/core/core
 import compiler/type/kind
 import compiler/kind/kind
+import compiler/common/syntax
 
 alias tvs = linearSet<typeVar>
 alias sub = linearMap<typeVar, ktype>
@@ -182,3 +183,13 @@ fun boundTypeVars(tp: ktype): pure tvs
 
 fun boundTypeVars(TName(_, tp): tName): pure tvs
   tp.boundTypeVars
+
+
+// TODO: More
+fun freshTypeVar(k: kind, fl: flavour)
+  val idbase = match fl
+    Meta -> "_v"
+    Skolem -> "$v"
+    Bound -> "v"
+  val id = uniqueId(idbase)
+  TypeVar(id, k, fl)

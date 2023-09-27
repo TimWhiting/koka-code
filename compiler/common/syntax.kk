@@ -234,6 +234,9 @@ type defSort
 fun defFunEx(pinfos: list<paramInfo>, fipKind: fipT)
   if pinfos.all(fn(p) p.is-own) then DefFun([], fipKind) else DefFun(pinfos, fipKind)
 
+fun defFun(pinfos: list<paramInfo>)
+  defFunEx(pinfos, noFip)
+
 fun show(s: defSort): string
   match s
     DefFun(p, f) -> "DefFun(" ++ p.show-list(show) ++ ", " ++ f.show ++ ")"

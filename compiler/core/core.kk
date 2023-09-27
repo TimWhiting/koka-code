@@ -1,6 +1,7 @@
 import std/num/float64
 import compiler/common/syntax
 import compiler/common/name
+import compiler/common/id
 import compiler/common/name-prim
 import compiler/common/range
 import compiler/type/type
@@ -430,11 +431,28 @@ fun isSpecialize(inl: inlineDef)
 effect corePhase
   fun getUnique(): int
   fun setUnique(i: int): ()
-  fun updateUnique(f: (int) -> e int): ()
+  fun updateUnique(f: (int) -> e int): int
   fun getCoreDefs(): defGroups
-  fun setCoreDefs(): defGroups
+  fun setCoreDefs(dgs: defGroups): ()
   fun phaseError(s: string): a
 
+fun newUnique(): <corePhase> int
+  updateUnique(fn(i) i + 1)
+
+fun uniques(n: int): <corePhase> list<int>
+  list(1, n).map(fn(_) newUnique())
+
+fun uniqueId(s: string): <corePhase> id
+  genId(s, newUnique())
+
+fun uniqueIds(s: string, n: int): <corePhase> list<id>
+  uniques(n).map(fn(i) genId(s, i))
+
+fun uniqueName(s: string): <corePhase> name
+  newHiddenName(s ++ "." ++ newUnique().show)
+
+fun uniqueNameFrom(nm: name): <corePhase> name
+  newUnique().toUniqueName(nm)
 
 // Expressions
 // Since this is System-F, all binding sites are annotated with their type.

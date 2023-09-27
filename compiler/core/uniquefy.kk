@@ -166,11 +166,3 @@ fun findUniqueName(i: int, n: name, locals: nameSet): div name
   val name1 = toUniqueName(i, n)
   if locals.member(name1) then findUniqueName(i+1, n, locals)
   else name1
-      
-  // TOOD:
-
-
-
-
-
-

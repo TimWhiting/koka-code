@@ -428,30 +428,42 @@ fun paramInfos(d: def)
 fun isSpecialize(inl: inlineDef)
   inl.paramSpecialize.is-cons
 
-effect corePhase
+effect uniquePhase
   fun getUnique(): int
   fun setUnique(i: int): ()
-  fun updateUnique(f: (int) -> e int): int
+  fun updateUnique(f: (int) -> int): int
+
+fun runUniquePhase(start: int, f: () -> <uniquePhase|e> a): e a 
+  var u := start
+  with handler
+    fun getUnique() u
+    fun setUnique(i) u := i
+    fun updateUnique(g) 
+        u := g(u)
+        u
+  f()
+
+effect corePhase
   fun getCoreDefs(): defGroups
   fun setCoreDefs(dgs: defGroups): ()
   fun phaseError(s: string): a
 
-fun newUnique(): <corePhase> int
+fun newUnique(): <uniquePhase> int
   updateUnique(fn(i) i + 1)
 
-fun uniques(n: int): <corePhase> list<int>
+fun uniques(n: int): <uniquePhase> list<int>
   list(1, n).map(fn(_) newUnique())
 
-fun uniqueId(s: string): <corePhase> id
+fun uniqueId(s: string): <uniquePhase> id
   genId(s, newUnique())
 
-fun uniqueIds(s: string, n: int): <corePhase> list<id>
+fun uniqueIds(s: string, n: int): <uniquePhase> list<id>
   uniques(n).map(fn(i) genId(s, i))
 
-fun uniqueName(s: string): <corePhase> name
+fun uniqueName(s: string): <uniquePhase> name
   newHiddenName(s ++ "." ++ newUnique().show)
 
-fun uniqueNameFrom(nm: name): <corePhase> name
+fun uniqueNameFrom(nm: name): <uniquePhase> name
   newUnique().toUniqueName(nm)
 
 // Expressions

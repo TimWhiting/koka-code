@@ -68,6 +68,9 @@ fun filter(l: linearSet<v>, f: (v) -> e bool): e linearSet<v>
 
 fun isSubsetOf(l1: linearSet<v>, l2: linearSet<v>): bool
   l1.list.all(fn(x) l2.member(x))
+
+pub fun map(l: linearSet<v>, f: (v) -> e w, eqW: (w, w) -> e bool, showW: (w) -> e string): e linearSet<w>
+  linearSet(l.list.map(f), eqW, showW)
 // pub fun main()
 //   val s = linearSet([1, 2, 3], (==))
 //   val s2 = linearSet([2, 3, 4], (==))

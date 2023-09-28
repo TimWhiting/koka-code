@@ -79,6 +79,16 @@ fun show(t: cTarget): string
     WasmJs -> "WasmJs"
     WasmWeb -> "WasmWeb"
 
+fun alignedSum(start: int, xs: list<int>): int
+  xs.foldl(start, alignedAdd)
+
+fun alignedAdd(x: int, y: int): int
+  alignUp(x, y) + y
+
+fun alignUp(x: int, y: int): int
+  if y <= 0 then x
+  else ((x + y - 1) / y) * y
+
 type buildType
   DebugFull
   Debug

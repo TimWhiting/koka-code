@@ -221,6 +221,15 @@ fun toHiddenUniqueName(i: int, s: string, n: name): name
     val xname = if c.is-alpha || c == '.' then n else n.nameModule.newQualified("op")
     makeHiddenName(s ++ i.show, xname)
 
+fun newPaddingName(i: int)
+  newHiddenName("padding" ++ i.show)
+
+fun isPaddingName(n: name)
+  n.nameId.starts-with(".padding").is-just
+
+fun isCCtxName(n: name)
+  n.nameId.starts-with(".cctx").is-just
+
 fun newFieldName(i: int): name
   newHiddenName("field" ++ i.show)
 

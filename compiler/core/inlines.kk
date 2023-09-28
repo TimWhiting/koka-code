@@ -6,7 +6,6 @@ import newstd/data/linearmap
 
 alias inlines = name-map<inlineDef>
 
-val nameEq = fn(n1: name, n2: name) n1 == n2
 val inlinesEmpty = linearMap([], nameEq, fn(inl1: inlineDef, inl2: inlineDef) inl1 == inl2, show, show)
 
 fun inlinesNew(xs: list<inlineDef>)

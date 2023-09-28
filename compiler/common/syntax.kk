@@ -252,6 +252,12 @@ type paramInfo
   Borrow
   Own
 
+fun (==)(p1: paramInfo, p2: paramInfo): bool
+  match (p1, p2)
+    (Borrow, Borrow) -> True
+    (Own, Own) -> True
+    _ -> False
+
 fun show(p: paramInfo): string
   match p
     Borrow -> "Borrow"

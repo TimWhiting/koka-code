@@ -84,7 +84,6 @@ fun coreExpr(info: nameInfo, qname: name)
 // Due to overloading there may be multiple entries for the same qualified name
 
 alias gamma = name-map<list<(name, nameInfo)>>
-val nameEq = fn(n1: name, n2: name) n1 == n2
 val listEq = fn(l1: list<(name, nameInfo)>, l2: list<(name, nameInfo)>) (==)(l1, l2, fn((n1, ni1), (n2, ni2)) n1 == n2 && ni1 == ni2)
 val showList = fn(l: list<(name, nameInfo)>) show-list(l, fn((n, ni)) show(n) ++ " -> " ++ show(ni))
 val empty = linearMap([], nameEq, listEq, show, showList)

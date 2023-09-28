@@ -411,11 +411,17 @@ fun show(d: def): div string
 struct inlineDef
   defName: name
   expr: expr
-  rec: bool
+  isRec: bool
   kind: defInline
   cost: int
   sort: defSort // for borrow information
   paramSpecialize: list<bool>
+
+fun (==)(inl1: inlineDef, inl2: inlineDef): bool
+  name/(==)(inl1.defName, inl2.defName)
+
+fun show(inl: inlineDef): div string
+  "InlineDef(" ++ inl.defName.show ++ "," ++ inl.expr.show ++ "," ++ inl.isRec.show ++ "," ++ inl.kind.show ++ "," ++ inl.cost.show ++ "," ++ inl.sort.show ++ "," ++ inl.paramSpecialize.show-list(show) ++ ")"
 
 fun isVal(d: def): bool
   !d.sort.is-defFun
@@ -666,7 +672,7 @@ fun isMonEffect(eff: ktype): pure bool
   val (ls, tl) = eff.extractEffectExtend
   !tl.isEffectEmpty || ls.any(fn(l) match l.getHandledEffect([]) {Just((ResumeMany, _)) -> True; _ -> False})
 
-fun isInlineable(max: int, d: def): div bool
+fun isInlineable(d: def, max: int): div bool
   match d.kinline
     InlineAlways -> True
     InlineNever -> False

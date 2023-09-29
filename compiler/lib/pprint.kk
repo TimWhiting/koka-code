@@ -2,6 +2,171 @@ import compiler/lib/printer
 import std/os/path
 import std/os/file
 
+infixr 5 (/), (||), (|-|), (|--|) 
+infixr 6 (|.|), (|+|)
+
+// List, tupled and semiBraces pretty print a list of documents
+// either horizontally or vertically aligned.
+
+fun list(l: list<doc>): doc
+  encloseSep(l, lbracket, rbracket, comma)
+
+fun tupled(l: list<doc>): doc
+  l.encloseSep(lparen, rparen, text(", "))
+
+fun semiBraces(l: list<doc>): doc
+  l.encloseSep(lbrace, rbrace, semi)
+
+fun angled(l: list<doc>): doc
+  l.encloseSep(langle, rangle, comma)
+
+fun encloseSep(lst: list<doc>, l: doc, r: doc, p: doc): doc
+  match lst
+    Nil -> l |.| r
+    Cons(c, Nil) -> l |.| c |.| r
+    _ -> 
+      val x = l |.| lst.punctuate(p).hcat |.| r
+      x.nest(2) 
+
+fun punctuate(l: list<doc>, p: doc): list<doc>
+  match l
+    Nil -> Nil
+    Cons(c, Nil) -> Cons(c, Nil)
+    Cons(c, cs) -> Cons(c |.| p, punctuate(cs, p)) 
+
+// High level combinators
+fun sep(l: list<doc>): doc
+  l.vsep.group
+
+fun fillSep(l: list<doc>): doc
+  l.fold((/))
+
+fun hsep(l: list<doc>): doc
+  l.fold((|+|))
+
+fun vsep(l: list<doc>): doc
+  l.filter(fn(x) !x.is-empty).fold((|--|))
+
+fun cat(l: list<doc>): doc
+  l.vcat.group
+
+fun fillCat(l: list<doc>): doc
+  l.fold((||))
+
+fun hcat(l: list<doc>): doc
+  l.fold((|.|))
+
+fun vcat(l: list<doc>): doc
+  l.filter(fn(x) !x.is-empty).fold((||))
+
+fun fold(l: list<doc>, f: (doc, doc) -> doc): doc
+  match l
+    Nil -> empty
+    Cons(x, xs) -> xs.foldr(x, f)
+
+fun (|.|)(x: doc, y: doc)
+  x.beside(y)
+
+fun (|+|)(x: doc, y: doc)
+  x |.| space |.| y
+
+fun (/)(x: doc, y: doc)
+  if x.is-empty then y else if y.is-empty then x else x |.| softline |.| y
+
+fun (||)(x: doc, y: doc)
+  x |.| softbreak |.| y
+
+fun (|-|)(x: doc, y: doc)
+  if x.is-empty then y else if y.is-empty then x else x |.| line |.| y
+
+fun (|--|)(x: doc, y: doc)
+  x |.| linebreak |.| y
+
+val softline = line.group
+val softbreak = linebreak.group
+
+fun squotes(d: doc): doc
+  d.enclose(squote, squote)
+
+fun dquotes(d: doc): doc
+  d.enclose(dquote, dquote)
+
+fun braces(d: doc)
+  d.enclose(lbrace, rbrace)
+
+fun parens(d: doc)
+  d.enclose(lparen, rparen)
+
+fun angles(d: doc)
+  d.enclose(langle, rangle)
+
+fun brackets(d: doc)
+  d.enclose(lbracket, rbracket)
+
+fun enclose(x: doc, l: doc, r: doc)
+  l |.| x |.| r
+
+val lparen = Char('(')
+val rparen = Char(')')
+val langle = Char('<')
+val rangle = Char('>')
+val lbrace = Char('{')
+val rbrace = Char('}')
+val lbracket = Char('[')
+val rbracket = Char(']')
+
+val squote = Char('\'')
+val dquote = Char('"')
+val semi = Char(';')
+val colon = Char(':')
+val comma = Char(',')
+val space = Char(' ')
+val dot = Char('.')
+val backslash = Char('\\')
+val equals = Char('=')
+
+// string is like "text" but replaces '\n' by "line"
+fun pretty(s: string): doc
+  if s == "" then empty else
+    match s.starts-with("\n")
+      Just(x) -> line |.| pretty(x.string.unsafe-decreasing)
+      _ -> 
+        val (xs, ys) = span(s.list, fn(c) c != '\n')
+        text(xs.string) |.| pretty(ys.string.unsafe-decreasing)
+
+fun pretty(b: bool): doc
+  b.show.text
+
+fun pretty(i: int): doc
+  i.show.text
+
+fun pretty(d: float64): doc
+  d.show.text
+
+// Semi primitive: fill and fillBreak
+
+fun fillBreak(d: doc, f): doc
+  d.width(fn(w) if w > f then linebreak.nest(f) else spaces(f - w).text)
+
+fun fill(d: doc, f: int): doc
+  d.width(fn(w) if w >= f then empty else spaces(f - w).text)
+
+fun width(d: doc, f: (int -> doc)): doc
+  column(fn(k1) d |.| column(fn(k2) f(k1 - k2)))
+
+// Semi primitive: Alignment and indentation
+
+fun indent(d: doc, i: int): doc
+  (spaces(i).text |.| d).hang(i)
+
+fun hang(d: doc, i: int): doc
+  d.nest(i).align()
+
+fun align(d: doc): doc
+  column(fn(k1:int) nesting(fn(i1) d.nest(k1 - i1)))
+
+// primitives
+
 alias docs = list<doc>
 type doc
   Empty
@@ -24,6 +189,7 @@ type simpleDoc
   SColorOpen(b: bool, c: color, d: simpleDoc)
   SColorClose(d: simpleDoc)
 
+
 val empty = Empty
 
 fun char(c: char): doc
@@ -35,9 +201,54 @@ fun text(s: string): doc
 val line = Line(False)
 val linebreak = Line(True)
 
+fun beside(x: doc, y: doc): doc
+  if x.is-empty then y else if y.is-empty then x else Cat(x, y)
 
-// TODO: More
+fun nest(x: doc, i: int): doc
+  Nest(i, x)
 
+fun column(f: int -> doc): doc
+  Column(f)
+
+fun nesting(f: int -> doc): doc
+  Nesting(f)
+
+fun group(d: doc): doc
+  Union(d.flatten, d)
+
+fun color(d: doc, c: color): doc
+  Colored(True, c, d)
+
+fun bcolor(d: doc, c: color): doc
+  Colored(False, c, d)
+
+fun flatten(d: doc): doc
+  match d
+    Cat(x, y) -> Cat(flatten(x), flatten(y))
+    Nest(i, x) -> Nest(i, flatten(x))
+    Line(b) -> if b then Empty else Text(" ")
+    Union(x, _) -> flatten(x)
+    Column(f) -> Column(fn(x) flatten(f(x)))
+    Nesting(f) -> Nesting(fn(x) flatten(f(x)))
+    Colored(b, c, x) -> Colored(b, c, flatten(x))
+    x -> x
+
+fun dcontains(d: doc, p: (string -> e bool)): e bool
+  d.texts.any(p)
+
+// TODO: Optimize a bunch of this
+fun dendsWith(d: doc, s: string): bool
+  dEndsWithT(d.rtexts, s.list.reverse.string, s.count)
+
+fun dEndsWithT(l:list<string>, rpost: string, n:int)
+  match l
+    Nil -> n == 0
+    Cons(s, xs) ->
+      val m = s.count
+      if m >= n then
+        s.slice.substr(0,n).string == rpost
+      else
+        rpost.slice.substr(0,m).string == s && dEndsWithT(xs, rpost.slice.substr(m,rpost.count).string, n - m)
 
 fun texts(d: doc): list<string>
   match d
@@ -239,7 +450,7 @@ fun writePretty(d: doc)
   displayP(defaultWidth, renderPretty(0.8, defaultWidth, d))
 
 fun writePrettyLn(d: doc)
-  writePretty(d + linebreak)
+  writePretty(d |.| linebreak)
 
 fun show(d: doc): div string
   displayS(renderPretty(0.5, defaultWidth, d))
@@ -252,6 +463,25 @@ fun writeDoc(fpath: path, doc: doc, width: int=defaultWidth)
 
 // insert spaces "indentation" used to insert tabs, but tabs seem to cause more trouble than they solve :-)
 fun spaces(n: int): string
-  if n <= 0 then "" else replicate(" ", n).join
+  match n
+    0 -> ""
+    1 -> " "
+    2 -> "  "
+    3 -> "   "
+    4 -> "    "
+    5 -> "     "
+    6 -> "      "
+    7 -> "       "
+    8 -> "        "
+    9 -> "         "
+    10 -> "          "
+    11 -> "           "
+    12 -> "            "
+    13 -> "             "
+    14 -> "              "
+    15 -> "               "
+    16 -> "                "
+    17 -> "                 "
+    _ -> if n <= 0 then "" else replicate(" ", n).join
 
 val defaultWidth = 160

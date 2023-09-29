@@ -598,12 +598,12 @@ fun show(v: varInfo): string
     InfoArity(m, n) -> "arity:" ++ m.show ++ "," ++ n.show
     InfoExternal(b) -> "external:" ++ b.show-list(fn((t, s)) t.show ++ ":" ++ s)
 
-fun airity(v: varInfo): int
+fun arity(v: varInfo): int
   match v
     InfoArity(_, n) -> n
     _ -> 0
 
-fun typeAirity(v: varInfo): int
+fun typeArity(v: varInfo): int
   match v
     InfoArity(n, _) -> n
     _ -> 0

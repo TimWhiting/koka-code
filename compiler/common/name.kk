@@ -31,6 +31,15 @@ pub fun (==)(n1: name, n2: name): bool
 
 val nameEq = fn(n1: name, n2: name) n1 == n2
 
+fun nameListEq(l1: list<name>, l2: list<name>): bool
+  match (l1, l2)
+    (Nil, Nil) -> True
+    (Cons(a, ra), Cons(b, rb)) -> a == b && nameListEq(ra.unsafe-decreasing, rb)
+    _ -> False
+
+inline fun (==)(l1: list<name>, l2: list<name>): bool
+  nameListEq(l1, l2)
+
 pub fun (!=)(n1: name, n2: name): bool
   !(n1 == n2)
 

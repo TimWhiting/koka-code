@@ -2,8 +2,8 @@ import compiler/lib/printer
 import std/os/path
 import std/os/file
 
-infixr 5 (/), (||), (|-|), (|--|) 
-infixr 6 (|.|), (|+|)
+pub infixr 5 (/), (||), (|-|), (|--|) 
+pub infixr 6 (|.|), (|+|)
 
 // List, tupled and semiBraces pretty print a list of documents
 // either horizontally or vertically aligned.
@@ -64,22 +64,22 @@ fun fold(l: list<doc>, f: (doc, doc) -> doc): doc
     Nil -> empty
     Cons(x, xs) -> xs.foldr(x, f)
 
-fun (|.|)(x: doc, y: doc)
+fun (|.|)(x: doc, y: doc): doc
   x.beside(y)
 
-fun (|+|)(x: doc, y: doc)
+fun (|+|)(x: doc, y: doc): doc
   x |.| space |.| y
 
-fun (/)(x: doc, y: doc)
+fun (/)(x: doc, y: doc): doc
   if x.is-empty then y else if y.is-empty then x else x |.| softline |.| y
 
-fun (||)(x: doc, y: doc)
+fun (||)(x: doc, y: doc): doc
   x |.| softbreak |.| y
 
-fun (|-|)(x: doc, y: doc)
+fun (|-|)(x: doc, y: doc): doc
   if x.is-empty then y else if y.is-empty then x else x |.| line |.| y
 
-fun (|--|)(x: doc, y: doc)
+fun (|--|)(x: doc, y: doc): doc
   x |.| linebreak |.| y
 
 val softline = line.group
@@ -91,19 +91,19 @@ fun squotes(d: doc): doc
 fun dquotes(d: doc): doc
   d.enclose(dquote, dquote)
 
-fun braces(d: doc)
+fun braces(d: doc): doc
   d.enclose(lbrace, rbrace)
 
-fun parens(d: doc)
+fun parens(d: doc): doc
   d.enclose(lparen, rparen)
 
-fun angles(d: doc)
+fun angles(d: doc): doc
   d.enclose(langle, rangle)
 
-fun brackets(d: doc)
+fun brackets(d: doc): doc
   d.enclose(lbracket, rbracket)
 
-fun enclose(x: doc, l: doc, r: doc)
+fun enclose(x: doc, l: doc, r: doc): doc
   l |.| x |.| r
 
 val lparen = Char('(')
@@ -236,8 +236,21 @@ fun flatten(d: doc): doc
 fun dcontains(d: doc, p: (string -> e bool)): e bool
   d.texts.any(p)
 
+fun dStartsWith(d: doc, s: string): bool
+  dStartsWithT(d.texts, s, s.count)
+
+fun dStartsWithT(l: list<string>, pre: string, n: int)
+  match l
+    Nil -> n == 0
+    Cons(s, xs) ->
+      val m = s.count
+      if m >= n then
+        s.slice.substr(0,n).string == pre
+      else
+        pre.slice.substr(0,m).string == s && dStartsWithT(xs, pre.slice.substr(m,pre.count).string, n - m)
+
 // TODO: Optimize a bunch of this
-fun dendsWith(d: doc, s: string): bool
+fun dEndsWith(d: doc, s: string): bool
   dEndsWithT(d.rtexts, s.list.reverse.string, s.count)
 
 fun dEndsWithT(l:list<string>, rpost: string, n:int)

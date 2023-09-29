@@ -9,7 +9,53 @@ import compiler/type/type
 import compiler/type/typevar
 import compiler/kind/kind
 import compiler/kind/newtypes
+import compiler/lib/pprint
 
 val debug = False
 
-val externalNames = [(exprTrue.name, "true"), (exprFalse.name, "false")]
+val externalNames = [(exprTrue.conName, "true"), (exprFalse.conName, "false")]
+
+// Generate C code from System-F core language
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

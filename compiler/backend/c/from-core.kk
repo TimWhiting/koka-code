@@ -216,6 +216,16 @@ fun genMain(mbMain: maybe<(name, bool)>): asmEff ()
         ]))
       )
 
+fun genLocalGroups(dgs: defGroups): asmEff list<doc>
+  dgs.map(genLocalGroup)
+
+fun genLocalGroup(dg: defGroup): asmEff doc
+  match dg
+    DefRec -> fail("backend/c/from-core genLocalGroup: local recursive function definitions are not allowed")
+    DefNonRec(d) -> genLocalDef(d)
+
+fun genLocalDef(d: def): asmEff doc
+  pprint/empty
 
 fun genTypeDefs(tds: typeDefGroups): asmEff ()
   ()

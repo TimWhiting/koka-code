@@ -5,9 +5,10 @@
 // terms of the Apache License, Version 2.0. A copy of the License can be
 // found in the LICENSE file at the root of this distribution.
 /////////////////////////////////////////////////////////////////////////////
-import std/data/map
-import std/data/imap
-import std/data/iset
+import newstd/data/linearmap
+import newstd/data/linearset
+import compiler/lib/pprint
+
 /// Internal identifiers (just 'Int's).
 
 /// Types
@@ -15,9 +16,9 @@ import std/data/iset
 /// A list of identifiers
 alias ids = list<id>
 // A map from identifiers to values
-// alias id-map = imap<a>
+alias id-map<a> = linearMap<int, a>
 // A set of identifiers
-// alias id-set = iset
+alias id-set = linearSet<int>
 
 /// Identifiers are unique compiler generated identities
 alias id = int;
@@ -52,23 +53,25 @@ fun idNumber(id: id): <> int
   id
 
 // Map identifiers to /nice/ strings.
-// alias nice = id-map<string>
+alias nice = id-map<string>
 
-// val niceEmpty:nice = empty
+val niceEmpty = linearMap([], fn(i1: int, i2: int) i1 == i2, fn(s1, s2: string) s1 == s2, show, show)
 
 // TODO: // Add fresh identifier substitutions give an (infinite) list of nice names.
-// fun extend(n: nice, ids: ids, names: list<string>): nice
-//   val names.filter(fn(i) -> n.)
+fun extend(n: nice, ids: ids, names: list<string>): nice
+  val usedNames = n.list.map(snd)
+  val niceNames = names.take(ids.length).filter(fn(n') !usedNames.any(fn(n'') n'' == n'))
+  ids.zip(niceNames).foldr(n, fn((id, name), nice) nice.update(id, name, fn(new, old) old))
 
 // Show the nice version of an identifier
-// fun niceShow(n: nice, id: id): string
-//   match n.lookup(id)
-//     Just(name) -> name
-//     Nothing -> id.show
+fun niceShow(n: nice, id: id): string
+  match n.maybeGet(id)
+    Just(name) -> name
+    Nothing -> id.show
 
 // Pretty print an identifier nicely.
-// fun nicePretty(n: nice, id: id): doc
-//   n.niceShow(id).text
+fun nicePretty(n: nice, id: id): doc
+  n.niceShow(id).text
 
 /// Tests for identifiers
 // fun main()

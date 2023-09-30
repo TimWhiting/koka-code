@@ -1,11 +1,14 @@
 import compiler/common/id
 import compiler/common/color-scheme
 import compiler/lib/pprint
+import compiler/lib/printer
 import compiler/type/type
 import compiler/common/name
 import newstd/data/linearmap
 import compiler/kind/importmap
 import compiler/platform/config
+import compiler/common/nice
+import compiler/kind/kind
 
 alias prec = int;
 val precTopTop = -1 // most outer level: used to suppress 'forall'
@@ -53,21 +56,30 @@ fun defaultCoreOptions(f)
   f()
 
 // Pretty print environment for types
-struct prettyTypeEnv
-  showKinds: bool = False
-  showIds: bool = False // show id numbers
-  expandSynonyms: bool = False
-  colors: colorScheme = ColorScheme()
-  nice: nice = niceEmpty
-  prec: prec = precTopTop
-  ranked: tvScheme = rankedDefault
-  moduleContext: name = "Main".newName // module in which we pretty print
-  importsMap: importmap = emptyImports // import aliases
-  fullNames: bool = False;
 
 effect prettyTypeEff
-  val prettyTypeEnv: prettyTypeEnv
+  val showKinds: bool
+  val showIds: bool // show id numbers
+  val expandSynonyms: bool
+  val colors: colorScheme
+  val prec: prec
+  val ranked: tvScheme
+  val moduleContext: name // module in which we pretty print
+  val importsMap: importmap // import aliases
+  val fullNames: bool
 
+fun ".default-prettyTypeEff"(f)
+  handle(f)
+    val showKinds = False
+    val showIds = False
+    val expandSynonyms = False
+    val colors = ColorScheme()
+    val prec = precTopTop
+    val ranked = rankedDefault
+    val moduleContext = "Main".newName
+    val importsMap = emptyImports
+    val fullNames = False
+ 
 fun typeColor(colors: colorScheme)
   ":".text.color(colors.colorSep)
 
@@ -96,4 +108,26 @@ fun compress(l: list<char>): list<char>
 //     tp.ppType.color(prettyTypeEnv.colors.colorType)
 
 // fun niceList(schemes: list<ktype>, f: (ktype) -> doc): list<doc>
-  
+
+fun ppTypeSyn(ts: typeSyn)
+  ts.name.ppNameEx(ts.kind).wrapKind.colorByKindDef(kind, colorTypeCon)
+
+fun colorByKindDef(d: doc, k: kind, defcolor: (colorScheme -> prettyTypeEff color))
+  d.colorByKind(k, fn(d') d'.color(defcolor(colors)))
+
+fun colorByKind(d: doc, k: kind, defcolor: (doc -> prettyTypeEff doc))
+  match k.colorForKind
+    Just(c) -> d.color(c)
+    Nothing -> defcolor(d)
+
+fun colorForKind(k: kind)
+  if k == kindEffect || k == kindLabel || k == kindFun(kindHeap, kindLabel) then
+    Just(colors.colorEffect)
+  elif k == kindHeap || k == kindScope then
+    Just(colors.colorEffect)
+  else Nothing
+
+fun wrapKind(d: doc, k: kind)
+  if showKinds && k != kindStar then
+    parens(d.color(colors.colorType) |+| "::".text |+| k.ppKind(precTop)).color(colors.colorKind)
+  else d

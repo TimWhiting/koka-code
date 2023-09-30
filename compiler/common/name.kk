@@ -214,7 +214,6 @@ fun makeFreshHiddenName(s: string, n: name, r: range)
 fun hiddenNameStartsWith(n: name, pre: string): bool
   n.nameId.starts-with("." ++ pre ++ "-").bool
 
-
 fun toUniqueName(i: int, n: name): name
   fun insert(l: list<char>): list<char>
     match l

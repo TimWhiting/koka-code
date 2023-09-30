@@ -4,12 +4,6 @@ alias importmap = list<(list<name>, name)>
 
 val emptyImports:importmap = []
 
-fun (==)(nms1: list<name>, nms2: list<name>): bool
-  match (nms1, nms2)
-    (Cons(nm1, nms1), Cons(nm2, nms2)) -> nm1 == nm2 && (==)(nms1.unsafe-decreasing, nms2)
-    (Nil, Nil) -> True
-    _ -> False
-
 fun isPrefix(x: list<name>, y: list<name>): bool
   match (x, y)
     (Cons(x1, xs), Cons(y1, ys)) -> x1 == y1 && isPrefix(xs.unsafe-decreasing, ys)

@@ -20,9 +20,11 @@ import newstd/data/linearset
 val externalNames = [(exprTrue.conName, "true"), (exprFalse.conName, "false")]
 
 // Generate C code from System-F core language
-fun cFromCore(cTarget: cTarget, b: buildType, sourceDir: path, platform: platform, borrowed: borrowed, enableReuse: bool, 
-  enableSpecialize: bool, enableReuseSpecialize: bool, enableBorrowInference: bool, eagerPatBind: bool, stackSize: int, 
-  mbMain: maybe<(name, bool)>, core: core): <pure,compFlags,uniquePhase,newtypes,printer> (doc, doc, core)
+fun cFromCore(cTarget: cTarget, b: buildType, sourceDir: path, 
+              platform: platform, borrowed: borrowed, enableReuse: bool, 
+              enableSpecialize: bool, enableReuseSpecialize: bool, enableBorrowInference: bool, 
+              eagerPatBind: bool, stackSize: int, mbMain: maybe<(name, bool)>, 
+              core: core): <pure,compFlags,uniquePhase,newtypes,printer> (doc, doc, core)
   with handler
     val cdefToHeader = False
     val substEnv = []
@@ -66,7 +68,6 @@ val checkInitDoc = [
   "static bool _kk_initialized = false;".text,
   "if (_kk_initialized) return;".text,
   "_kk_initialized = true;".text].vcat
-
 
 fun initImport(i: kimport): doc
   i.importName.qualify(".init".newName).ppName |.| emptyArgs |.| semi

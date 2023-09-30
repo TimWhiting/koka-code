@@ -30,5 +30,14 @@ fun importsExpand(imp: importmap, name: name): either<list<name>, (name, name)>
         Right((qualify(fullName, name.unqualify), ralias.take(rpath.length).reverse.unsplitModuleName))
       amb -> Left(amb.map(fn(x) x.fst.reverse.unsplitModuleName))
 
+// Given a fully qualified name, return the shorter aliased name.
+fun importsAlias(imp: importmap, nm: name)
+  val mname = if nm.isQualified then nm.qualifier else nm
+  match imp.filter(fn((_, fullname)) mname == fullname)
+    [(ralias, _)] ->
+      val alias0 = ralias.reverse.unsplitModuleName
+      if nm.isQualified then qualify(alias0, nm.unqualify) else alias0
+    _ -> nm
+
 fun importsList(imp: importmap): list<(name, name)>
   imp.map(fn(x) (x.fst.reverse.unsplitModuleName, x.snd))

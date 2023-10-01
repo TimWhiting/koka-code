@@ -5,6 +5,7 @@ import compiler/common/id
 import compiler/common/range
 import compiler/common/failure
 import compiler/kind/kind
+import compiler/type/kind
 import newstd/data/sort
 
 pub type ktype

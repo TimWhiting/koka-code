@@ -18,6 +18,7 @@ import compiler/lib/printer
 import compiler/backend/c/helpers
 import std/os/path
 import newstd/data/linearset
+import newstd/data/sort
 
 val externalNames = [(exprTrue.conName, "true"), (exprFalse.conName, "false")]
 
@@ -373,10 +374,12 @@ fun genTopLevelStringLiteral(s: string, name: name, vis: visibility)
 
 fun genTypeDefs(tds: typeDefGroups): asmEff ()
   tds.map(genTypeDefGroup)
+  ()
 
-fun genTypeDefGroup(tdg: typeDefGroup)
+fun genTypeDefGroup(tds: typeDefGroup): asmEff ()
   tds.map(genTypeDefPre)
   tds.map(genTypeDefPost)
+  ()
 
 fun genTypeDefPre(td: typeDef)
   match td
@@ -423,7 +426,9 @@ fun genTypeDefPost(td: typeDef)
 
       // generate types for constructors
       if dataRepr.is-dataEnum then ()
-      else conInfos.map(fn(ci) ci.genConstructorType(info, dataRepr))
+      else 
+        conInfos.map(fn(ci) ci.genConstructorType(info, dataRepr))
+        ()
 
       // wrap up the type definition
       if dataRepr.is-dataOpen && !isExtend then
@@ -438,7 +443,8 @@ fun genTypeDefPost(td: typeDef)
             info.vis.cppVis |.| "struct".text |+| nm.cppName |.| "_s".text |+|
             block("kk_value_tag_t _tag;".text |-| "union".text |+| 
               block(vcat(
-                (info.constrs ++ (if maxSC > 1 && minSC != maxSC then ["kk_box_t _fields[" |.| (maxSC - 1).pretty |.| "]".text])).map(ppStructConField)
+                (info.constrs.map(ppStructConField) ++ 
+                 (if maxSC > 1 && minSC != maxSC then ["kk_box_t _fields[".text |.| (maxSC - 1).pretty |.| "]".text] else []))
                 )) |+| "_cons;".text) |.| semi
             |-| info.vis.cppVis |.| "typedef struct".text |+| nm.cppName |.| "_s".text |+| nm.typeClassName.cppName |.| semi
           )
@@ -459,24 +465,131 @@ fun genTypeDefPost(td: typeDef)
 
       // generate functions for the data type
       if !isExtend then
-        nm.typeClassName.genDupDrop(info, dataRepr, sconinfos)
+        nm.typeClassName.genDupDrop(info, dataRepr, sconInfos)
         nm.genBoxUnbox(info, dataRepr)
       else
         ()
 
-fun genConstructorType((ci, crepr, cfields, scanCount): (conInfo, conRepr, list<(name, ktype)>, int), info: dataInfo, drepr: dataRepr)
+fun genConstructorType((ci, crepr, cfields, _): (conInfo, conRepr, list<(name, ktype)>, int), info: dataInfo, drepr: dataRepr)
   match crepr
     ConEnum -> () // already in enum declaration
     ConSingleton | !drepr.isValue -> ()
     _ ->
       val typeField = if drepr.isValue then [] else ["struct".text |+| info.name.typeClassName.cppName |.| "_s".text |+| "_base;".text]
       val fields = typeField ++ cfields.map(ppConField)
-      emitToH(ci.vis.ppVis |.| "struct".text |+| c.name.cppName |+| 
-        block(if fields.is-nil then "kk_box_t _unused;" else fields.vcat) // avoid empty struct
+      emitToH(ci.vis.ppVis |.| "struct".text |+| ci.name.cppName |+| 
+        block(if fields.is-nil then "kk_box_t _unused;".text else fields.vcat) // avoid empty struct
         |.| semi)
 
 fun ppConField((nm, tp): (name, ktype))
   tp.cppType |+| nm.unqualify.cppName |.| semi
+
+fun genConstructor((ci, crepr, cfields, scanCount): (conInfo, conRepr, list<(name, ktype)>, int), info: dataInfo, drepr: dataRepr, maxScanCount: int)
+  genConstructorBaseCast(ci, crepr, info, drepr)
+  genConstructorCreate(ci, crepr, cfields, scanCount, maxScanCount, info, drepr)
+  genConstructorAccess(ci, crepr, info, drepr)
+
+fun genConstructorTest((ci, crepr, _, _): (conInfo, conRepr, list<(name, ktype)>, int), info: dataInfo, drepr: dataRepr)
+  val nameDoc = ci.name.cppName
+  val dataTypeTagDoc = "kk_datatype_tag".text |.| arguments(["x".text])
+  val ctag = ppConTag(ci, crepr, drepr)
+  val valueTagEq = "kk_value_tag_eq(x._tag,".text |+| ctag |.| ")".text
+
+  emitToH(
+    "static inline bool".text |+| ci.conTestName |.| parameters([info.name.typeClassName.cppName |+| "x".text])
+    |+| block(
+      match crepr
+        ConEnum -> "x ==".text |+| ctag
+        ConIso -> "true".text
+        ConSingleton | drepr.isValue -> valueTagEq
+        ConSingleton -> "kk_datatype_has_singleton_tag".text |.| ["x".text, ctag].tupled
+        ConSingle -> "true".text
+        ConStruct -> valueTagEq
+        ConAsJust(asNothing=non) -> "!".text |.| conTestNameX(non) |.| arguments(["x".text])
+        ConAsCons(asNil=non) -> // TODO kk_datatype_is_ptr may be faster on arm64?
+          "!".text |.| non.conTestNameX |.| arguments(["x".text])
+        ConNormal ->
+          text(if drepr.dataReprMayHaveSingletons then "kk_datatype_has_ptr_tag" else "kk_datatype_ptr_has_tag") |.| arguments(["x".text, ctag])
+        ConOpen ->
+          "kk_string_ptr_eq_borrow".text |.| tupled([
+            parens("kk_datatype_as".text |.| arguments([
+              "struct".text |+| info.name.typeClassName.cppName |.| "_s*".text
+            ])) |.| "->_tag".text
+            ,ctag
+          ])
+    ) |.|
+    ");".text
+  )
+
+fun ppConTag(ci: conInfo, crepr: conRepr, drepr: dataRepr)
+  match crepr 
+    ConOpen -> "tag".makeHiddenName(ci.name).cppName
+    ConEnum -> ci.name.cppName
+    ConSingleton | drepr.is-dataAsMaybe -> "KK_TAG_NOTHING".text
+    ConAsJust -> "KK_TAG_JUST".text
+    _ | drepr.needsTagField -> "kk_value_tag(".text |.| crepr.tag.pretty |.| ")".text
+    _ -> "(kk_tag_t)".text |.| crepr.tag.pretty.parens
+
+
+fun genConstructorCreate(ci: conInfo, crepr: conRepr, allFields: list<(name, ktype)>, scanCount: int, maxScanCount: int, info: dataInfo, drepr: dataRepr)
+// TODO: Implement
+  ()
+
+fun genConstructorBaseCast(ci: conInfo, crepr: conRepr, info: dataInfo, drepr: dataRepr)
+  match crepr
+    ConEnum -> ()
+    ConSingleton -> ()
+    ConIso -> ()
+    _ | drepr.isValue -> ()
+    _ ->
+      emitToH("static inline".text |+| info.name.typeClassName.cppName |+| ci.conBaseCastNameInfo |.|
+      parameters(["struct".text |+| ci.name.cppName |.| "* _x".text]) |+|
+      block("return".text |+| "kk_datatype_from_base".text |.| arguments(["&_x->_base".text]) |.| semi))
+
+fun genConstructorAccess(ci: conInfo, crepr: conRepr, info: dataInfo, drepr: dataRepr)
+  if drepr.isValue || crepr.is-conSingleton then ()
+  else
+    emitToH("static inline struct".text |+| ci.name.cppName |.| "*".text |+| ci.conAsName |.|
+      parameters([info.name.typeClassName.cppName |+| "x".text]) |+|
+      block(
+        "return".text |+| "kk_datatype_as_assert".text |.|
+        arguments(["struct".text |+| ci.name.cppName |.| "*".text, "x".text, (if drepr.is-dataOpen then "KK_TAG_OPEN".text else ppConTag(ci, crepr, drepr))]) 
+        |.| semi
+      )
+    )
+
+fun genBoxUnbox(nm: name, info: dataInfo, drepr: dataRepr)
+  val tname = nm.typeClassName
+  tname.genBox(info, drepr)
+  tname.genUnbox(info, drepr)
+
+fun genBoxCall(tp: ktype, arg: doc)
+  val prim = "box"
+  match tp.cType
+    CFun -> primName_t(prim, "function_t") |.| tupled([arg, contextDoc])
+    CPrim(v) | v == "kk_unit_t" || v == "bool" || v == "kk_string_t" -> primName_t(prim, v) |.| parens(arg)
+    CData(nm) -> primName(prim, nm.cppName) |.| tupled([arg, contextDoc])
+    _ -> primName_t(prim, tp.cppType.show) |.| tupled([arg, contextDoc])
+
+fun genBox(nm: name, info: dataInfo, drepr: dataRepr)
+  // TODO: Implement
+  ()
+
+fun genUnbox(nm: name, info: dataInfo, drepr: dataRepr)
+  // TODO: Implement
+  ()
+
+fun genDupDropCall(nm: doc, isDup: bool, tp: ktype): list<doc>
+  // TODO: Implement
+  []
+
+fun genDupDrop(nm: name, info: dataInfo, drepr: dataRepr, conInfos: list<(conInfo, conRepr, list<(name, ktype)>, int)>)
+  // TODO: Implement
+  ()
+
+fun conBaseCastNameInfo(ci: conInfo): doc
+  //TODO: Implement
+  empty
 
 type result
   ResultReturn(tn: maybe<tName>, args: list<tName>) // first field carries function name if not anonymous and second the arguments which are always known

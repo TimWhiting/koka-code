@@ -255,6 +255,18 @@ type conRepr
   ConOpen(n: name, repr: dataRepr, vrepr: valueRepr, ctxPath: ctxPath) // constructor of open data type
   ConNormal(n: name, repr: dataRepr, vrepr: valueRepr, ctxPath: ctxPath, tag: int); // a regular constructor
 
+fun tag(c: conRepr): exn int
+  match c
+    ConEnum(tag=tag) -> tag
+    ConIso(tag=tag) -> tag
+    ConSingleton(tag=tag) -> tag
+    ConSingle(tag=tag) -> tag
+    ConAsJust(tag=tag) -> tag
+    ConStruct(tag=tag) -> tag
+    ConAsCons(tag=tag) -> tag
+    ConOpen(_) -> throw("core/core: tag: open constructor")
+    ConNormal(tag=tag) -> tag
+
 fun show(r: conRepr): string
   match r
     ConEnum(n, drepr, vrepr, tag) -> "ConEnum(" ++ n.show ++ "," ++ show(drepr) ++ "," ++ show(vrepr) ++ "," ++ tag.show ++ ")"

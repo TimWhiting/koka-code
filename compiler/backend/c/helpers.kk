@@ -416,6 +416,9 @@ fun ppConField(n: name, t: ktype): doc
 fun conTestName(c: conInfo): doc
   cppName(makeHiddenName("is", c.name))
 
+fun conTestNameX(nm: name): doc
+  cppName(makeHiddenName("is", nm))
+
 fun conTagName(c: conInfo): doc
   cppName(makeHiddenName("tag", c.name))
 

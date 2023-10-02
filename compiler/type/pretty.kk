@@ -3,9 +3,11 @@ import compiler/common/color-scheme
 import compiler/lib/pprint
 import compiler/lib/printer
 import compiler/type/type
+import compiler/type/typevar
 import compiler/common/name
 import compiler/common/name-prim
 import newstd/data/linearmap
+import newstd/data/linearset
 import compiler/kind/importmap
 import compiler/platform/config
 import compiler/common/nice
@@ -64,7 +66,7 @@ fun defaultCoreOptions(f)
 
 // Pretty print environment for types
 
-alias ppTypeEff = <precEff,prettyTypeEff,documentation,coreOptions,pure>
+alias ppTypeEff = <precEff,prettyTypeEff,documentation,coreOptions,pure,niceEff,compFlags>
 
 effect precEff
   val prec: prec
@@ -85,7 +87,7 @@ fun overridePrec(p: prec, f)
   f()
 
 fun handlePrettyEff(f)
-  with override
+  with handler
     val prec = precTopTop
   with handler 
     val showKinds = False
@@ -121,37 +123,125 @@ fun compress(l: list<char>): list<char>
 fun niceType(tp)
   niceTypes([tp]).head.unjust
 
-fun niceTypes(tps: list<ktype>): list<doc>
+fun niceTypes(tps: list<ktype>): ppTypeEff list<doc>
   tps.niceList fn(tp)
-    tp.ppType.color(prettyTypeEnv.colors.colorType)
+    tp.ppType.color(colors.colorType)
 
 fun niceList(schemes: list<ktype>, f: (ktype) -> ppTypeEff doc): ppTypeEff list<doc>
-  schemes.map(fn(tp) tp.typeVars).unions.list.map(extendNice)
+  schemes.map(fn(tp) tp.freeTypeVars).unions.list.map(extendNice)
   schemes.map(f)
 
 // Pretty print a type
-// ppScheme
+fun pretty(t: ktype): <documentation,coreOptions,pure,compFlags> doc
+  with handlePrettyEff
+  with niceEnv
+  t.ppType
 
-// ppSchemeEffect
+fun pretty(tv: typeVar): <documentation,coreOptions,pure,compFlags> doc
+  with handlePrettyEff
+  with niceEnv
+  tv.ppTypeVar
 
-// ppDefFunType
+fun pretty(tc: typeCon): <documentation,coreOptions,pure,compFlags> doc
+  with handlePrettyEff
+  with niceEnv
+  tc.ppTypeCon
 
-// ppDeclType
+fun pretty(ts: typeSyn): <documentation,coreOptions,pure,compFlags> doc
+  with handlePrettyEff
+  with niceEnv
+  ts.ppTypeSyn
+
+fun ppScheme(tp: ktype)
+  tp.niceType
+
+fun ppSchemeEffect(tp: ktype)
+  match tp
+    TFun([], _, _) -> ppSchemeEffect(TForAll([], [], tp))
+    TForAll(vars, preds, TFun([], eff, res)) ->
+      vars.map(extendNice)
+      with overridePrec(precTypeTop)
+      val fors = if vars.is-nil then empty else "forall".keyword |.| vars.map(ppTypeVar).angled |.| dot |.| space
+      val predDoc = if preds.is-nil then empty else preds.map(ppPred).commaSep |+| "=> ".text
+      val effDoc = if eff.isTypeTotal then empty else overridePrec(precArrow - 1, {eff.ppType}) |.| space
+      val resDoc = res.ppType
+      (fors |.| predDoc |.| effDoc |.| resDoc).pparens(prec, precTypeQuant)
+    _ -> tp.niceType
+
+fun prettyDefFunType(tp: ktype, pinfos: list<paramInfo>)
+  fun ppParam((nm, pinfo, tpDoc))
+    val x = match pinfo
+      Borrow -> "^".text |+| (if nm.isNil then "_".text else nm.ppName) |+| ": ".text
+      _ -> if nm.isNil then empty else nm.ppName |+| ": ".text
+    x |.| tpDoc
+  match tp.ppDeclType(pinfos)
+    (Just(params), pre, post) ->
+      pre |.| params.map(ppParam).commaSep.parens |+| "->".text |+| post
+    (Nothing, pre, post) -> pre |+| "()".text |+| "->".text |+| post
+
+fun ppDeclType(tp: ktype, pinfos: list<paramInfo>)
+  match tp
+    TForAll(vars, preds, rho) ->
+      vars.map(extendNice)
+      val (args, _, res) = rho.ppDeclType(pinfos)
+      val pre = if vars.is-nil then empty else "forall".keyword |.| vars.map(ppTypeVar).angled |.| space
+      (args, pre, res |.| preds.ppPredicates)
+    TFun(params, eff, rho) ->
+      val pparams = params.map(fn((name, tp')) (name, Own, tp'.ppType))
+      (Just(pparams), empty, if eff.isTypeTotal then empty else overridePrec(precArrow, {eff.ppType |.| space}) |.| overridePrec(precArrow, {rho.ppType})) 
+    _ -> (Nothing, empty, tp.ppType)
+
+fun pretty(d: dataInfo): <documentation,coreOptions,pure,compFlags> doc
+  with handlePrettyEff
+  with niceEnv
+  ppDataInfo(d, True, False)
+
+fun ppDataInfo(d: dataInfo, showBody: bool, isExtend: bool)
+  d.prettyDataInfo(showBody, False, isExtend)
 
 fun commaSep(d: list<doc>)
   d.punctuate(comma).hsep
 
+fun prettyDataInfo(d: dataInfo, showBody: bool, publicOnly: bool, isExtend: bool)
+  if publicOnly && d.vis.is-private then empty
+  else
+    val vis = if publicOnly then empty else d.vis.ppVis
+    d.params.map(extendNice)
+    val ext = if isExtend then "extend ".keyword else match d.def
+      DataDefRec -> "recursive ".text
+      DataDefOpen -> "open ".text
+      DataDefValue(v) -> ("value" ++ v.show ++ " ").text
+      _ -> empty 
+    val sort = match d.sort
+      Inductive -> "type".keyword
+      CoInductive -> "co type".keyword
+      Retractive -> "rec type".keyword
+    val params = if d.params.is-nil then empty else d.params.map(TVar).niceTypes.angled
+    val kind = if d.kind == kindStar then empty else " ::".text |+| d.kind.ppKind(colors, precTop)
+    val body = if showBody && d.constrs.is-cons then 
+        "{".text |-| d.constrs.map(fn(c) c.prettyConInfo(publicOnly)).vcat.indent(2) |-| "}".text 
+      else empty
+    val data = vis |.| ext |.| sort |+| d.name.ppName |.| params |.| body
+    data.prettyComment(d.doc)
 
-// prettyDataInfo
-
-// prettyConInfo
-
+fun prettyConInfo(c: conInfo, publicOnly: bool)
+  if publicOnly && c.vis.is-private then empty
+  else
+    fun ppField((_, (name, tp)))
+      (if name.isFieldName then empty else name.ppName |.| ": ".text) |.| tp.ppType
+    val vis = if publicOnly then empty else c.vis.ppVis
+    c.existentials.map(fn(v) extendNice(v))
+    val exists0 = if c.existentials.is-nil then empty else c.existentials.map(ppTypeVar).angled
+    val fields = if c.params.is-nil then empty else zip(c.paramVis, c.params).map(ppField).commaSep.parens
+    val vrepr = c.valueRepr.show.text
+    val const = vis |.| "con".keyword |+| c.name.ppName |.| exists0 |.| fields |+| vrepr |+| ":".text |+| c.typeScheme.ppType |.| semi
+    const.prettyComment(c.doc)
 
 fun prettyComment(d: doc, comment: string)
   if comment == "" then d else
     val clist = comment.list
-    val cmt = if c.last.unjust == '\n' then c.init.string else comment
-    (cmt.text |-| doc).color(colors.colorComment)
+    val cmt = if clist.last.unjust == '\n' then clist.init.string else comment
+    (cmt.text |-| d).color(colors.colorComment)
 
 fun ppVis(v: visibility)
   match v
@@ -159,14 +249,20 @@ fun ppVis(v: visibility)
     Public -> "pub ".keyword
 
 // Synonym info
+fun pretty(s: synInfo): <documentation,coreOptions,pure,compFlags> doc
+  with handlePrettyEff
+  with niceEnv
+  ppSynInfo(s)
 
-// fun pretty(s: syninfo
-//   with handlePrettyEff
-//   ppSynInfo(s)
-
-// fun ppSynInfo(s: synInfo, isLocal: bool=False, publicOnly:bool=False, showBody:bool=True)
-  // if publicOnly && vis.isPrivate then empty else
-  //   s.doc.prettyComment
+fun ppSynInfo(s: synInfo, isLocal: bool=False, publicOnly:bool=False, showBody:bool=True)
+  if publicOnly && s.vis.is-private then empty 
+  else
+    val al = if isLocal then "local alias".keyword else s.vis.ppVis |.| "alias".keyword
+    val params = if s.params.is-nil then empty else s.params.map(TVar).niceTypes.angled
+    val kind = if s.kind == kindStar then empty else " ::".text |+| s.kind.ppKind(colors, precTop)
+    val body = if !showBody then empty else "=".keyword |+| s.t.niceType
+    val syn = al |+| s.name.ppName |.| params |.| kind |+| body |+| "=".text |+| pretty(s.rank)
+    syn.prettyComment(s.doc)
 
 fun ppType(tp: ktype)
   val t = match tp
@@ -207,9 +303,9 @@ fun ppType(tp: ktype)
             val fdoc = overridePrec(precTypeAtom, {f.ppType})
             val argsdoc = match args 
               Nil -> empty
-              Cons(arg, rest) -> 
+              Cons(targ, rest) -> 
                 val argsDoc = args.map(fn(a) overridePrec(precTypeTop, {a.ppType})).angled
-                if rest.is-nil then argsDoc.colorByKind(arg.kind, id) else argsDoc
+                if rest.is-nil then argsDoc.colorByKind(targ.kind, id) else argsDoc
             (fdoc |.| argsdoc).pparens(prec, precApp)
     // TODO: this is duplicated above due to issues with limitations in guards
     TApp(f, args) ->

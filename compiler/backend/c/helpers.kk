@@ -2,10 +2,12 @@ import compiler/core/core
 import compiler/common/syntax
 import compiler/common/failure
 import compiler/common/name
+import compiler/common/nice
 import compiler/common/name-prim
 import compiler/core/corevar
 import compiler/core/borrowed
 import compiler/type/type
+import compiler/type/pretty
 import compiler/type/typevar
 import compiler/kind/kind
 import compiler/kind/newtypes
@@ -15,7 +17,7 @@ import compiler/common/file
 import compiler/lib/printer
 import std/os/path
 
-alias asmEff = <pure,asm,compFlags,uniquePhase,newtypes,printer,subst>
+alias asmEff = <pure,asm,compFlags,uniquePhase,newtypes,printer,subst,documentation,coreOptions,niceEff,precEff,prettyTypeEff>
 
 // Put the things that need overriding in here
 effect subst
@@ -31,6 +33,7 @@ effect asm
   fun emitToDone(d: doc): ()
   fun getInit(): doc
   fun getDone(): doc
+  fun getTop(): doc
   fun addCanonical(lam: canonicalLambda): bool // true if first instance, otherwise false
   // TODO: Canonical lambda
   val modName: name // current module
@@ -251,7 +254,7 @@ fun cTypeCon(tp: typeCon): cType
 fun typeClassName(n: name)
   prepend(".", n)
 
-fun ppVis(v: visibility): doc
+fun cppVis(v: visibility): doc
   empty
 
 fun typeConClassName(n: name)
@@ -260,18 +263,18 @@ fun typeConClassName(n: name)
 fun cPrimCanBeBoxed(s: string): bool
   ["kk_char_t", "int64_t", "int16_t", "int32_t", "float", "double", "intptr_t", "kk_ssize_t"].any(fn(x) x == s)
 
-fun ppType(tp: ktype): doc
+fun cppType(tp: ktype): doc
   match tp.cType
     CBox -> "kk_box_t".text
     CFun -> "kk_function_t".text
-    CData(nm) -> ppName(nm)
+    CData(nm) -> cppName(nm)
     CPrim(prim) -> prim.text
 
 fun ppVarDecl(TName(nm, tp): tName): doc
-  tp.ppType |+| nm.ppName
+  tp.cppType |+| nm.cppName
 
 fun ppDefName(n: name)
-  ppName(n.unqualify)
+  cppName(n.unqualify)
 
 val contextDoc = "_ctx".text
 val contextParam = "kk_context_t* _ctx".text
@@ -370,15 +373,15 @@ fun isSmallIntPtrT(i)
     8 -> i > minSmallInt64 && i < maxSmallInt64
     _ -> fail("backend/c/from-core: isSmallIntPtrT: unknown platform intptr_t: " ++ targetPlatform.show)
 
-fun ppName(n: name): doc
+fun cppName(n: name): doc
   if n.isQualified then ppModName(n.qualifier) |.| "_".text |.| n.unqualify.show.asciiEncode(False).text
   else n.encode(False)
 
-fun ppQName(modName: name, name: name)
-  if modName == name.qualifier then ppName(name.unqualify)
-  else ppName(name)
+fun ppQName(modName: name, name: name): doc
+  if modName == name.qualifier then cppName(name.unqualify)
+  else cppName(name)
 
-fun ppModName(n: name)
+fun ppModName(n: name): doc
   "kk_".text |.| n.encode(True)
 
 fun encode(n: name, isModule: bool)
@@ -408,13 +411,13 @@ val reserved = [
 ]
 
 fun ppConField(n: name, t: ktype): doc
-  t.ppType |+| n.unqualify.ppName |.| semi
+  t.cppType |+| n.unqualify.cppName |.| semi
 
 fun conTestName(c: conInfo): doc
-  ppName(makeHiddenName("is", c.name))
+  cppName(makeHiddenName("is", c.name))
 
 fun conTagName(c: conInfo): doc
-  ppName(makeHiddenName("tag", c.name))
+  cppName(makeHiddenName("tag", c.name))
 
 fun primName_t(prim: string, s: string)
   val start = if s.starts-with("kk_").is-just then "" else "kk_"
@@ -425,25 +428,25 @@ fun primName(prim: string, d: doc)
   d |.| "_".text |.| prim.text
 
 fun conBaseCastName(c: conInfo): doc
-  ppName(makeHiddenName("base", c.name))
+  cppName(makeHiddenName("base", c.name))
 
 fun conCreateName(c: conInfo): doc
-  makeHiddenName("new", c.name).ppName
+  makeHiddenName("new", c.name).cppName
 
 fun conSingletonName(c: conInfo): doc
-  makeHiddenName("singleton", c.name).ppName
+  makeHiddenName("singleton", c.name).cppName
 
 fun conAsName(c: conInfo): doc
-  ppName(makeHiddenName("as", c.name))
+  cppName(makeHiddenName("as", c.name))
 
 fun openTagName(n: name): doc
-  ppName(makeHiddenName("tag", n))
+  cppName(makeHiddenName("tag", n))
 
 fun ntParameters(pars: list<(name, ktype)>): doc
-  parameters(pars.map(fn((n, t)) t.ppType |+| n.unqualify.ppName))
+  parameters(pars.map(fn((n, t)) t.cppType |+| n.unqualify.cppName))
 
 fun closFnParameters(pars: list<(name, ktype)>): doc
-  parameters(Cons("void* fnPtr".text, pars.map(fn((n, t)) t.ppType |+| n.unqualify.ppName)))
+  parameters(Cons("void* fnPtr".text, pars.map(fn((n, t)) t.cppType |+| n.unqualify.cppName)))
 
 fun vcatBreak(l: list<doc>): doc
   linebreak |.| l.vcat
@@ -492,6 +495,10 @@ fun debugWrap(d: doc, s: string)
 
 val tagField = "_tag".text
 val constdecl = "const".text
+
+fun tParameters(tns: list<tName>): doc
+  ntParameters(tns.map(fn(tn) (tn.getName, tn.tNameType)))
+
 fun resultType(tp: ktype): <pure,compFlags> ktype
   match tp.splitFunScheme
     Just((_, _, _, _, res)) -> res

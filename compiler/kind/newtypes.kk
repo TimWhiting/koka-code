@@ -41,7 +41,7 @@ val eqD = fn(d1:dataInfo, d2:dataInfo) d1 == d2
 val showD = fn(d:dataInfo) d.show
 fun single(name: name, d: dataInfo): name-map<dataInfo>
   linearMap([(name, d)], (==), eqD, show, showD)
-val empty:name-map<dataInfo> = linearMap([], fn(n1: name, n2: name) n1 == n2, eqD, show, showD)
+val emptyNewtypes:name-map<dataInfo> = linearMap([], fn(n1: name, n2: name) n1 == n2, eqD, show, showD)
 
 fun extractNewtypes(c: core): <pure,compFlags> name-map<dataInfo>
   c.typeDefs.map(extractTypeDefGroup).unions
@@ -52,6 +52,6 @@ fun extractTypeDefGroup(g: typeDefGroup): <pure,compFlags> name-map<dataInfo>
 fun extractTypeDef(d: typeDef): <pure,compFlags> name-map<dataInfo>
   match d
     Data(dataInfo, False) -> single(dataInfo.name, dataInfo)
-    _ -> empty
+    _ -> emptyNewtypes
 
 // TODO: Pretty print

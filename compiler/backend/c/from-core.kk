@@ -3,9 +3,11 @@ import compiler/common/syntax
 import compiler/common/failure
 import compiler/common/name
 import compiler/common/name-prim
+import compiler/common/nice
 import compiler/core/corevar
 import compiler/core/borrowed
 import compiler/type/type
+import compiler/type/pretty
 import compiler/type/typevar
 import compiler/kind/kind
 import compiler/kind/newtypes
@@ -24,7 +26,7 @@ fun cFromCore(cTarget: cTarget, b: buildType, sourceDir: path,
               platform: platform, borrowed: borrowed, enableReuse: bool, 
               enableSpecialize: bool, enableReuseSpecialize: bool, enableBorrowInference: bool, 
               eagerPatBind: bool, stackSize: int, mbMain: maybe<(name, bool)>, 
-              core: core): <pure,compFlags,uniquePhase,newtypes,printer> (doc, doc, core)
+              core: core): <pure,compFlags,uniquePhase,newtypes,printer,documentation,coreOptions,niceEff,prettyTypeEff,precEff> (doc, doc, core)
   with handler
     val cdefToHeader = False
     val substEnv = []
@@ -43,6 +45,10 @@ fun cFromCore(cTarget: cTarget, b: buildType, sourceDir: path,
     fun emitToDone(d: doc) rddoc := Cons(d, rddoc)
     fun getInit() ridoc.vcat
     fun getDone() rddoc.vcat
+    fun getTop() 
+      val res = rtdoc.reverse.vcat
+      rtdoc := []
+      res
     fun addCanonical(c: canonicalLambda) 
       if canonicalLamTypes.member(c) then False
       else
@@ -69,11 +75,11 @@ val checkInitDoc = [
   "if (_kk_initialized) return;".text,
   "_kk_initialized = true;".text].vcat
 
-fun initImport(i: kimport): doc
-  i.importName.qualify(".init".newName).ppName |.| emptyArgs |.| semi
+fun initImport(i: kimport)
+  i.importName.qualify(".init".newName).cppName |.| emptyArgs |.| semi
 
-fun doneImport(i: kimport): doc
-  i.importName.qualify(".done".newName).ppName |.| emptyArgs |.| semi
+fun doneImport(i: kimport)
+  i.importName.qualify(".done".newName).cppName |.| emptyArgs |.| semi
 
 val customInitDoc = [
   "#if defined(KK_CUSTOM_INIT)".text,
@@ -88,8 +94,8 @@ fun genModule(core: core, mbMain: maybe<(name, bool)>): asmEff core
   // parcReuseSpecializeCore
 
   val headComment = "// Koka generated module:".text |+| modName.show.pretty |+| ", koka version:".text |+| compFlags.version.pretty |.| ", platform:".text |+| (targetPlatform.ptrSize * 8).pretty |.| "-bit".text
-  val initSignature = "void".text |+| ".init".newName.qualify(modName).ppName |.| emptyParams
-  val doneSignature = "void".text |+| ".done".newName.qualify(modName).ppName |.| emptyParams
+  val initSignature = "void".text |+| ".init".newName.qualify(modName).cppName |.| emptyParams
+  val doneSignature = "void".text |+| ".done".newName.qualify(modName).cppName |.| emptyParams
 
   [checkInitDoc, core.imports.map(initImport).vcat, customInitDoc].vcat.emitToInit
   
@@ -201,17 +207,17 @@ fun genMain(mbMain: maybe<(name, bool)>): asmEff ()
         "\n// main exit\n static void _kk_main_exit(void)".text |+| block(
           vcat([
             "kk_context_t* _ctx = kk_get_context();".text,
-            ppName(modName.qualify(".done".newName)) |.| parens("_ctx".text) |.| semi
+            cppName(modName.qualify(".done".newName)) |.| parens("_ctx".text) |.| semi
           ])
         ) |-|
         "\n// main entry \nint main(int argc, char** argv)".text |+| block(vcat([
           text("kk_assert(sizeof(size_t) == " ++ targetPlatform.sizeSize.show ++ " && sizeof(void*) == " ++ targetPlatform.ptrSize.show ++ ");"),
-          (if stackSize == 0 then pprint/empty else ("kk_os_set_stack_size(KK_IZ(" ++ stackSize.show ++ "));").text),
+          (if stackSize == 0 then empty else ("kk_os_set_stack_size(KK_IZ(" ++ stackSize.show ++ "));").text),
           "kk_context_t* _ctx = kk_main_start(argc, argv);".text,
-          ppName(modName.qualify(".init".newName)) |.| parens("_ctx".text) |.| semi,
+          cppName(modName.qualify(".init".newName)) |.| parens("_ctx".text) |.| semi,
           "atexit(&_kk_main_exit);".text,
-          ppName(name) |.| parens("_ctx".text) |.| semi,
-          ppName(modName.qualify(".done".newName)) |.| parens("_ctx".text) |.| semi,
+          cppName(name) |.| parens("_ctx".text) |.| semi,
+          cppName(modName.qualify(".done".newName)) |.| parens("_ctx".text) |.| semi,
           "kk_main_end(_ctx);".text,
           "return 0;".text
         ]))
@@ -226,13 +232,189 @@ fun genLocalGroup(dg: defGroup): asmEff doc
     DefNonRec(d) -> genLocalDef(d)
 
 fun genLocalDef(d: def): asmEff doc
-  pprint/empty
+  val resDoc = typeComment(d.ktype.cppType)
+  val defDoc = genStat(ResultAssign(d.defTName, Nothing), d.defExpr)
+  fun isDiscardExpr(e: expr)
+    e.isUnit || e.isReuseNull
+  vcat([
+    (if d.doc == "" then empty else align(vcat(Cons(space, d.doc.trimComment.lines.map(text)))))
+    ] ++ (if d.defName.isNil && defDoc.dStartsWith(d.defName.show ++ " =") then
+     // single assignment without declarations
+        [d.ktype.cppType |+| defDoc |.| semi] 
+      else
+        [(if d.defName.isNil then empty else ppVarDecl(d.defTName) |.| d.ktype.unitSemi),
+         (if d.defExpr.isDiscardExpr then empty else defDoc)]
+     )
+  )
 
-fun genTypeDefs(tds: typeDefGroups): asmEff ()
-  ()
+fun isWhitespace(c: char)
+  c == ' ' || c == '\t' || c == '\n' || c == '\r'
+
+fun trimComment(comm: string)
+  fun trimRest(xs: list<char>)
+    xs.drop-while(fn(x) x.isWhitespace).reverse.string
+  fun trimLine(s: string)
+    match s.list.reverse
+      Cons('\\', xs) -> xs.trimRest
+      xs -> xs.trimRest
+  comm.lines.map(trimLine).unlines
+
+fun unitSemi(tp: ktype): doc
+  if tp.isTypeUnit then " = kk_Unit;".text else semi
+
+
+// Generate C declaration for top level definitions
 
 fun genTopGroups(d: list<defGroup>): asmEff ()
+  with localUnique
+  d.map(genTopGroup)
   ()
+
+fun genTopGroup(g: defGroup): asmEff ()
+  match g
+    DefRec(defs) -> 
+      defs.map(genFunTopDefSig)
+      defs.map(fn(d) d.genTopDef(False, False))
+      ()
+    DefNonRec(d) ->
+      val inlineC = d.kinline.is-inlineAlways || d.isInlineable(5)
+      d.genTopDef(True, inlineC)
+
+fun genFunTopDefSig(d: def)
+  emitToH(
+    linebreak |.| d.genFunDefSig(False) |.| semi |+|
+    d.ktype.cppType.typeComment
+  )
+
+fun genFunDefSig(d: def, inlineC: bool)
+  d.defExpr.genFunSig(inlineC, d.vis, d.defName)
+
+fun genFunSig(ex: expr, inlineC: bool, vis: visibility, nm: name)
+  match ex
+    TypeApp(e) -> e.genFunSig(inlineC, vis, nm)
+    TypeLam(_, e) -> e.genFunSig(inlineC, vis, nm)
+    Lam(params, _, body) -> body.genLamSig(inlineC, vis, nm, params)
+    _ -> fail("backend/c/from-core genFunSig: expected lambda expression")
+
+fun genLamSig(body: expr, inlineC: bool, vis: visibility, nm: name, params: list<tName>)
+  val inl = if inlineC then "static inline ".text else empty
+  inl |.| body.typeOf.cppType |+| nm.cppName |.| params.tParameters
+
+fun genTopDef(d: def, genSig: bool, inlineC: bool)
+  if d.doc != "" then
+    val doc = align(vcat(Cons(space, d.doc.trimComment.lines.map(text))))
+    if inlineC then emitToH(doc) else emitToC(doc)
+  d.genTopDefDecl(genSig, inlineC)
+
+fun genTopDefDecl(d: def, genSig: bool, inlineC: bool)
+  if d.ktype.isValueOperation then () // Don't generate code for phantom definitions for value operations (these were only needed for type checking)
+  else
+    val emit = if inlineC then emitToH else emitToC
+    val resTp = match d.ktype.splitFunScheme
+      Nothing -> d.ktype
+      Just((_, _, _, _, res)) -> res
+    fun genFunDef(body: expr, params: list<tName>)
+      val args = params.map(fn(p) p.getName.cppName)
+      val isTailCall = body.isTailCalling(d.defName)
+      val bodyDoc = genStat(ResultReturn(Just(TName(d.defName, resTp)), params), body)
+      val tpDoc = d.ktype.cppType.typeComment
+      val sig = body.genLamSig(inlineC, d.vis, d.defName, params)
+      if genSig && !inlineC then emitToH(linebreak |.| sig |.| semi |+| tpDoc)
+      val top = getTop() // get top level decls generated by body (for functions etc)
+      emit(linebreak |.| top |.| sig |+| (if isTailCall then tcoBlock(tpDoc, bodyDoc) else debugComment("genFunDef: no tail calls to " ++ d.defName.showName ++ " found") |.| tblock(tpDoc, bodyDoc)))
+
+    fun genDecl(ex: expr)
+      match ex
+        TypeApp(e) -> genDecl(e)
+        TypeLam(_, e) -> genDecl(e)
+        Lam(params, _, body) | d.sort.is-defFun -> body.genFunDef(params)
+        _ | d.sort.is-defFun -> 
+          // some optimization turned a toplevel lambda into a value;
+          // wrap it back into a lmabda again as all occurences will have InfoArity and call it directly (so it cannot be a function_t)
+          match d.ktype.splitFunScheme
+            Nothing -> fail("backend/c/from-core genTopDefDecl: expected function type, got: " ++ d.ktype.show ++ " for def " ++ d.defName.show)
+            Just((_, _, argTps, _, _)) ->
+              val names = list(1, argTps.length).map(fn(x) ("x" ++ x.show).newVarName)
+              val tnames = zip(names, argTps).map(fn((nm, (_, tp))) TName(nm, tp))
+              val app = App(ex, tnames.map(fn(tn) Var(tn, InfoNone)))
+              app.genFunDef(tnames)
+        // Special case string literals
+        ELit(LitString(s)) -> s.genTopLevelStringLiteral(d.defName, d.vis)
+        // Special case for doubles
+        ELit(lit as LitFloat) ->
+          emitToH("#define".text |+| d.defName.cppName |+| parens("(double)".text |.| lit.ppLit.parens))
+        _ ->
+          val doc = genStat(ResultAssign(TName(d.defName, d.ktype), Nothing), d.defExpr)
+          emitToInit(doc.block) // must be scoped to avoid name clashes
+          match d.defName.cppName.genDupDropCall(False, d.ktype)
+            [] -> ()
+            docs -> emitToDone(docs.hcat |.| semi)
+          val hdecl = d.ktype.cppType |+| d.defName.cppName |.| semi
+          val cdecl = d.ktype.cppType |+| d.defName.cppName |.| d.ktype.unitSemi
+          emitToH(linebreak |.| "extern".text |+| hdecl)
+          emitToC(linebreak |.| cdecl)
+    with setDef(d.defName, inlineC)
+    genDecl(d.defExpr)
+
+fun genTopLevelStringLiteral(s: string, name: name, vis: visibility)
+  val (cstr, clen) = s.cString
+  val decl = if vis.is-public then empty else "static".text
+  val nameDoc = name.cppName
+  if clen > 0 then
+    emitToC("kk_declare_string_literal".text |.| [decl, nameDoc, clen.pretty, cstr].tupled)
+    emitToInit("kk_init_string_literal".text |.| [nameDoc].arguments)
+    // TODO: Emit drop in Done?
+  else
+    emitToC("kk_define_string_literal_empty".text |.| [decl, nameDoc].tupled)
+  if vis.is-public then
+    emitToH(linebreak |.| "extern".text |+| typeString.cppType |+| nameDoc |.| semi)
+
+// Generate value constructors for each defined type
+
+fun genTypeDefs(tds: typeDefGroups): asmEff ()
+  tds.map(genTypeDefGroup)
+
+fun genTypeDefGroup(tdg: typeDefGroup)
+  tds.map(genTypeDefPre)
+  tds.map(genTypeDefPost)
+
+fun genTypeDefPre(td: typeDef)
+  match td
+    Synonym -> ()
+    Data(info, isExtend) ->
+      // generate the type constructor
+      emitToH(linebreak |.| text("// " ++ (if info.isValue then "value type" else "type")) |+| info.name.pretty)
+      val (dataRepr, conReprs) = info.dataRepr(isValue)
+      if dataRepr.is-dataEnum then
+        val enumIntTp = match info.def
+          DataDefValue(ValueRepr(n, 0, _)) ->
+            if n <= 1 then "uint8_t" elif n <= 2 then "uint16_t" elif n <= 4 then "uint32_t" else "uint64_t"
+          _ -> "kk_intb_t" // should not happen!
+        fun ppEnumCon((c: conInfo, _)) c.name.cppName
+        emitToH(info.vis.cppVis |.| "enum".text |+| info.name.typeClassName.cppName |.| "_e".text |+|
+          block(if conReprs.is-nil then info.name.cppName |.| "_empty".text else vcat(info.constrs.zip(conReprs).map(ppEnumCon).punctuate(comma))) |.| semi |-|
+          "typedef".text |+| enumIntTp.text |+| info.name.typeClassName.cppName |.| semi |.| linebreak
+          )
+      elif dataRepr.isValue || isExtend then ()
+      else
+        emitToH(info.vis.cppVis |.| "struct".text |+| info.name.typeClassName.cppName |.| "_s".text |+| 
+          block(vcat(["kk_block_t _block;".text] ++ (if dataRepr.is-dataOpen then ["kk_string_t _tag;".text] else []))) |.| semi |-|
+          (if dataRepr.dataReprMayHaveSingletons then "typedef kk_datatype_t".text |+| info.name.typeClassName.cppName |.| semi 
+           else "typedef kk_datatype_ptr_t".text |+| info.name.typeClassName.cppName |.| semi)
+          )
+
+fun genTypeDefPost(td: typeDef)
+  match td
+    Synonym -> ()
+    Data(info, isExtend) ->
+      ()
+
+type result
+  ResultReturn(tn: maybe<tName>, args: list<tName>) // first field carries function name if not anonymous and second the arguments which are always known
+  ResultAssign(tn: tName, label: maybe<name>) // variable name nad optional label to break
+
+fun genStat(res: result, ex: expr): doc
+  empty
 
 
 

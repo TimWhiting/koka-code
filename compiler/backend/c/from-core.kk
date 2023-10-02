@@ -407,7 +407,76 @@ fun genTypeDefPost(td: typeDef)
   match td
     Synonym -> ()
     Data(info, isExtend) ->
-      ()
+      // Generate the type constructor
+      val (dataRepr, conReprs) = info.dataRepr(isValue)
+      val noCons = conReprs.is-nil
+      val nm = info.name
+
+      // order fields of constructors to have their scan fields first
+      val conInfoReprs = zip(info.constrs, conReprs)
+      val conInfos = conInfoReprs.map fn((ci, crepr))
+        val fields = ci.orderedParams
+        val scanCount = ci.valueRepr.scanCount
+        (ci, crepr, fields, scanCount)
+      val maxSC = conInfos.maxScanCountOf
+      val minSC = conInfos.minScanCountOf
+
+      // generate types for constructors
+      if dataRepr.is-dataEnum then ()
+      else conInfos.map(fn(ci) ci.genConstructorType(info, dataRepr))
+
+      // wrap up the type definition
+      if dataRepr.is-dataOpen && !isExtend then
+        ()
+      elif dataRepr.is-dataEnum || !dataRepr.isValue then
+        ()
+      else
+        fun ppStructConField(c: conInfo)
+          "struct".text |+| c.name.cppName |+| c.name.unqualify.cppName |.| semi
+        if dataRepr.needsTagField then
+          emitToH(
+            info.vis.cppVis |.| "struct".text |+| nm.cppName |.| "_s".text |+|
+            block("kk_value_tag_t _tag;".text |-| "union".text |+| 
+              block(vcat(
+                (info.constrs ++ (if maxSC > 1 && minSC != maxSC then ["kk_box_t _fields[" |.| (maxSC - 1).pretty |.| "]".text])).map(ppStructConField)
+                )) |+| "_cons;".text) |.| semi
+            |-| info.vis.cppVis |.| "typedef struct".text |+| nm.cppName |.| "_s".text |+| nm.typeClassName.cppName |.| semi
+          )
+        else
+          emitToH(info.vis.cppVis |.| "typedef struct".text |+| (
+            match (dataRepr, info.constrs)
+              (DataIso, [c]) -> c.name.cppName
+              (DataSingleStruct, [c]) -> c.name.cppName
+              _ -> nm.cppName |.| "_s".text
+            )
+            |+| nm.typeClassName.cppName |.| semi
+          )
+      
+      // generate functions for constructors
+      val sconInfos = conInfos.sortBy(fn(ci1, ci2) ci1.fst.params.length.compare(ci2.fst.params.length)) // singletons first
+      sconInfos.map(fn(ci) ci.genConstructor(info, dataRepr, maxSC))
+      sconInfos.map(fn(ci) ci.genConstructorTest(info, dataRepr))
+
+      // generate functions for the data type
+      if !isExtend then
+        nm.typeClassName.genDupDrop(info, dataRepr, sconinfos)
+        nm.genBoxUnbox(info, dataRepr)
+      else
+        ()
+
+fun genConstructorType((ci, crepr, cfields, scanCount): (conInfo, conRepr, list<(name, ktype)>, int), info: dataInfo, drepr: dataRepr)
+  match crepr
+    ConEnum -> () // already in enum declaration
+    ConSingleton | !drepr.isValue -> ()
+    _ ->
+      val typeField = if drepr.isValue then [] else ["struct".text |+| info.name.typeClassName.cppName |.| "_s".text |+| "_base;".text]
+      val fields = typeField ++ cfields.map(ppConField)
+      emitToH(ci.vis.ppVis |.| "struct".text |+| c.name.cppName |+| 
+        block(if fields.is-nil then "kk_box_t _unused;" else fields.vcat) // avoid empty struct
+        |.| semi)
+
+fun ppConField((nm, tp): (name, ktype))
+  tp.cppType |+| nm.unqualify.cppName |.| semi
 
 type result
   ResultReturn(tn: maybe<tName>, args: list<tName>) // first field carries function name if not anonymous and second the arguments which are always known

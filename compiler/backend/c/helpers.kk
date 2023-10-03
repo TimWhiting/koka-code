@@ -442,6 +442,9 @@ fun primName(prim: string, d: doc)
 fun conBaseCastName(c: conInfo): doc
   cppName(makeHiddenName("base", c.name))
 
+fun conBaseCastNameX(c: name): doc
+  cppName(makeHiddenName("base", c))
+
 fun conCreateName(c: conInfo): doc
   makeHiddenName("new", c.name).cppName
 
@@ -450,6 +453,9 @@ fun conSingletonName(c: conInfo): doc
 
 fun conAsName(c: conInfo): doc
   cppName(makeHiddenName("as", c.name))
+
+fun conAsNameX(c: name): doc
+  cppName(makeHiddenName("as", c))
 
 fun openTagName(n: name): doc
   cppName(makeHiddenName("tag", n))

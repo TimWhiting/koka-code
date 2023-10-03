@@ -54,13 +54,18 @@ effect asm
 
 value struct canonicalLambda
   canonicalName : name
-  fieldNames: list<name>
+  fieldNames: list<(name, bool)>
+
+fun (==)(fn1: list<(name, bool)>, fn2: list<(name, bool)>): bool
+  match (fn1, fn2)
+    (Cons((n1, b1), r1), Cons((n2, b2), r2)) -> n1 == n2 && b1 == b2 && r1.unsafe-decreasing == r2 
+    _ -> False
 
 fun (==)(c1: canonicalLambda, c2: canonicalLambda): pure bool
   c1.canonicalName == c2.canonicalName && c1.fieldNames == c2.fieldNames
 
 fun show(c: canonicalLambda): string
-  c.canonicalName.show ++ "(" ++ c.fieldNames.map(fn(n) n.show).join(", ") ++ ")"
+  c.canonicalName.show ++ "(" ++ c.fieldNames.map(fn(n) n.fst.show ++ " " ++ n.snd.show).join(", ") ++ ")"
 
 // Effect helpers
 fun emitToCurrentDef(d: doc)
@@ -209,6 +214,10 @@ fun isTailCalling(ex: expr, n: name): bool
     App -> False
     Let(_, e) -> e.unsafe-decreasing.isTailCalling(n) // tail calls can only happen in the actual body
     Case(_, bs) -> bs.any(f1)
+
+type result
+  ResultReturn(tn: maybe<tName>, args: list<tName>) // first field carries function name if not anonymous and second the arguments which are always known
+  ResultAssign(tn: tName, label: maybe<name>) // variable name nad optional label to break
 
 // Pretty printing
 
@@ -466,6 +475,11 @@ fun block(d: doc)
   if d.dStartsWith("{") then d
   else "{".text |--| tab(d) |--| "}".text
 
+fun block1(l: list<doc>)
+  match l
+    [d] -> "{".text |+| d |+| "}".text
+    _ -> block(l.vcat)
+
 fun tblock(tp: doc, d: doc)
   "{".text |+| tp |--| tab(d) |--| "}".text
 
@@ -487,6 +501,21 @@ fun comment(d: doc)
 
 fun linecomment(d: doc)
   "//".text |+| d
+
+fun isWhitespace(c: char)
+  c == ' ' || c == '\t' || c == '\n' || c == '\r'
+
+fun trimComment(comm: string)
+  fun trimRest(xs: list<char>)
+    xs.drop-while(fn(x) x.isWhitespace).reverse.string
+  fun trimLine(s: string)
+    match s.list.reverse
+      Cons('\\', xs) -> xs.trimRest
+      xs -> xs.trimRest
+  comm.lines.map(trimLine).unlines
+
+fun unitSemi(tp: ktype): doc
+  if tp.isTypeUnit then " = kk_Unit;".text else semi
 
 fun debugComment(s: string)
   if debug then comment(s.text)

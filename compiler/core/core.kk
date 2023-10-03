@@ -230,6 +230,15 @@ value type dataRepr
   DataNormal(hasSingletons: bool)
   DataOpen;
 
+fun isDataStructOrLess(d: dataRepr): bool
+  match d
+    DataEnum -> True
+    DataIso -> True
+    DataSingleStruct -> True
+    DataStructAsMaybe -> True
+    DataStruct -> True
+    _ -> False
+
 fun show(d: dataRepr): string
   match d
     DataEnum -> "DataEnum"

@@ -110,6 +110,25 @@ fun conName(e: expr)
       trace("Failed in top level extracting con name of " ++ e.show)
       TName("error".newName, typeAny)
 
+fun getFormat(tname: tName, formats: list<(target, string)>)
+  match formats.find(fn((t, _)) t == C(cTarget))
+    Nothing -> 
+      trace("warning: C backend does not support external in " ++ tname.show)
+      "kk_unsuported_external(\"" ++ tname.show ++ "\")"
+    Just(x) -> x.snd
+
+fun genDefName(tname: tName)
+  tname.getName.unqualify.cppName
+
+fun genVarName(s: string)
+  newVarName(s).cppName
+
+fun genVarNames(i: int)
+  newVarNames(i).map(cppName)
+
+fun genCommentTName(tname: tName)
+  tname.getName.cppName |+| comment(tname.tNameType.ppType)
+
 // Classification
 fun maxScanCountOf(l: list<(conInfo, conRepr, list<(name,ktype)>, int)>): int
   l.foldl(0, fn(m, (_, _, _, sc)) if sc > m then sc else m)
@@ -447,6 +466,9 @@ fun conBaseCastNameX(c: name): doc
 
 fun conCreateName(c: conInfo): doc
   makeHiddenName("new", c.name).cppName
+
+fun conCreateNameX(c: name): doc
+  makeHiddenName("new", c).cppName
 
 fun conSingletonName(c: conInfo): doc
   makeHiddenName("singleton", c.name).cppName

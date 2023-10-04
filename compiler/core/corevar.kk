@@ -11,6 +11,9 @@ fun isTopLevel(d: def)
 fun freeLocals(e: expr)
   e.freeVars.filter(fn(TName(nm)) !nm.isQualified)
 
+fun freeLocals(b: branch)
+  b.freeVars.filter(fn(TName(nm)) !nm.isQualified)
+
 fun freeVars(l: list<expr>): pure linearSet<tName>
   l.map(freeVars).unions
 

@@ -594,6 +594,9 @@ value struct tName
 fun (==)(tn1: tName, tn2: tName): bool
   tn1.getName == tn2.getName
 
+fun (!=)(tn1: tName, tn2: tName): bool
+  tn1.getName != tn2.getName
+
 fun show(n: tName): string
   n.getName.show
 

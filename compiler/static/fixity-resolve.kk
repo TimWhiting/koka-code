@@ -11,9 +11,9 @@ import newstd/data/linearmap
 import compiler/lib/pprint
 
 fun fixityResolve(cscheme: colorScheme, fixMap: fixities, program: userProgram)
-  val fixMap1 = fixitiesCompose(fixMap, program.fixdefs.extractFixMap)
+  val fixMap1 = fixitiesCompose(fixMap, program.fixDefs.extractFixMap)
   with handleFixities(fixMap1)
-  val defs = defs.resolveDefs()
+  val defs1 = program.defs.resolveDefs()
   program(defs=defs1)
 
 fun extractFixMap(fds: list<fixDef>): fixities

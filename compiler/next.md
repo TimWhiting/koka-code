@@ -7,7 +7,6 @@
 - [ ] common/file (finish) 499
 - [ ] core/pretty 729
 - [ ] core/analysismatch 248
-- [ ] core/analysiscctx 330
 - [ ] core/ctail 691
 - [ ] core/check 336
 - [ ] core/gendoc 598

@@ -276,6 +276,14 @@ fun tag(c: conRepr): exn int
     ConOpen(_) -> throw("core/core: tag: open constructor")
     ConNormal(tag=tag) -> tag
 
+fun updateCtxPath(c: conRepr, cp: ctxPath)
+  match c
+    ConSingle(n, r, v, _, t) -> ConSingle(n, r, v, cp, t)
+    ConAsCons(n, r, v, a, _, t) -> ConAsCons(n, r, v, a, cp, t)
+    ConOpen(n, r, v, _) -> ConOpen(n, r, v, cp)
+    ConNormal(n, r, v, _, t) -> ConNormal(n, r, v, cp, t)
+    _ -> throw("core/core: updateCtxPath: not a constructor with a path")
+
 fun show(r: conRepr): string
   match r
     ConEnum(n, drepr, vrepr, tag) -> "ConEnum(" ++ n.show ++ "," ++ show(drepr) ++ "," ++ show(vrepr) ++ "," ++ tag.show ++ ")"

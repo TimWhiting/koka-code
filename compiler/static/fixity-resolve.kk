@@ -16,25 +16,86 @@ fun fixityResolve(cscheme: colorScheme, fixMap: fixities, program: userProgram)
   val defs = defs.resolveDefs()
   program(defs=defs1)
 
+fun extractFixMap(fds: list<fixDef>): fixities
+  fun extractFix(FixDef(name, fixity): fixDef)
+    (name, fixity)
+  fixitiesNew(fds.map(extractFix))
 
+// Rewrite syntax tree
+fun resolveDefs(defs: defGroups<userType>): fixEff defGroups<userType>
+  defs.map(resolveDefGroup)
 
+fun resolveDefGroup(dg: defGroup<userType>)
+  match dg
+    DefRec(dfs) -> DefRec(dfs.map(resolveDef))
+    DefNonRec(df) -> DefNonRec(resolveDef(df))
 
+fun resolveDef(d: def<userType>)
+  val binder' = d.binder.resolveBinder
+  d(binder=binder')
 
+fun resolveBinder(b: valueBinder<t, userExpr>): fixEff valueBinder<t, userExpr>
+  val expr' = b.expr.resolveExpr
+  b(expr=expr')
 
+fun resolveBinder(b: valueBinder<t, maybe<userExpr>>): fixEff valueBinder<t, maybe<userExpr>>
+  val expr' = b.expr.map(fn(e) e.resolveExpr)
+  b(expr=expr')
 
+fun resolveExpr(ex: userExpr): fixEff userExpr
+  match ex
+    Lam(binds, expr, rng) ->
+      val binds' = binds.map(resolveBinder)
+      val expr' = expr.resolveExpr
+      Lam(binds', expr', rng)
+    Let(defs, expr, rng) ->
+      val defs' = defs.resolveDefGroup
+      val expr' = expr.resolveExpr
+      Let(defs', expr', rng)
+    Bind(def, expr, rng) ->
+      val def' = def.resolveDef
+      val expr' = expr.resolveExpr
+      Bind(def', expr', rng)
+    App(f, nargs, rng) ->
+      val f' = f.resolveExpr
+      val nargs' = nargs.map(fn((n, e)) (n, e.resolveExpr))
+      if f.is-var then
+        resolve(nargs'.map(snd))
+      else  
+        App(f', nargs', rng)
+    Var -> ex
+    Literal -> ex
+    Ann(expr, ty, rng) ->
+      val expr' = expr.resolveExpr
+      Ann(expr', ty, rng)
+    Case(expr, brs, rng) ->
+      val expr' = expr.resolveExpr
+      val brs' = brs.map(resolveBranch)
+      Case(expr', brs', rng)
+    Parens(expr, nm, rng) ->
+      val expr' = expr.resolveExpr
+      Parens(expr', nm, rng)
+    Handler(shallow, scoped, over, allowMask, eff, pars, reinit, ret, finally, ops, hrng, rng) ->
+      val ret' = ret.resolveExpr
+      val ops' = ops.map(resolveHandlerBranch)
+      val reinit' = reinit.resolveExpr
+      val final' = finally.resolveExpr
+      Handler(shallow, scoped, over, allowMask, eff, pars, reinit', ret', final', ops', hrng, rng)
+    Inject(tp, expr, b, rng) ->
+      val expr' = expr.resolveExpr
+      Inject(tp, expr', b, rng)
 
+fun resolveExpr(ex: maybe<userExpr>): fixEff maybe<userExpr>
+  ex.map(resolveExpr)
 
+fun resolveBranch(Branch(patt, guards): branch<userType>)
+  Branch(patt, guards.map(resolveGuard))
 
+fun resolveGuard(Guard(test, expr): guard<userType>)
+  Guard(test.resolveExpr, expr.resolveExpr)
 
-
-
-
-
-
-
-
-
-
+fun resolveHandlerBranch(h as HandlerBranch(branchExpr=e): handlerBranch<userType>)
+  h(branchExpr=e.resolveExpr)
 
 // Fixity map for all operators
 alias fixities = name-map<fixity>
@@ -158,8 +219,7 @@ fun ppFixity(f: fixity): doc
     FixPostfix -> "postfix".text
 
 // Helper operations: push and apply
-
-fun push(xs: exprStack, ts: opStack, ts: list<term>, t as Op(op, fix): op)
+fun push(xs: exprStack, ops: opStack, ts: list<term>, t: op): fixEff userExpr 
   resolveTerms(xs, Cons(t, ops), ts)
 
 fun apply(xs: list<expr<userType>>, ops: list<op>, ts: list<term>)

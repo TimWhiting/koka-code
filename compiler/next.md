@@ -10,11 +10,10 @@
 - [ ] core/analysiscctx 330
 - [ ] core/ctail 691
 - [ ] core/check 336
-- [ ] core/openresolve 231
 - [ ] core/gendoc 598
+- [ ] core/simplify 970
 - [ ] core/inline 290
 - [ ] core/specialize 498
-- [ ] core/simplify 970
 - [ ] core/funlift 381
 - [ ] backend/c/parc 1037
 - [ ] backend/c/parcreuse 731

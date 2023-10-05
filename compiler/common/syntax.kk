@@ -289,6 +289,13 @@ type fixity
   FixPrefix
   FixPostfix
 
+fun (==)(f1: fixity, f2: fixity): bool
+  match (f1, f2)
+    (FixInfix(p1, a1), FixInfix(p2, a2)) -> p1 == p2 && a1 == a2
+    (FixPrefix, FixPrefix) -> True
+    (FixPostfix, FixPostfix) -> True
+    _ -> False
+
 fun show(f: fixity): string
   match f
     FixInfix(p, a) -> "FixInfix(" ++ p.show ++ ", " ++ a.show ++ ")"
@@ -299,6 +306,13 @@ type assoc
   AssocNone
   AssocRight
   AssocLeft
+
+fun (==)(a1: assoc, a2: assoc): bool
+  match (a1, a2)
+    (AssocNone, AssocNone) -> True
+    (AssocRight, AssocRight) -> True
+    (AssocLeft, AssocLeft) -> True
+    _ -> False
 
 fun show(a: assoc): string
   match a

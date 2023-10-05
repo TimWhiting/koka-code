@@ -4,6 +4,8 @@ import compiler/common/name
 import compiler/common/name-prim
 import compiler/common/name-collections
 import compiler/common/syntax
+import compiler/common/failure
+import compiler/platform/config
 import newstd/data/linearset
 import newstd/core
 
@@ -371,3 +373,76 @@ fun freeTypeVars(tp: kUserType<k>): div nameSet
     TpCon -> namesEmpty
     TpParens(tp) -> tp.freeTypeVars
     TpAnn(tp) -> tp.freeTypeVars
+
+// access definitions
+fun defBody(d: def<t>): expr<t>
+  d.binder.expr
+
+fun defName(d: def<t>): name
+  d.binder.name
+
+fun defType(d: def<t>): maybe<t>
+  match d.binder.expr
+    Ann(_, tp) -> Just(tp)
+    _ -> Nothing
+
+fun typeDefName(d: typeDef<t,u,k>): name
+  d.binder.name
+
+fun typeDefNameRange(d: typeDef<t,u,k>): range
+  d.binder.nameRange
+
+fun programNull(n: name)
+  Program(sourceNull, n, rangeNull, [], [], [preludeImport], [], [], "")
+
+// Import declaration for the standard prelude
+val preludeImport = Kimport(nameSystemCore, nameSystemCore, rangeNull, Private)
+
+fun makeProgram(n: name, tdefs: list<typeDef<t,t,k>>, defs: list<def<t>>): program<t,k>
+  Program(sourceNull, n, rangeNull, [TypeDefRec(tdefs)], [DefRec(defs)], [], [], [], "")
+
+fun addImports(p: program<t,k>, imps: list<kimport>): program<t,k>
+  Program(p.source, p.name, p.nameRange, p.typeDefs, p.defs, imps ++ p.imports, p.externals, p.fixDefs, p.doc)
+
+fun removeTDefs(tdefs, tdefs0)
+  tdefs0.foldl(tdefs, fn(acc, tdef) acc.std/core/filter(fn(tdef') tdef'.typeDefName != tdef.typeDefName))
+
+fun removeDefs(defs, defs0)
+  defs0.foldl(defs, fn(acc, def) acc.std/core/filter(fn(def') def'.defName != def.defName))
+
+fun addDefs(p: program<t,k>, tdefs0: list<typeDef<t,t,k>>, defs0: list<def<t>>): <exn,compFlags> program<t,k>
+  val tdefs' = match p.typeDefs
+    [] -> [TypeDefRec(tdefs0)]
+    [TypeDefRec(ts)] -> [TypeDefRec(ts.removeTDefs(tdefs0) ++ tdefs0)]
+    _ -> fail("syntax/syntax: can not add type definitions to processed tree")
+  val defs' = match p.defs
+    [] -> [DefRec(defs0)]
+    [DefRec(ds)] -> [DefRec(ds.removeDefs(defs0) ++ defs0)]
+    _ -> fail("syntax/syntax: can not add definitions to processed tree")
+  Program(p.source, p.name, p.nameRange, tdefs', defs', p.imports, p.externals, p.fixDefs, p.doc)
+
+fun removeAllDefs(p: program<t,k>): program<t,k>
+  p(defs=[])
+
+fun programRemoveDef(p: program<t,k>, nm: name): program<t,k>
+  fun filterTDef(tdefg: typeDefGroup<t,k>): typeDefGroup<t,k>
+    match tdefg
+      TypeDefRec(tdefs) -> TypeDefRec(tdefs.filter(fn(tdef) tdef.typeDefName != nm))
+      TypeDefNonRec(tdef) -> TypeDefNonRec(tdef)
+  fun filterDef(defg: defGroup<t>): defGroup<t>
+    match defg
+      DefRec(defs) -> DefRec(defs.filter(fn(def) def.defName != nm))
+      DefNonRec(def) -> DefNonRec(def)
+  Program(p.source, p.name, p.nameRange, p.typeDefs.map(filterTDef), p.defs.map(filterDef), p.imports, p.externals, p.fixDefs, p.doc)
+
+fun programFind(p: program<t,k>, nm: name): maybe<range>
+  fun trange(tdefg: typeDefGroup<t,k>): list<(name, range)>
+    match tdefg
+      TypeDefRec(tdefs) -> tdefs.map(fn(tdef) (tdef.typeDefName, tdef.typeDefNameRange))
+      TypeDefNonRec(tdef) -> [(tdef.typeDefName, tdef.typeDefNameRange)]
+  fun drange(defg: defGroup<t>): list<(name, range)>
+    match defg
+      DefRec(defs) -> defs.map(fn(def) (def.defName, def.range))
+      DefNonRec(def) -> [(def.defName, def.range)]
+  val names = p.typeDefs.map(trange).concat ++ p.defs.map(drange).concat
+  names.find(fn((n, _)) n == nm).map(snd)

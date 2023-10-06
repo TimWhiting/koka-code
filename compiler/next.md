@@ -3,7 +3,6 @@
 - [ ] syntax/rangemap 222
 - [ ] syntax/colorize 607
 - [ ] syntax/highlight 515
-- [ ] common/message 83
 - [ ] common/file (finish) 499
 - [ ] core/pretty 729
 - [ ] core/analysismatch 248
@@ -13,7 +12,6 @@
 - [ ] core/simplify 970
 - [ ] core/inline 290
 - [ ] core/specialize 498
-- [ ] core/funlift 381
 - [ ] backend/c/parc 1037
 - [ ] backend/c/parcreuse 731
 - [ ] backend/c/parcreusespec 341

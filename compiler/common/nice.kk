@@ -9,10 +9,10 @@ alias nice = id-map<string>
 
 val niceEmpty = linearMap([], fn(i1: int, i2: int) i1 == i2, fn(s1, s2: string) s1 == s2, show, show)
 
-effect niceEff
-  fun extendNice(tv: typeVar): ()
-  fun getNice(tv: typeVar): string 
-  fun getNiceDoc(tv: typeVar): doc 
+effect niceEff<k>
+  fun extendNice(tv: k): ()
+  fun getNice(tv: k): string 
+  fun getNiceDoc(tv: k): doc 
 
 fun niceEnv(f)
   var nice := niceEmpty

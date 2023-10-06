@@ -17,7 +17,7 @@ import compiler/common/file
 import compiler/lib/printer
 import std/os/path
 
-alias asmEff = <pure,asm,compFlags,uniquePhase,newtypes,printer,subst,documentation,coreOptions,niceEff,precEff,prettyTypeEff>
+alias asmEff = <pure,asm,compFlags,uniquePhase,newtypes,printer,subst,documentation,coreOptions,niceEff<typeVar>,precEff,prettyTypeEff>
 
 // Put the things that need overriding in here
 effect subst

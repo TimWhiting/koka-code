@@ -16,7 +16,6 @@
 - [ ] backend/c/parcreuse 731
 - [ ] backend/c/parcreusespec 341
 - [ ] kind/unify 116
-- [ ] kind/inferkind 214
 - [ ] kind/infer 1102
 - [ ] type/unify 535
 - [ ] type/infer 2300

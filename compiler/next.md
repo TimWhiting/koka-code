@@ -1,6 +1,5 @@
 # TODO
 
-- [ ] syntax/rangemap 222
 - [ ] syntax/colorize 607
 - [ ] syntax/highlight 515
 - [ ] common/file (finish) 499

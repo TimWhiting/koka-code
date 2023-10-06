@@ -25,6 +25,11 @@ fun (<=)(p1: pos, p2: pos): bool
   else
     p1.col <= p2.col
 
+fun compare(p1: pos, p2: pos): order
+  match p1.line.compare(p2.line)
+    Eq -> p1.col.compare(p2.col)
+    o -> o
+
 fun show(p: pos): string
   "(" ++ p.showPos(2) ++ ")"
 
@@ -72,6 +77,13 @@ fun showRange(r: range, endToo: bool)
       range := "(" ++ r.start.showPos(0) ++ "-" ++ r.end.showPos(0) ++ ")"     
     r.start.source.name ++ range
 
+fun compare(r1: range, r2: range): order
+  match r1.start.compare(r2.start)
+    Eq -> r1.end.compare(r2.end)
+    o -> o
+
+fun length(r: range): int
+  r.end.off - r.start.off
 
 // Does r2 start after r1
 fun after(r1: range, r2: range): bool

@@ -66,7 +66,7 @@ fun defaultCoreOptions(f)
 
 // Pretty print environment for types
 
-alias ppTypeEff = <precEff,prettyTypeEff,documentation,coreOptions,pure,niceEff,compFlags>
+alias ppTypeEff = <precEff,prettyTypeEff,documentation,coreOptions,pure,niceEff<typeVar>,compFlags>
 
 effect precEff
   val prec: prec

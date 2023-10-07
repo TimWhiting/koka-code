@@ -84,8 +84,18 @@ fun synTypeDef(td: compiler/core/core/typeDef, modName: name): list<compiler/syn
   match td
     compiler/core/core/Synonym -> []
     Data(di) | di.name.isHiddenName -> []
-    Data(_) -> []
-      // di.synAccessors(modName) // TODO:
+    Data(di, isExtend) ->
+      di.synAccessors(modName) ++ (
+        if di.constrs.length == 1 && !di.isOpen && !di.constrs.head.unjust.name.isHiddenName && di.kind.hasKindStarResult then
+          [synCopyCon(di, modName, di.constrs.head)]
+        else []
+      ) ++ (
+        if di.constrs.length > 1 && di.isOpen then
+          di.constrs.map(fn(ci) ci.synTester(di)).concat
+        else []
+      ) ++ (
+        if di.isOpen then di.constrs.map(synConstrTag) else []
+      )
 
 fun synCopyCon(di: dataInfo, ci: conInfo, modName: name)
   val rc = ci.range
@@ -109,4 +119,63 @@ fun hasAccessor(ci: conInfo, nm: name, tp: ktype)
   val tvs = tp.freeTypeVars
   !(nm.isFieldName || nm == nameNil) && ci.existentials.all(fn(tv) !tvs.member(tv))
 
+fun nubBy(xs: list<a>, f: (a, a) -> bool): list<a>
+  match xs
+    Cons(x1, rst) -> Cons(x1, rst.filter(fn(y) !f(x1, y)))
+    Nil -> Nil
+
+fun is-alphanum(c: char)
+  c.is-alpha || c.is-digit
+
+fun synAccessors(di: dataInfo, modName: name)
+  val paramss = di.constrs.map(fn(ci) ci.params.zipwith(ci.paramVis.zip(ci.paramRanges)) fn((nm, tp), (pvis, rng))
+    (nm, (tp, rng, pvis, ci))
+  )
+  fun occursOnAllConstrs((nm, (tp, _, _, _)))
+    paramss.all(fn(ps) ps.any(fn((n, (t, _, _, _))) n == nm && t == tp))
+  val fields = paramss.concat.filter(fn((nm, (tp, _, _, cinfo))) cinfo.hasAccessor(nm, tp)).nubBy(fn(x, y) x.fst == y.fst).filter(occursOnAllConstrs)
+  fun synAccessor((nm, (tp, rng, vis, cinfo)))
+    val dataName = di.name.unqualify
+    val arg = if dataName.show.list.all(is-alphanum) then dataName else ".this".newName
+    val fld = ".x".newName
+    val dataTp = TypeApp(TCon(TypeCon(di.name, di.kind)), di.params.map(TVar))
+    val fullTp = 
+      val (vars, preds, rho) = tp.splitPredType
+      TForAll(di.params ++ foralls, preds, TypeFun([(arg, dataTp)], if isPartial then typePartial else typeTotal, rho))
+    fun makeBranch(ci: conInfo)
+      val r = ci.range
+      match zip(ci.params, list(0, ci.params.length)).lookup(fn(n) n == nm)
+        Just(i) ->
+          val patterns = list(0, i - 1).map(fn(_) (Nothing, PatWild(r))) ++ [(Nothing, PatVar(ValueBinder(fld, Nothing, PatWild(r), r, r)))] ++ list(i+1, ci.params.length - 1).map(fn(_) (Nothing, PatWild(r)))
+          [(ci.vis, Branch(PatCon(ci.name, patterns, r, r), [Guard(guardTrue, Var(fld, False, r))]))]
+        _ -> []
+    val messages = [Literal(LitString(rng.start.source.name ++ rng.show, rng)), Literal(LitString(nm.show, rng))]
+    val doc = "// Automatically generated. Retrieves the `" ++ nm.show ++ "` constructor field of the `" ++ di.name.nameId ++ "` type.\n"
+    val defaultBranch = if isPartial then [Branch(PatWild(rng), [Guard(guardTrue, App(Var(namePatternMatchError, False, rng), message.map(fn(msg) (Nothing, msg)), rng))])]
+    val branches = di.constrs.map(makeBranch).concat
+    val isPartial = branches.length < di.constrs.length || di.isOpen
+    val caseExpr = Case(Var(arg, False, rng), branches.map(snd) ++ defaultBranch, rng)
+    val expr = Ann(Lam([ValueBinder(arg, Nothing, Nothing, rng, rng)], caseExpr, rng), fullTp, rng)
+    DefNonRec(Def(ValueBinder(nm, (), expr, rng, rng), rng, vis, defFunEx([Borrow], noFip), InlineAlways, doc))
+  fields.map(synAccessor)
+
+fun synTester(di: dataInfo, ci: conInfo)
+  if ci.name.isHiddenName then []
+  else
+    val defName = "is-".prepend(ci.name.unqualify.toVarName)
+    val arg = di.name.unqualify
+    val rc = ci.range
+    val patterns = ci.params.map(fn(_) (Nothing, PatWild(rc)))
+    val branch1 = Branch(PatCon(ci.name, patterns, rc, rc), [Guard(guardTrue, Var(nameTrue, False, rc))])
+    val branch2 = Branch(PatWild(rc), [Guard(guardTrue, Var(nameFalse, False, rc))])
+    val caseExpr = Case(Var(arg, False, rc), [branch1, branch2], rc)
+    val expr = Lam([ValueBinder(arg, Nothing, Nothing, rc, rc)], caseExpr, rc)
+    val doc = "// Automatically generated. Tests for the `" ++ ci.name.nameId ++ "` constructor of the `:" ++ di.name.nameId ++ "` type.\n"
+    [DefNonRec(Def(ValueBinder(defName, (), expr, rc, rc), rc, ci.vis, defFunEx([Borrow], Fip(AllocAtMost(0))), InlineAlways, doc))]
+
+fun synConstrTag(ci: conInfo)
+  val nm = ci.name.unqualify.toOpenTagName
+  val rc = ci.range
+  val expr = Literal(LitString(ci.name.show, rc))
+  DefNonRec(Def(ValueBinder(nm, (), expr, rc, rc), rc, ci.vis, DefVal, InlineNever, ""))
 // TODO: Lots more

@@ -26,6 +26,7 @@ fun (==)(k1: infKind, k2: infKind): div bool
     _ -> False
 
 alias infKGamma = linearMap<name, infKind>
+val infKGammaEmpty = linearMap([], fn(n1: name, n2: name) n1 == n2, fn(k1: infKind, k2: infKind) k1 == k2, show, show)
 
 val infKindStar = KICon(kindStar)
 val infKindHandled = KICon(kindHandled)
@@ -99,7 +100,7 @@ fun niceInfKinds(kinds: list<infKind>)
   kinds.map(fkv).unions.list.map(extendNice)
   kinds.map(fn(k) k.liftKApp.ppInfKind(precInfKindTop))
 
-fun ppInfKind(k: infKind, prec: int): <pure, niceEff<id>, compFlags> doc
+fun ppInfKind(k: infKind, prec: int): <pure, niceEff<id>, compFlags, colorSchemeEffect> doc
   fun collectFunArgs(ik: infKind)
     match ik
       KIApp(KIApp(KICon(KCon(nm)), k1), k2) | nm == "->".newName -> Cons(k1, k2.collectFunArgs)

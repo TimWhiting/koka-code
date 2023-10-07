@@ -8,54 +8,61 @@ import compiler/common/failure
 import compiler/platform/config
 import newstd/data/linearmap
 
-effect kGamma
+alias kGamma = qname-map<kind>
+
+effect kGammaEff
   fun kgammaExtend(name: name, k: kind): ()
   fun kgammaLookup(ctxt: name, name: name): lookup<kind>
   fun kgammaLookupQ(name: name): maybe<kind>
   fun kgammaFind(ctxt: name, name: name): (name, kind)
   fun kgammaList(): list<(name, list<(name, kind)>)>
-  fun kgammaFilter(modName: name): qname-map<kind>
-  fun kgammaUnions(ks: list<qname-map<kind>>): qname-map<kind>
+  fun kgammaFilter(modName: name): kGamma
 
-fun withKGamma(kg0: qname-map<kind>, f: () -> <kGamma,exn,compFlags|e> a): <exn,compFlags|e> a
+fun withKGamma(kg0: kGamma, f: () -> <kGammaEff,exn,compFlags|e> a): <exn,compFlags|e> a
   var kg := kg0
   with handler
-    fun kgammaExtend(name: name, k: kind)
-      kg := kg.insert(name, k)
-    fun kgammaLookup(ctxt, name: name)
-      kg.lookup(ctxt, name)
-    fun kgammaLookupQ(name: name)
-      kg.lookupQ(name)
-    fun kgammaFind(ctxt: name, name: name)
-      match kg.lookup(ctxt, name)
-        Found((qn, scheme)) -> (qn, scheme)
-        _ -> fail("kind lookup failed")
-    fun kgammaList()
-      kg.list
-    fun kgammaFilter(modName: name)
-      kg.filterNames(fn(n) n == modName)
-    fun kgammaUnions(ks: list<qname-map<kind>>)
-      kg := unions(ks)
-      kg
+    fun kgammaExtend(name: name, k: kind) kg := kgammaExtend(kg, name, k)
+    fun kgammaLookup(ctxt, name: name) kg.kgammaLookup(ctxt, name)
+    fun kgammaLookupQ(name: name) kg.kgammaLookupQ(name)
+    fun kgammaFind(ctxt: name, name: name) kg.kgammaFind(ctxt, name)
+    fun kgammaList() kg.list
+    fun kgammaFilter(modName: name) kg.kgammaFilter(modName)
   f()
+
+fun kgammaUnions(ks: list<kGamma>)
+  unions(ks)
+fun kgammaNewNub(xs: list<(name,kind)>): <compFlags, exn> kGamma
+  xs.foldl(emptyKGamma, fn(m, (n,k)) m.insert(n,k))
+fun kgammaExtend(kg: kGamma, name: name, k: kind)
+  kg.insert(name, k)
+fun kgammaLookup(kg: kGamma, ctxt:name , name: name)
+  kg.lookup(ctxt, name)
+fun kgammaLookupQ(kg: kGamma, name: name)
+  kg.lookupQ(name)
+fun kgammaFind(kg: kGamma, ctxt: name, name: name)
+  match kg.lookup(ctxt, name)
+    Found((qn, scheme)) -> (qn, scheme)
+    _ -> fail("kind lookup failed")
+fun kgammaFilter(kg: kGamma, modName: name)
+  kg.filterNames(fn(n) n == modName)
 
 val eqK = fn(k1:kind, k2:kind) k1 == k2
 val showK = fn(k:kind) k.show
-fun single(name: name, k: kind): qname-map<kind>
+fun single(name: name, k: kind): kGamma
   name-collections/single(name, k, eqK, showK)
 
-val empty = name-collections/qname-empty(eqK, showK)
+val emptyKGamma = qname-empty(eqK, showK)
 
-fun extractKGamma(c: core): <exn,compFlags> qname-map<kind>
+fun extractKGamma(c: core): <exn,compFlags> kGamma
   c.typeDefs.map(extractTypeDefGroup).unions
 
-fun extractTypeDefGroup(g: typeDefGroup): <exn,compFlags> qname-map<kind>
+fun extractTypeDefGroup(g: typeDefGroup): <exn,compFlags> kGamma
   g.map(extractTypeDef).unions
 
-fun extractTypeDef(d: typeDef): qname-map<kind>
+fun extractTypeDef(d: typeDef): kGamma
   match d
     Synonym(synInfo) | synInfo.vis.is-public -> single(synInfo.name, synInfo.kind)
     Data(dataInfo, False) | dataInfo.vis.is-public -> single(dataInfo.name, dataInfo.kind)
-    _ -> empty
+    _ -> emptyKGamma
 
 // TODO: Pretty print

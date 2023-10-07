@@ -19,22 +19,15 @@ effect newtypesEff
 fun withNewtypes(newtps0: newtypes, f: () -> <newtypesEff,exn,compFlags|e> a): <exn,compFlags|e> a
   var newtps := newtps0
   with handler
-    fun newtypesExtend(name: name, k: dataInfo)
-      newtps := newtps.set(name, k)
-    fun newtypesLookupAny(name: name)
-      newtps.maybeGet(name)
-    fun newtypesLookupPublic(name: name)
-      match newtps.maybeGet(name)
-        Just(di) | di.vis.is-public -> Just(di)
-        _ -> Nothing
-    fun newtypesFind(name: name)
-      match newtps.maybeGet(name)
-        Just(di) -> di
-        _ -> fail("newTypes lookup failed")
-    fun newtypesList()
-      newtps.list
+    fun newtypesExtend(name: name, k: dataInfo) newtps := newtps.set(name, k)
+    fun newtypesLookupAny(name: name) newtps.maybeGet(name)
+    fun newtypesLookupPublic(name: name) newtps.newtypesLookupPublic(name)
+    fun newtypesFind(name: name) newtps.newtypesFind(name)
+    fun newtypesList() newtps.list
   f()
 
+fun newtypesNew(lst: list<dataInfo>): newtypes
+  linearMap(lst.map(fn(di) (di.name, di)), (==), eqD, show, showD)
 fun newtypesExtend(newtps: newtypes, name: name, k: dataInfo)
   newtps.set(name, k)
 fun newtypesLookupAny(newtps: newtypes, name: name)
@@ -47,8 +40,6 @@ fun newtypesFind(newtps: newtypes, name: name)
   match newtps.maybeGet(name)
     Just(di) -> di
     _ -> fail("newTypes lookup failed")
-fun newtypesList(newtps: newtypes)
-  newtps.list
 fun newtypesCompose(ntps1: newtypes, ntps2: newtypes)
   unions([ntps2, ntps1])
 

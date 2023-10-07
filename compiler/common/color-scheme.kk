@@ -5,6 +5,13 @@ import compiler/lib/printer
 // Color Scheme
 // Color scheme for the interpreter
 
+effect colorSchemeEffect
+  val colors: colorScheme;
+
+fun ".default-colorSchemeEff"(f)
+  handle(f)
+    val colors = ColorScheme()
+
 struct colorScheme
   colorInterpreter: color = DarkRed
   colorType: color = DarkCyan

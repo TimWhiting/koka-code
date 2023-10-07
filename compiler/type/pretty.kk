@@ -66,7 +66,7 @@ fun defaultCoreOptions(f)
 
 // Pretty print environment for types
 
-alias ppTypeEff = <precEff,prettyTypeEff,documentation,coreOptions,pure,niceEff<typeVar>,compFlags>
+alias ppTypeEff = <precEff,prettyTypeEff,documentation,colorSchemeEffect,coreOptions,pure,niceEff<typeVar>,compFlags>
 
 effect precEff
   val prec: prec
@@ -75,7 +75,6 @@ effect prettyTypeEff
   val showKinds: bool
   val showIds: bool // show id numbers
   val expandSynonyms: bool
-  val colors: colorScheme
   val ranked: tvScheme
   val moduleContext: name // module in which we pretty print
   val importsMap: importmap // import aliases
@@ -93,14 +92,13 @@ fun handlePrettyEff(f)
     val showKinds = False
     val showIds = False
     val expandSynonyms = False
-    val colors = ColorScheme()
     val ranked = rankedDefault
     val moduleContext = "Main".newName
     val importsMap = emptyImports
     val fullNames = False
   f()
  
-fun typeColor(colors: colorScheme)
+fun typeColor()
   ":".text.color(colors.colorSep)
 
 fun minCanonical(tp: ktype): pure string
@@ -132,22 +130,22 @@ fun niceList(schemes: list<ktype>, f: (ktype) -> ppTypeEff doc): ppTypeEff list<
   schemes.map(f)
 
 // Pretty print a type
-fun pretty(t: ktype): <documentation,coreOptions,pure,compFlags> doc
+fun pretty(t: ktype): <documentation,coreOptions,pure,compFlags,colorSchemeEffect> doc
   with handlePrettyEff
   with niceEnv
   t.ppType
 
-fun pretty(tv: typeVar): <documentation,coreOptions,pure,compFlags> doc
+fun pretty(tv: typeVar): <documentation,coreOptions,pure,compFlags,colorSchemeEffect> doc
   with handlePrettyEff
   with niceEnv
   tv.ppTypeVar
 
-fun pretty(tc: typeCon): <documentation,coreOptions,pure,compFlags> doc
+fun pretty(tc: typeCon): <documentation,coreOptions,pure,compFlags,colorSchemeEffect> doc
   with handlePrettyEff
   with niceEnv
   tc.ppTypeCon
 
-fun pretty(ts: typeSyn): <documentation,coreOptions,pure,compFlags> doc
+fun pretty(ts: typeSyn): <documentation,coreOptions,pure,compFlags,colorSchemeEffect> doc
   with handlePrettyEff
   with niceEnv
   ts.ppTypeSyn
@@ -191,7 +189,7 @@ fun ppDeclType(tp: ktype, pinfos: list<paramInfo>)
       (Just(pparams), empty, if eff.isTypeTotal then empty else overridePrec(precArrow, {eff.ppType |.| space}) |.| overridePrec(precArrow, {rho.ppType})) 
     _ -> (Nothing, empty, tp.ppType)
 
-fun pretty(d: dataInfo): <documentation,coreOptions,pure,compFlags> doc
+fun pretty(d: dataInfo): <documentation,coreOptions,pure,compFlags,colorSchemeEffect> doc
   with handlePrettyEff
   with niceEnv
   ppDataInfo(d, True, False)
@@ -217,7 +215,7 @@ fun prettyDataInfo(d: dataInfo, showBody: bool, publicOnly: bool, isExtend: bool
       CoInductive -> "co type".keyword
       Retractive -> "rec type".keyword
     val params = if d.params.is-nil then empty else d.params.map(TVar).niceTypes.angled
-    val kind = if d.kind == kindStar then empty else " ::".text |+| d.kind.ppKind(colors, precTop)
+    val kind = if d.kind == kindStar then empty else " ::".text |+| d.kind.ppKind(precTop)
     val body = if showBody && d.constrs.is-cons then 
         "{".text |-| d.constrs.map(fn(c) c.prettyConInfo(publicOnly)).vcat.indent(2) |-| "}".text 
       else empty
@@ -249,7 +247,7 @@ fun ppVis(v: visibility)
     Public -> "pub ".keyword
 
 // Synonym info
-fun pretty(s: synInfo): <documentation,coreOptions,pure,compFlags> doc
+fun pretty(s: synInfo): <documentation,coreOptions,pure,compFlags,colorSchemeEffect> doc
   with handlePrettyEff
   with niceEnv
   ppSynInfo(s)
@@ -259,7 +257,7 @@ fun ppSynInfo(s: synInfo, isLocal: bool=False, publicOnly:bool=False, showBody:b
   else
     val al = if isLocal then "local alias".keyword else s.vis.ppVis |.| "alias".keyword
     val params = if s.params.is-nil then empty else s.params.map(TVar).niceTypes.angled
-    val kind = if s.kind == kindStar then empty else " ::".text |+| s.kind.ppKind(colors, precTop)
+    val kind = if s.kind == kindStar then empty else " ::".text |+| s.kind.ppKind(precTop)
     val body = if !showBody then empty else "=".keyword |+| s.t.niceType
     val syn = al |+| s.name.ppName |.| params |.| kind |+| body |+| "=".text |+| pretty(s.rank)
     syn.prettyComment(s.doc)
@@ -384,10 +382,10 @@ fun ppTypeCon(tc: typeCon)
 fun ppTypeSyn(ts: typeSyn)
   ts.name.ppNameEx.wrapKind(ts.kind).colorByKindDef(ts.kind, colorTypeCon)
 
-fun colorByKindDef(d: doc, k: kind, defcolor: (colorScheme -> prettyTypeEff color))
+fun colorByKindDef(d: doc, k: kind, defcolor: (colorScheme -> <prettyTypeEff,colorSchemeEffect> color))
   d.colorByKind(k, fn(d') d'.color(defcolor(colors)))
 
-fun colorByKind(d: doc, k: kind, defcolor: (doc -> prettyTypeEff doc))
+fun colorByKind(d: doc, k: kind, defcolor: (doc -> <prettyTypeEff,colorSchemeEffect> doc))
   match k.colorForKind
     Just(c) -> d.color(c)
     Nothing -> defcolor(d)
@@ -401,5 +399,5 @@ fun colorForKind(k: kind)
 
 fun wrapKind(d: doc, k: kind)
   if showKinds && k != kindStar then
-    parens(d.color(colors.colorType) |+| "::".text |+| k.ppKind(colors, kind/pretty/precTop)).color(colors.colorKind)
+    parens(d.color(colors.colorType) |+| "::".text |+| k.ppKind(kind/pretty/precTop)).color(colors.colorKind)
   else d

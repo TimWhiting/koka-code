@@ -10,7 +10,7 @@ import compiler/common/color-scheme
 import newstd/data/linearmap
 import compiler/lib/pprint
 
-fun fixityResolve(cscheme: colorScheme, fixMap: fixities, program: userProgram)
+fun fixityResolve(fixMap: fixities, program: userProgram)
   val fixMap1 = fixitiesCompose(fixMap, program.fixDefs.extractFixMap)
   with handleFixities(fixMap1)
   val defs1 = program.defs.resolveDefs()

@@ -5,7 +5,7 @@ import compiler/common/range
 import compiler/common/color-scheme
 
 // Pretty print helpers
-fun ppRange(r: range, endToo: bool, colors: colorScheme)
+fun ppRange(r: range, endToo: bool)
   r.showRange(endToo).text.color(colors.colorRange)
 
 fun table(xs: list<(doc, doc)>)
@@ -21,10 +21,10 @@ fun tablex(n: int, xs: list<(doc, doc)>)
 fun sourceFromRanges(rngs: list<range>)
   rngs.map(sourceFromRange)
 
-fun docsFromRanges(rngs: list<range>, colors: colorScheme)
-  rngs.map(fn(r) r.docFromRange(colors))
+fun docsFromRanges(rngs: list<range>)
+  rngs.map(fn(r) r.docFromRange)
 
-fun docFromRange(r: range, colors: colorScheme)
+fun docFromRange(r: range)
   fun removeIndent(ls: list<string>)
     val i = Cons(0, ls.map(fn(l) l.list.take-while(isSpace).length)).minimum
     ls.map(fn(l) l.list.drop(i).string)

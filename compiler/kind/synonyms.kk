@@ -8,7 +8,7 @@ import compiler/platform/config
 import newstd/data/linearmap
 
 effect synonyms
-  fun synonymsExtend(name: name, newtp: synInfo): ()
+  fun synonymsExtend(newtp: synInfo): ()
   fun synonymsLookup(name: name): maybe<synInfo>
   fun synonymsFind(name: name): synInfo
   fun synonymsList(): list<(name, synInfo)>
@@ -25,8 +25,8 @@ fun withSynonyms(synonyms0: name-map<synInfo>, f: () -> <synonyms,exn,compFlags|
       synonyms
     fun setSynonyms(syns: name-map<synInfo>)
       synonyms := syns
-    fun synonymsExtend(name: name, k: synInfo)
-      synonyms := synonyms.set(name, k)
+    fun synonymsExtend(k: synInfo)
+      synonyms := synonyms.set(k.name, k)
     fun synonymsLookup(name: name)
       synonyms.maybeGet(name)
     fun synonymsFind(name: name)
@@ -50,7 +50,7 @@ val eqS = fn(s1:synInfo, s2:synInfo) s1 == s2
 val showS = fn(s:synInfo) s.show
 fun single(name: name, s: synInfo): name-map<synInfo>
   linearMap([(name, s)], (==), eqS, show, showS)
-val empty:name-map<synInfo> = linearMap([], fn(n1: name, n2: name) n1 == n2, eqS, show, showS)
+val emptySynonyms:name-map<synInfo> = linearMap([], fn(n1: name, n2: name) n1 == n2, eqS, show, showS)
 
 fun extractSynonyms(c: core): <pure,compFlags> name-map<synInfo>
   c.typeDefs.map(extractTypeDefGroup).unions
@@ -61,6 +61,6 @@ fun extractTypeDefGroup(g: typeDefGroup): <pure,compFlags> name-map<synInfo>
 fun extractSynonyms(d: typeDef): <pure,compFlags> name-map<synInfo>
   match d
     Synonym(synInfo) -> single(synInfo.name, synInfo)
-    _ -> empty
+    _ -> emptySynonyms
 
 // TODO: Pretty print

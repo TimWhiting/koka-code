@@ -89,17 +89,17 @@ fun fkv(k: infKind): kvs
     KICon(_) -> emptyIds
 
 // Pretty printing
-fun show(infkind: infKind): <compFlags,pure> string
+fun show(infkind: infKind): <compFlags,pure,colorSchemeEffect> string
   with niceKindEnv()
   infkind.fkv.foreach(extendNice)
-  infkind.ppInfKind(ColorScheme(), precInfKindTop).pprint/show
+  infkind.ppInfKind(precInfKindTop).pprint/show
 
-fun niceInfKinds(kinds: list<infKind>, colors: colorScheme)
+fun niceInfKinds(kinds: list<infKind>)
   with niceKindEnv()
   kinds.map(fkv).unions.list.map(extendNice)
-  kinds.map(fn(k) k.liftKApp.ppInfKind(colors, precInfKindTop))
+  kinds.map(fn(k) k.liftKApp.ppInfKind(precInfKindTop))
 
-fun ppInfKind(k: infKind, colors: colorScheme, prec: int): <pure, niceEff<id>, compFlags> doc
+fun ppInfKind(k: infKind, prec: int): <pure, niceEff<id>, compFlags> doc
   fun collectFunArgs(ik: infKind)
     match ik
       KIApp(KIApp(KICon(KCon(nm)), k1), k2) | nm == "->".newName -> Cons(k1, k2.collectFunArgs)
@@ -110,16 +110,16 @@ fun ppInfKind(k: infKind, colors: colorScheme, prec: int): <pure, niceEff<id>, c
       _ -> [ik]
   match k
     KIVar(id) -> getNiceDoc(id)
-    KICon(k') -> k'.ppKind(colors, prec)
+    KICon(k') -> k'.ppKind(prec)
     KIApp(KIApp(KICon(KCon(nm)), k1), k2) | nm == nameKindFun ->
       val doc = match k2.collectFunArgs
-        [res] -> k1.ppInfKind(colors, precInfKindArrow) |+| "->".text |+| res.ppInfKind(colors, precInfKindArrow - 1)
-        Cons(res, args) -> Cons(k1, args).commaParens(fn(p') p'.ppInfKind(colors, precInfKindTop)) |+| "->".text |+| res.ppInfKind(colors, precInfKindArrow - 1)
+        [res] -> k1.ppInfKind(precInfKindArrow) |+| "->".text |+| res.ppInfKind(precInfKindArrow - 1)
+        Cons(res, args) -> Cons(k1, args).commaParens(fn(p') p'.ppInfKind(precInfKindTop)) |+| "->".text |+| res.ppInfKind(precInfKindArrow - 1)
         _ -> throw("kind/inferKind KIApp function")
       doc.pparens(prec, precInfKindArrow)
     KIApp ->
       val doc = match k.collectArgs
-        Cons(k', ks) -> k'.ppInfKind(colors, precInfKindApp - 1) |+| ks.commaParens(fn(p') p'.ppInfKind(colors, precInfKindTop))
+        Cons(k', ks) -> k'.ppInfKind(precInfKindApp - 1) |+| ks.commaParens(fn(p') p'.ppInfKind(precInfKindTop))
         _ -> throw("kind/inferKind KIApp")
       doc.pparens(prec, precInfKindApp)
 

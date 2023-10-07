@@ -34,43 +34,21 @@ fun source(d: doc)
   // val importsMap: importmap // import aliases
   // val fullNames: bool
 
-fun showX(f: () -> prettyTypeEff a): prettyTypeEff a
-  with override
-    val showKinds = True
-    val expandSynonyms = True
-    val showIds = showIds
-    val ranked = ranked
-    val moduleContext = moduleContext
-    val importsMap = importsMap
-    val fullNames = fullNames
+fun setEnv(env: ppEnv, f: () -> <ppEnvEff|e> a): <ppEnvEff|e> a
+  with override val ppEnv = env
   f()
 
-fun showNoSyns(f: () -> prettyTypeEff a): prettyTypeEff a
-  with override
-    val showKinds = showKinds
-    val expandSynonyms = False
-    val showIds = showIds
-    val ranked = ranked
-    val moduleContext = moduleContext
-    val importsMap = importsMap
-    val fullNames = fullNames
-  f()
+fun showX(f)
+  setEnv(ppEnv(showKinds = False, expandSynonyms = True), f)
+
+fun showNoSyns(f)
+  setEnv(ppEnv(expandSynonyms = False), f)
 
 fun noVis(f)
-  with override
-    val coreShowDef = coreShowDef
-    val coreShowTypes = coreShowTypes
-    val coreShowVis = False
-    val coreIface = coreIface
-  f()
+  setEnv(ppEnv(coreShowVis=False), f)
 
 fun noVisShowDef(f)
-  with override
-    val coreShowDef = True
-    val coreShowTypes = coreShowTypes
-    val coreShowVis = False
-    val coreIface = coreIface
-  f()
+  setEnv(ppEnv(coreShowVis=False, coreShowDef=True),f)
 
 fun prettyCore(target: target, inlineDefs: list<inlineDef>, c as Core(name, imports, fixDefs, typeDefGroups, defGroups, externals, doc): core)
   val importedSyns = c.extractImportedSynonyms()
@@ -78,21 +56,15 @@ fun prettyCore(target: target, inlineDefs: list<inlineDef>, c as Core(name, impo
   val allDefs = defGroups.flatten
   val allTypeDefs = typeDefGroups.flatten
   fun separator(msg)
-    if !coreIface then [] else [" ".text, "//----------------------".text, ("//#kki: " ++ msg).text, " ".text]
+    if !ppEnv.coreIface then [] else [" ".text, "//----------------------".text, ("//#kki: " ++ msg).text, " ".text]
   with override
-    val showKinds = showKinds || coreIface
     val importsMap = importsMap.extendImportMap(extraImports)
-    val expandSynonyms = expandSynonyms
-    val showIds = showIds
     val ranked = ranked
     val moduleContext = moduleContext
-    val fullNames = fullNames
+  val p0 = ppEnv
   with override
-    val coreShowDef = !coreIface
-    val coreShowTypes = coreShowTypes || coreIface
-    val coreShowVis = coreShowVis
-    val coreIface = coreIface
-  val coreDoc = "module".keyword |+| (if coreIface then "interface".text else empty) |.|
+    val ppEnv = p0(showKinds = p0.showKinds || p0.coreIface, coreShowDef = !p0.coreIface, coreShowTypes = p0.coreIface || p0.coreShowTypes)
+  val coreDoc = "module".keyword |+| (if ppEnv.coreIface then "interface".text else empty) |.|
     name.prettyDefName |-|
     vcat([
       "import declarations".separator,
@@ -111,7 +83,7 @@ fun prettyCore(target: target, inlineDefs: list<inlineDef>, c as Core(name, impo
       showX({externals.map(prettyExternal)}),
       "inline definitions".separator,
       (
-        if !coreIface || inlineDefs.is-nil then [] 
+        if !ppEnv.coreIface || inlineDefs.is-nil then [] 
         else 
           ["//.inline-section".text] ++ inlineDefs.map(prettyInlineDef) // TODO: Wrong env
       ) 
@@ -124,12 +96,17 @@ fun prettyCore(target: target, inlineDefs: list<inlineDef>, c as Core(name, impo
 fun prettyExternal(ex: external)
   match ex
     ExternalImport -> empty
-    External(name, tp, pinfos, body, vis, fipT, nameRng, doc) ->
-      if coreIface && name.isHiddenExternalName then empty
+    External(name, tp, pinfos, body, vis, _, _, doc) ->
+      if ppEnv.coreIface && name.isHiddenExternalName then empty
       else
         // TODO:
-        empty
-
+        fun prettyEntry((t:target, c: string))
+          t.ppTarget |.| "inline".keyword |+| LitString(c).prettyLit |.| semi
+        val entriesDoc = match body
+          [(DefaultTarget, content)] -> "= inline".keyword |+| LitString(content).prettyLit |.| semi
+          _ -> "{".text |-| tab(body.map(prettyEntry).vcat) |-| "}".text
+        val d = "extern".keyword |+| name.prettyDefName |+| ":".text |+| tp.prettyDefFunType(pinfos) |+| entriesDoc
+        prettyVis(vis, d).prettyComment(doc)
 
 fun ppTarget(t: target)
   match t
@@ -156,11 +133,11 @@ fun prettyDefs(defs: list<def>)
 
 fun prettyInlineDef(InlineDef(name, expr, isRec, inlkind, cost, sort, specArgs): inlineDef)
   val rdoc = if isRec then "recursive ".keyword else empty
-  val prettySpecArgs = specArgs.map(fn(s) if s then '*'.text else '_'.text)
+  val prettySpecArgs = specArgs.map(fn(s) if s then '*' else '_').string.text.dquotes
   val specdoc = if specArgs.is-nil then empty else "specialize ".keyword |.| prettySpecArgs |.| " ".text 
   val inl = if cost <= 0 || inlkind.is-inlineAlways then "inline ".keyword else empty
   val pidoc = match sort
-    DefFun(pinfos) -> if pinfos.any(fn(p) p.is-borrow) then "borrow".keyword |+| dquotes(pinfos.map(fn(i) if i.is-borrow then "^".text else "_".text)) |.| " ".text else empty
+    DefFun(pinfos) -> if pinfos.any(fn(p) p.is-borrow) then "borrow".keyword |+| dquotes(pinfos.map(fn(i) if i.is-borrow then '^' else '_').string.text) |.| " ".text else empty
     _ -> empty
   val nm = if name.isNil then "_".text else name.prettyDefName
   rdoc |.| specdoc |.| inl |.| pidoc |.| sort.showFull.keyword |+|
@@ -170,15 +147,15 @@ fun prettyInlineDef(InlineDef(name, expr, isRec, inlkind, cost, sort, specArgs):
 fun prettyDef(d: def)
   d.prettyDefX(True)
 
-fun prettyDefX(Def(name, scheme, expr, vis, sort, _, _, doc): def, isRec: bool)
+fun prettyDefX(Def(name, scheme, expr, _, sort, _, _, doc): def, isRec: bool)
   val ppBody = noVis({expr.prettyExpr})
-  val d = sort.showFull.keyword |+| (if name.isNil ** coreShowDef then "_".text else name.prettyDefName) |+|
-    ":".text |+| (match sort {DefFun(pinfos) -> prettyDefFunType(pinfos, scheme); _ -> scheme.prettyType}) |.|
-    (if !coreShowDef then empty else linebreak |.| ("=".text |+| ppBody).indent(2) |.| semi)
+  val d = sort.showFull.keyword |+| (if name.isNil && ppEnv.coreShowDef then "_".text else name.prettyDefName) |+|
+    ":".text |+| (match sort {DefFun(pinfos) -> scheme.prettyDefFunType(pinfos); _ -> scheme.prettyType}) |.|
+    (if !ppEnv.coreShowDef then empty else linebreak |.| ("=".text |+| ppBody).indent(2) |.| semi)
   d.prettyComment(doc)
 
 fun prettyVis(vis: visibility, d: doc)
-  if !coreShowVis then d
+  if !ppEnv.coreShowVis then d
   else
     match vis
       Public -> "pub".keyword |+| d
@@ -216,7 +193,7 @@ fun prettyExpr(ex: expr)
       val doc = overridePrec(precTypeTop, {"forall".text |.| tvs.map(fn(tv) tv.prettyTypeVar).angled |+| ".".text |+| expr.prettyExpr})
       doc.pparens(prec, precTypeArrow)
     TypeApp(expr, tps) ->
-      if !coreShowTypes then expr.prettyExpr
+      if !ppEnv.coreShowTypes then expr.prettyExpr
       else
         val dtps = overridePrec(precTypeTop, {tps.map(fn(tp) tp.prettyType)}).angled
         val de = overridePrec(precTypeApp - 1, {expr.prettyExpr})
@@ -259,7 +236,7 @@ fun prettyPatterns(pats: list<pattern>)
 
 fun prettyPatternType(pat: pattern, tp: ktype)
   val doc = overridePrec(prec - 1, {pat.prettyPattern})
-  doc |.| (if coreShowTypes then " :".text |+| tp.prettyType else empty)
+  doc |.| (if ppEnv.coreShowTypes then " :".text |+| tp.prettyType else empty)
 
 fun prettyConName(tname: tName)
   tname.getName.pretty
@@ -351,6 +328,7 @@ fun extractType(tp: ktype)
     TForAll(_, _, b) -> b.extractType
     TCon(tc) -> [tc.name.qualifier]
     TVar -> []
+
 fun extractTypes(tps: list<ktype>)
   tps.map(extractType).concat
 

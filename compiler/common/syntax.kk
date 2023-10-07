@@ -253,6 +253,12 @@ fun show(s: defSort): string
     DefVal -> "DefVal"
     DefVar -> "DefVar"
 
+fun showFull(s: defSort): string
+  match s
+    DefFun(_, f) -> f.show ++ " fun"
+    DefVal -> "val"
+    DefVar -> "var"
+
 pub fun isFun(s: defSort): bool
   match s
     DefFun(_) -> True

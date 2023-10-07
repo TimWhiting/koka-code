@@ -42,11 +42,6 @@ effect documentation
 
 // find a better place for this
 // Signifies whether we output core for an interface or not
-effect coreOptions
-  val coreIface: bool
-  val coreShowTypes: bool // show types in core output
-  val coreShowVis: bool // show visibility
-  val coreShowDef: bool; // show definition body
 
 fun defaultDocEnv(f)
   with handler
@@ -56,29 +51,37 @@ fun defaultDocEnv(f)
     val htmlJs = "scripts/" ++ compFlags.programName ++ "-highlight.js"
   f()
 
-fun defaultCoreOptions(f)
+fun defaultPPEnv(f)
   with handler
-    val coreIface = False
-    val coreShowTypes = False
-    val coreShowVis = True
-    val coreShowDef = False
+    val ppEnv = PpEnv()
   f()
 
 // Pretty print environment for types
 
-alias ppTypeEff = <precEff,prettyTypeEff,documentation,colorSchemeEffect,coreOptions,pure,niceEff<typeVar>,compFlags>
+alias ppTypeEff = <ppTypeEnv,documentation,colorSchemeEffect,pure,niceEff<typeVar>,compFlags>
 
 effect precEff
-  val prec: prec
+  val prec: prec;
+
+effect ppEnvEff
+  val ppEnv: ppEnv;
+
+struct ppEnv
+  showKinds: bool = False
+  showIds: bool = False // show id numbers
+  expandSynonyms: bool = False
+  fullNames: bool = False
+  coreIface: bool = False
+  coreShowTypes: bool = False // show types in core output
+  coreShowVis: bool = True // show visibility
+  coreShowDef: bool = False; // show definition body
+
+alias ppTypeEnv = <prettyTypeEff,ppEnvEff,precEff>
 
 effect prettyTypeEff
-  val showKinds: bool
-  val showIds: bool // show id numbers
-  val expandSynonyms: bool
   val ranked: tvScheme
   val moduleContext: name // module in which we pretty print
   val importsMap: importmap // import aliases
-  val fullNames: bool
 
 fun overridePrec(p: prec, f)
   with override 
@@ -89,13 +92,9 @@ fun handlePrettyEff(f)
   with handler
     val prec = precTopTop
   with handler 
-    val showKinds = False
-    val showIds = False
-    val expandSynonyms = False
     val ranked = rankedDefault
     val moduleContext = "Main".newName
     val importsMap = emptyImports
-    val fullNames = False
   f()
  
 fun typeColor()
@@ -130,22 +129,22 @@ fun niceList(schemes: list<ktype>, f: (ktype) -> ppTypeEff doc): ppTypeEff list<
   schemes.map(f)
 
 // Pretty print a type
-fun pretty(t: ktype): <documentation,coreOptions,pure,compFlags,colorSchemeEffect> doc
+fun pretty(t: ktype): <documentation,ppEnvEff,pure,compFlags,colorSchemeEffect> doc
   with handlePrettyEff
   with niceEnv
   t.ppType
 
-fun pretty(tv: typeVar): <documentation,coreOptions,pure,compFlags,colorSchemeEffect> doc
+fun pretty(tv: typeVar): <documentation,ppEnvEff,pure,compFlags,colorSchemeEffect> doc
   with handlePrettyEff
   with niceEnv
   tv.ppTypeVar
 
-fun pretty(tc: typeCon): <documentation,coreOptions,pure,compFlags,colorSchemeEffect> doc
+fun pretty(tc: typeCon): <documentation,ppEnvEff,pure,compFlags,colorSchemeEffect> doc
   with handlePrettyEff
   with niceEnv
   tc.ppTypeCon
 
-fun pretty(ts: typeSyn): <documentation,coreOptions,pure,compFlags,colorSchemeEffect> doc
+fun pretty(ts: typeSyn): <documentation,ppEnvEff,pure,compFlags,colorSchemeEffect> doc
   with handlePrettyEff
   with niceEnv
   ts.ppTypeSyn
@@ -189,7 +188,7 @@ fun ppDeclType(tp: ktype, pinfos: list<paramInfo>)
       (Just(pparams), empty, if eff.isTypeTotal then empty else overridePrec(precArrow, {eff.ppType |.| space}) |.| overridePrec(precArrow, {rho.ppType})) 
     _ -> (Nothing, empty, tp.ppType)
 
-fun pretty(d: dataInfo): <documentation,coreOptions,pure,compFlags,colorSchemeEffect> doc
+fun pretty(d: dataInfo): <documentation,ppEnvEff,pure,compFlags,colorSchemeEffect> doc
   with handlePrettyEff
   with niceEnv
   ppDataInfo(d, True, False)
@@ -247,7 +246,7 @@ fun ppVis(v: visibility)
     Public -> "pub ".keyword
 
 // Synonym info
-fun pretty(s: synInfo): <documentation,coreOptions,pure,compFlags,colorSchemeEffect> doc
+fun pretty(s: synInfo): <documentation,ppEnvEff,pure,compFlags,colorSchemeEffect> doc
   with handlePrettyEff
   with niceEnv
   ppSynInfo(s)
@@ -280,7 +279,7 @@ fun ppType(tp: ktype)
     TApp(TCon(c), [_, _]) | c.name == nameEffectExtend ->
       val (ls, tl) = tp.shallowExtractEffectExtend
       val tldoc = if tl == effectEmpty then empty else "|".text |.| overridePrec(precTypeTop, {tl.ppType})
-      val isCoreIface = coreIface
+      val isCoreIface = ppEnv.coreIface
       val isTailEmpty = tl == effectEmpty 
       val doc = match ls
         [l] | isTailEmpty && !isCoreIface -> overridePrec(precTypeAtom, {l.ppType})
@@ -292,7 +291,7 @@ fun ppType(tp: ktype)
     TApp(TCon(c), [arg]) ->
       if c.name == nameTpOptional && colorizing then
         "?".text |.| overridePrec(precTypeAtom, {arg.ppType})
-      elif c.name == nameTpHandled || c.name == nameTpHandled1 && !coreIface then
+      elif c.name == nameTpHandled || c.name == nameTpHandled1 && !ppEnv.coreIface then
         arg.ppType
       else
         match tp
@@ -342,9 +341,9 @@ fun ppTypeName(nm: name)
   nm.ppNameEx.color(colors.colorType)
 
 fun ppNameEx(n: name)
-  if fullNames then n.pretty
+  if ppEnv.fullNames then n.pretty
   elif n.qualifier == moduleContext || n.isNameTuple || 
-    ((n.qualifier == nameSystemCore || n.qualifier == nameCoreTypes) && !coreIface) then
+    ((n.qualifier == nameSystemCore || n.qualifier == nameCoreTypes) && !ppEnv.coreIface) then
     n.unqualify.pretty
   else
     importsMap.importsAlias(n).pretty
@@ -360,8 +359,8 @@ fun ppPred(pred: pred)
 
 fun ppSynonym(tpdoc: doc, ts: typeSyn, args: list<ktype>)
   val nm = overridePrec(precTypeTop, {TApp(TCon(TypeCon(ts.name, ts.kind)), args).ppType}) |.| 
-    (if expandSynonyms then " == ".text |.| ts.rank.pretty |+| tpdoc else empty)
-  if expandSynonyms then
+    (if ppEnv.expandSynonyms then " == ".text |.| ts.rank.pretty |+| tpdoc else empty)
+  if ppEnv.expandSynonyms then
     nm.parens
   elif args.is-nil then
     nm
@@ -371,9 +370,9 @@ fun ppSynonym(tpdoc: doc, ts: typeSyn, args: list<ktype>)
 fun ppTypeVar(tv: typeVar)
   val fl = match tv.flavour
     Meta -> "_".text
-    Skolem -> if coreIface then "__".text else "$".text
+    Skolem -> if ppEnv.coreIface then "__".text else "$".text
     _ -> empty
-  val nm = fl |.| getNiceDoc(tv) |.| (if showIds then text("=" ++ tv.tid.show) else empty)
+  val nm = fl |.| getNiceDoc(tv) |.| (if ppEnv.showIds then text("=" ++ tv.tid.show) else empty)
   nm.wrapKind(tv.kind).colorByKindDef(tv.kind, colorTypeVar)
 
 fun ppTypeCon(tc: typeCon)
@@ -398,6 +397,6 @@ fun colorForKind(k: kind)
   else Nothing
 
 fun wrapKind(d: doc, k: kind)
-  if showKinds && k != kindStar then
+  if ppEnv.showKinds && k != kindStar then
     parens(d.color(colors.colorType) |+| "::".text |+| k.ppKind(kind/pretty/precTop)).color(colors.colorKind)
   else d

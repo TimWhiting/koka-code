@@ -1,6 +1,7 @@
 # TODO
 
 ## All dependencies ready
+- [ ] type/unify 535
 - [ ] kind/infer 1102
 - [ ] backend/c/parc 1037
 - [ ] backend/c/parcreuse 731
@@ -16,7 +17,6 @@
 - [ ] core/check 336 - needs type/unify
 - [ ] core/inline 290 - needs simplify
 - [ ] core/specialize 498 - needs simplify
-- [ ] type/unify 535 - needs kind/unify
 - [ ] type/infermonad 1500 - needs type/unify
 - [ ] type/infer 2300 - needs type/infermonad, core/analysismatch
 - [ ] compiler/module 180 - needs compiler/package

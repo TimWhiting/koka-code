@@ -12,6 +12,7 @@ import compiler/kind/importmap
 import compiler/type/type
 import compiler/type/typevar
 import compiler/type/pretty
+import compiler/platform/config
 import newstd/data/linearmap
 
 // Show pretty names rather than numbers
@@ -38,12 +39,6 @@ fun setEnv(env: ppEnv, f: () -> <ppEnvEff|e> a): <ppEnvEff|e> a
   with override val ppEnv = env
   f()
 
-fun showX(f)
-  setEnv(ppEnv(showKinds = False, expandSynonyms = True), f)
-
-fun showNoSyns(f)
-  setEnv(ppEnv(expandSynonyms = False), f)
-
 fun noVis(f)
   setEnv(ppEnv(coreShowVis=False), f)
 
@@ -64,34 +59,68 @@ fun prettyCore(target: target, inlineDefs: list<inlineDef>, c as Core(name, impo
   val p0 = ppEnv
   with override
     val ppEnv = p0(showKinds = p0.showKinds || p0.coreIface, coreShowDef = !p0.coreIface, coreShowTypes = p0.coreIface || p0.coreShowTypes)
+  val p = ppEnv(expandSynonyms = False)
+  val px = ppEnv(showKinds = False, expandSynonyms = True)
   val coreDoc = "module".keyword |+| (if ppEnv.coreIface then "interface".text else empty) |.|
     name.prettyDefName |-|
     vcat([
       "import declarations".separator,
-      showX({imports.map(prettyImport)}),
+      setEnv(px, {imports.map(prettyImport)}),
       "external imports".separator,
-      showX({externals.map(fn(e) e.prettyExternalImports(target))}),
+      setEnv(px, {externals.map(fn(e) e.prettyExternalImport(target))}),
       "fixity declarations".separator,
-      showX({fixities.map(prettyFixDef)}),
+      setEnv(px, {fixDefs.map(prettyFixDef)}),
       "local imported aliases".separator,
-      showX({importedSyns.map(prettyImportedSyn)}),
+      setEnv(px, {importedSyns.map(prettyImportedSyn)}),
       "type declarations".separator,
-      showX({allTypeDefs.map(prettyTypeDef)}),
+      setEnv(px, {allTypeDefs.map(prettyTypeDef)}),
       "declarations".separator,
-      showX({allDefs.map(prettyDef)}), // TODO: this env is wrong
+      setEnv(p, {allDefs.map(prettyDef)}), // TODO: is this and the next env wrong?
       "external declarations".separator,
-      showX({externals.map(prettyExternal)}),
+      setEnv(p, {externals.map(prettyExternal)}),
       "inline definitions".separator,
       (
         if !ppEnv.coreIface || inlineDefs.is-nil then [] 
         else 
-          ["//.inline-section".text] ++ inlineDefs.map(prettyInlineDef) // TODO: Wrong env
+          ["//.inline-section".text] ++ inlineDefs.map(prettyInlineDef)
       ) 
     ].concat)
   coreDoc.prettyComment(doc)
 
+fun prettyImport(Kimport(name, pkg, vis, _): kimport)
+  prettyVis(vis, "import".keyword |+| importsAlias(importsMap, name).pretty |+| "=".text |+|
+    name.prettyName |+| "=".text |+| LitString(pkg).prettyLit |.| semi
+    )
 
-// TODO: More here
+fun prettyExternalImport(e: external, t: target)
+  match e
+    External -> empty
+    ExternalImport(imports) ->
+      match lookupTarget(t, imports)
+        Nothing -> empty
+        Just(kvals0) ->
+          fun prettyKeyval((k, v))
+            LitString(k).prettyLit |.| "=".text |.| LitString(v).prettyLit |.| semi
+          match kvals0.filter(fn((key, _)) key != "include-inline" && key != "header-include-inline")
+            [] -> empty
+            keyvals ->
+              "extern import".keyword |+| "{".text |-|
+                tab(t.ppTarget |+| "{".text |-| tab(keyvals.map(prettyKeyval).vcat) |-| "};".text) |-| "};".text
+  
+fun prettyFixDef(FixDef(nm, fixity): fixDef)
+  val d = match fixity
+    FixInfix(f, assoc) ->
+      val adoc = match assoc
+        AssocLeft -> "infixl".text
+        AssocRight -> "infixr".text
+        AssocNone -> "infix".text 
+      adoc |+| f.pretty
+    FixPrefix -> "prefix".text
+    FixPostfix -> "postfix".text
+  d |+| nm.prettyDefName |.| semi
+
+fun prettyImportedSyn(si: synInfo)
+  si.ppSynInfo(True, False, True) |.| semi
 
 fun prettyExternal(ex: external)
   match ex
@@ -104,7 +133,7 @@ fun prettyExternal(ex: external)
           t.ppTarget |.| "inline".keyword |+| LitString(c).prettyLit |.| semi
         val entriesDoc = match body
           [(DefaultTarget, content)] -> "= inline".keyword |+| LitString(content).prettyLit |.| semi
-          _ -> "{".text |-| tab(body.map(prettyEntry).vcat) |-| "}".text
+          _ -> "{".text |-| tab(body.map(prettyEntry).vcat) |-| "};".text
         val d = "extern".keyword |+| name.prettyDefName |+| ":".text |+| tp.prettyDefFunType(pinfos) |+| entriesDoc
         prettyVis(vis, d).prettyComment(doc)
 
@@ -116,7 +145,7 @@ fun ppTarget(t: target)
     C -> "c ".text
 
 fun prettyTypeDefGroup(tdg: typeDefGroup)
-  vcat(tdg.defs.map(prettyTypeDef))
+  vcat(tdg.map(prettyTypeDef))
 
 fun prettyTypeDef(td: typeDef)
   match td

@@ -1,35 +1,41 @@
 # TODO
 
-- [ ] syntax/colorize 607
-- [ ] syntax/highlight 515
-- [ ] common/file (finish) 499
-- [ ] core/pretty 729
-- [ ] core/analysismatch 248
-- [ ] core/ctail 691
-- [ ] core/check 336
-- [ ] core/gendoc 598
-- [ ] core/simplify 970
-- [ ] core/inline 290
-- [ ] core/specialize 498
+## All dependencies ready
+- [ ] kind/infermonad - 350
+- [ ] type/infGamma 135
 - [ ] backend/c/parc 1037
 - [ ] backend/c/parcreuse 731
 - [ ] backend/c/parcreusespec 341
-- [ ] kind/unify 116
-- [ ] kind/infer 1102
-- [ ] type/unify 535
-- [ ] type/infer 2300
-- [ ] type/inferGamma 135
-- [ ] compiler/module 180
 - [ ] compiler/package 208
-- [ ] compiler/compile 1865
-- [ ] compiler/options 1360
-- [ ] main 144
-- [ ] interpreter/command 318
-- [ ] interpreter/interpret 734
-- [ ] platform(as needed)
-- [ ] backend/csharp/from-core 1884
-- [ ] backend/javascript/from-core 1371
+- [ ] core/ctail 691
+- [ ] core/simplify 970
 
+## Next priority (lots of dependencies require)
+- [ ] kind/unify 116  - needs kind/infermonad
+- [ ] kind/infer 1102 - needs kind/infermonad / kind/unify
+
+## Needs dependencies
+- [ ] core/analysismatch 248 - needs type/unify
+- [ ] core/check 336 - needs type/unify
+- [ ] core/inline 290 - needs simplify
+- [ ] core/specialize 498 - needs simplify
+- [ ] type/unify 535 - needs kind/unify
+- [ ] type/infermonad 1500 - needs type/unify
+- [ ] type/infer 2300 - needs type/infermonad, core/analysismatch
+- [ ] compiler/module 180 - needs compiler/package
+- [ ] compiler/compile 1865 - needs everything
+- [ ] main 144 - needs everything
+- [ ] platform(as needed)
+
+## Low priority
+- [ ] interpreter/commands 318 - can be done
+- [ ] syntax/colorize 607 - can be done
+- [ ] backend/csharp/from-core 1884 - can be done
+- [ ] backend/javascript/from-core 1371 - can be done
+- [ ] common/file 499 - finish as needed
+- [ ] syntax/highlight 515 - needs isocline
+- [ ] core/gendoc 598 - needs colorize / highlight
+- [ ] interpreter/interpret 734 - needs everything
 
 # TODO: Language Server
 Lots

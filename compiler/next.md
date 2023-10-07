@@ -1,8 +1,7 @@
 # TODO
 
 ## All dependencies ready
-- [ ] type/infGamma 135
-- [ ] kind/unify 116
+- [ ] kind/infer 1102
 - [ ] backend/c/parc 1037
 - [ ] backend/c/parcreuse 731
 - [ ] backend/c/parcreusespec 341
@@ -11,7 +10,6 @@
 - [ ] core/simplify 970
 
 ## Next priority (lots of dependencies require)
-- [ ] kind/infer 1102 - needs kind/unify
 
 ## Needs dependencies
 - [ ] core/analysismatch 248 - needs type/unify

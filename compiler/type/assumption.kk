@@ -1,9 +1,12 @@
 import compiler/common/syntax
 import compiler/common/name
 import compiler/common/range
+import compiler/common/color-scheme
 import compiler/type/type
+import compiler/type/pretty
 import compiler/core/core
 import compiler/common/name-collections
+import compiler/lib/pprint
 import newstd/data/linearmap
 import newstd/data/linearset
 import newstd/data/sort
@@ -215,3 +218,38 @@ fun freeTypeVars(info: nameInfo): pure tvs
 
 fun boundTypeVars(info: nameInfo): pure tvs
   info.typ.boundTypeVars
+
+fun mapType(ni: nameInfo, f: (ktype) -> e ktype): e nameInfo
+  match ni
+    InfoVal(vis, cname, typ, range, isVar) -> InfoVal(vis, cname, f(typ), range, isVar)
+    InfoFun(vis, cname, typ, arity, fipt, range) -> InfoFun(vis, cname, f(typ), arity, fipt, range)
+    InfoCon(vis, typ, repr, conInfo, range) -> InfoCon(vis, f(typ), repr, conInfo, range)
+    assumption/InfoExternal(vis, cname, typ, format, fipt, range) -> assumption/InfoExternal(vis, cname, f(typ), format, fipt, range)
+    InfoImport(vis, typ, nameAlias, fullName, range) -> InfoImport(vis, f(typ), nameAlias, fullName, range)
+
+fun (|->)(sub: sub, g: gamma): pure gamma
+  g.map(fn(n, nis) (n, nis.map(fn((n1, ni)) (n1, sub |-> ni))))
+
+fun (|->)(sub: sub, ni: nameInfo): pure nameInfo
+  ni.mapType(fn(t) sub |-> t)
+
+fun ppGammaInternal(g: gamma, showHidden: bool)
+  val nameSchemes = g.gammaList.map(fn((n, i)) (n, i.typ))
+  val maxWidth = nameSchemes.map(fn((n, _)) n.show.count).maximum(0).min(12)
+  fun nice(scheme: ktype)
+    align(niceTypes([scheme]).head.unjust)
+  vcat(nameSchemes.filter(fn((n, _)) showHidden || !n.isHiddenName).map(fn((n, s))
+    fill(n.showPlain.text |.| typeColon().color(colors.colorSep) |+| align(nice(s)), maxWidth)
+  ))
+
+fun ppGamma(g: gamma)
+  ppGammaInternal(g, False)
+
+fun ppGammaHidden(g: gamma)
+  ppGammaInternal(g, True)
+
+fun pretty(g: gamma): <ppTypeEff> doc
+  ppGamma(g)
+
+fun showGamma(g: gamma): ppTypeEff string
+  pretty(g).show

@@ -97,7 +97,7 @@ fun handlePrettyEff(f)
     val importsMap = emptyImports
   f()
  
-fun typeColor()
+fun typeColon()
   ":".text.color(colors.colorSep)
 
 fun minCanonical(tp: ktype): pure string

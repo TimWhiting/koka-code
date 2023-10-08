@@ -27,6 +27,9 @@ struct inferKindEnv
   newtypesImported: newtypes
   newtypesExtended: newtypes
 
+fun allnewtypes(infKindEnv: inferKindEnv)
+  infKindEnv.newtypesImported.newtypesCompose(infKindEnv.newtypesExtended)
+
 fun runKindInfer(platform: platform, mbRangeMap: maybe<range-map>, moduleName: name, imports: importmap, kgamma: kGamma, syns: synonyms, datas: newtypes, f: () -> <inferKindEff,pure,colorSchemeEffect,uniquePhase> a): <pure,colorSchemeEffect,uniquePhase> (list<(doc,range)>, list<(doc,range)>, maybe<range-map>, a)
   val imports' = match imports.importsExtend(moduleName, moduleName)
     Just(imp) -> imp

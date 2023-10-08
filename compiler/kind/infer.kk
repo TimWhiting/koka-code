@@ -178,4 +178,104 @@ fun synConstrTag(ci: conInfo)
   val rc = ci.range
   val expr = Literal(LitString(ci.name.show, rc))
   DefNonRec(Def(ValueBinder(nm, (), expr, rc, rc), rc, ci.vis, DefVal, InlineNever, ""))
+
+// Infer kinds for type definition groups
+fun infTypeDefGroups(tdgs: list<compiler/syntax/syntax/typeDefGroup<userType,userKind>>)
+  match tdgs
+    Nil -> (Nil, infKindEnv.kGamma, infKindEnv.synonyms, infKindEnv.allnewtypes)
+    Cons(tdgroup, tdgroups) ->
+      val ctdgroup = infTypeDefGroup(tdgroup)
+      with extendKGamma(tdgroup.getRanges, ctdgroup)
+      val (ctdgroups, kgamma1, syns1, data1) = infTypeDefGroups(tdgroups)
+      Cons(ctdgroup, kgamma1, syns1, data1)
+
+fun infTypeDefGroup(td: compiler/syntax/syntax/typeDefGroup<userType,userKind>)
+  match td
+    TypeDefRec(tdefs) -> infTypeDefs(True, tdefs)
+    TypeDefNonRec(tdef) -> infTypeDefs(False, [tdef])
+
+fun infTypeDefs(isRec: bool, tdefs: list<compiler/syntax/syntax/typeDef<userType, userType, userKind>>)
+  val xinfgamma = tdefs.map(bindTypeDef) // set up recursion
+  val infgamma = xinfgamma.filter(snd).map(fst)
+  with extendInfGamma(infgamma)
+  val names = infgamma.map(tbinderName)
+  val tdefs1 = xinfgamma.map(fst).zip(tdefs).map(infTypeDef)
+  val ctdefs = tdefs1.map(fn(d) d.resolveTypeDef(isRec, names))
+  checkRecursion(tdefs) // check for recursive type synonym definitions rather late so we spot duplicate definitions first
+  compiler/core/core/TypeDefGroup(ctdefs)
+
+fun checkRecursion(tdefs: list<compiler/syntax/syntax/typeDef<userType, userType, userKind>>)
+  if tdefs.length <= 1 || tdefs.any(is-dataType) then
+    ()
+  else
+    addError("Type synonyms cannot be recursive".text, tdefs.getRange)
+
+// Setup type environment for recursive definitions
+fun bindTypeDef(tdef: compiler/syntax/syntax/typeDef<userType, userType, userKind>)
+  val TypeBinder(name, kind, rngName, rng) = bindTypeBinder(tdef.binder)
+  val qname = if isExtend then name else name.qualifyDef
+  val isExtend = 
+    match tdef
+      DataType(isExtend=yes) -> yes
+      _ -> False
+  (TypeBinder(qname, kind, rngName, rng), !isExtend)
+
+fun bindTypeBinder(TypeBinder(name, userKind, rngName, rng): typeBinder<userKind>)
+  val kind = userKindToKind(userKind)
+  TypeBinder(name, kind, rngName, rng)
+
+fun userKindToKind(userKind: userKind)
+  match userKind
+    KindCon(nm) -> KICon(KCon(nm))
+    KindArrow(k1, k2) ->
+      val k1' = userKindToKind(k1)
+      val k2' = userKindToKind(k2)
+      match (k1', k2')
+        (KICon(kk1), KICon(kk2)) -> KICon(kindFun(kk1, kk2))
+        _ -> KIApp(k1', k2')
+    KindParens(k) -> userKindToKind(k)
+    KindNone -> freshKind()
+
+// Infer kinds of external definitions
+fun infExternals(externals0: list<compiler/syntax/syntax/external>)
+  fun walk(names: list<name>, externals: list<compiler/syntax/syntax/external>)
+    match externals
+      Nil -> Nil
+      Cons(ex, exs) ->
+        val (ext, names2) = ex.infExternal(names)
+        val exts = walk(names2, exs)
+        Cons(ext, exts)
+  walk([], externals0)
+
+fun infExternal(ex: compiler/syntax/syntax/external, names: list<name>)
+  match ex
+    External(name, tp, pinfos, nameRng, rng, calls, vis, fipT, doc) ->
+      with uctx = Check("Externals must be values", rng)
+      val tp' = tp.infResolveType()
+      val qname = name.qualifyDef
+      val cname = canonicalName(names.filter(fn(n) n == qname).length, qname)
+      if name.isHiddenName then ()
+      else
+        addRangeInfo(nameRng, Id(qname, NIValue(tp'), True))
+        addRangeInfo(rng, Decl("external", qname, cname.mangle(tp')))
+      (compiler/core/core/External(cname, tp', pinfos, calls.map(fn(c) c.formatCall(tp')), vis, fipT, nameRng, doc), Cons(qname, names))
+    _ -> (ex, names)
+
+fun formatCall((target, externalCall): (target, externalCall), tp: ktype)
+  match externalCall
+    ExternalInline -> (target, externalCall)
+    ExternallCall(fname) ->
+      val (foralls, _, rho) = tp.splitPredType
+      val argumentCount = match rho.splitFunType
+        Just((args, _, _)) -> args.length
+        _ -> 0
+      val arguments = "(" ++ list(1, argumentCount.length).map(fn(i) "#" ++ i.show).join(",") ++ ")"
+      val argumentsC = "(" ++ list(1, argumentCount.length).map(fn(i) "#" ++ i.show).join(",") ++ (if fname.starts-with("kk_").is-just then "kk_context()" else "") ++ ")"
+      val typeArguments = if foralls.is-nil then "" else "<" ++ list(1, foralls.length).map(fn(v) "##" ++ v.show).join(",") ++ ">"
+      match target
+        CS -> (target, fname ++ typeArguments ++ arguments)
+        JS -> (target, fname ++ arguments)
+        C -> (target, fname ++ argumentsC)
+        DefaultTarget -> (target, fname ++ arguments)
+
 // TODO: Lots more

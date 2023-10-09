@@ -16,6 +16,18 @@
       "externalConsole": false,
       // "MIMode": "lldb"
     },
+    {
+      "name": "(lldb) Launch Macos",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceRoot}/.koka/v2.4.3/clang-debug/higher_dash_order_dash_programs_koka_rosetta_tic_dash_tac_dash_toe_game",
+      "args": [],
+      "stopAtEntry": false,
+      "cwd": "${workspaceRoot}/.koka/v2.4.3/clang-debug",
+      "environment": [],
+      "externalConsole": false,
+      "MIMode": "lldb"
+    },
     // {
     //   "name": "Debug Parse",
     //   "type": "lldb",

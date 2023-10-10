@@ -278,4 +278,135 @@ fun formatCall((target, externalCall): (target, externalCall), tp: ktype)
         C -> (target, fname ++ argumentsC)
         DefaultTarget -> (target, fname ++ arguments)
 
+fun infResolveType(tp: userType)
+  val infTp = tp.infUserType(infKindStar)
+  infTp.resolveType(False)
+
+fun infResolveHX(tp: userType)
+  val infTp = tp.infUserType(infKindHandled)
+  infTp.resolveType(False)
+
+fun infResolveX(tp: userType, rng: range)
+  val ikind = freshKind()
+  val infTp = tp.infUserType(ikind)
+  val skind = subst(ikind)
+  // also allow effect label constructors without giving type parameters
+  val (kargs, kres) = skind.infExtractKindFun
+  if kargs.is-cons then
+    val vars = kargs.map-indexed(fn(i, _) newName("_" ++ i.show))
+    val quals = vars.map(fn(nm) TypeBinder(nm, KindNone, rng, rng))
+    val tpvars = vars.map(fn(nm) TpVar(nm, rng))
+    val newTp = quals.foldr(TpApp(tp, tpvars, rng), fn(q, t) TpQuan(QSome, q, t, rng))
+    newTp.infResolveX(rng) // recurse
+  else
+    // auto upgrade bare labels of HX or HX1 to X kind labels.
+    val eff = match skind
+      KICon(k) | k == kindLabel -> infTp
+      KICon(k) | k == kindHandled -> makeHandled(infTp, rng)
+      KICon(k) | k == kindHandled1 -> makeHandled1(infTp, rng)
+      _ -> 
+        unify(rng, infKindLabel, skind)
+        infTp
+    eff.resolveType(False)
+
+// Infer kinds of definitions
+fun infDefGroups(dgs: list<compiler/syntax/syntax/defGroup<userType>>)
+  dgs.map(infDefGroup)
+
+fun infDefGroup(dg: compiler/syntax/syntax/defGroup<userType>)
+  match dg
+    DefRec(defs) -> DefRec(defs.map(infDef))
+    DefNonRec(def) -> DefNonRec(infDef(def))
+
+fun infDef(d: compiler/syntax/syntax/def<userType>)
+  d(binder = d.binder.infValueBinder)
+
+fun infValueBinder(vb: valueBinder<(), compiler/syntax/syntax/expr<userType>>)
+  vb(expr=infExpr(vb.expr))
+
+fun infLamValueBinder(vb: valueBinder<maybe<userType>, maybe<compiler/syntax/syntax/expr<userType>>>)
+  val mbTp = vb.tp.map
+    fn(t)
+      with override val uctx = Check("Function parameters must be values", rng)
+      t.infResolveType()
+  val mbExpr = vb.expr.map(infExpr)
+  vb(expr=mbExpr, tp=mbTp)
+
+fun infPatValueBinder(vb: valueBinder<maybe<userType>, compiler/syntax/syntax/pattern<userType>>)
+  val mbTp = vb.tp.map
+    fn(t)
+      with override val uctx = Check("Matched expressions must be values", rng)
+      t.infResolveType()
+  vb(tp=mbTp, pat=vb.pat.infPat)
+
+fun infHandlerValueBinder(vb: valueBinder<maybe<userType>, ()>)
+  val mbTp = vb.tp.map
+    fn(t)
+      with override val uctx = Check("Handler parameters must be values", rng)
+      t.infResolveType()
+  vb(tp=mbTp)
+
+fun infExpr(ex: compiler/syntax/syntax/expr<userType>)
+  match ex
+    Lam(binds, expr, rng) -> Lam(binds.map(infLamValueBinder), expr.infExpr, rng)
+    Let(defs, expr, rng) -> Let(defs.infDefGroup, expr.infExpr, rng)
+    Bind(def, expr, rng) -> Bind(def.infDef, expr.infExpr, rng)
+    App(f, nargs, rng) -> App(f.infExpr, nargs.map(fn((nm, arg)) (nm, arg.infExpr)), rng)
+    Var(nm, isOp, rng) -> Var(nm.infQualifiedName(rng), rng)
+    Literal(l) -> Literal(l)
+    Ann(expr, tp, rng) -> 
+      val expr' = expr.infExpr
+      val tp' = 
+        with override val uctx = Check("Expressions must be values", rng) 
+        tp.infResolveType()
+      Ann(expr', tp')
+    Case(expr, brs, rng) -> Case(expr.infExpr, brs.map(infBranch), rng)
+    Parens(expr, nm, rng) -> Parens(expr.infExpr, nm, rng)
+    Handler(hsort, scoped, over, allowMask, meff, pars, reinit, ret, fin, ops, hrng, rng) ->
+      val pars' = pars.map(infHandlerValueBinder)
+      val meff' = meff.map() fn(eff)
+        with override val uctx = Check("Handler effects must be effect constants (of kind X)", hrng)
+        eff.infResolveX()
+      Handler(hsort, scoped, over, allowMaks, meff', pars', reinit.map(infExpr), ret.map(infExpr), fin.map(infExpr), ops.map(infHandlerBranch), hrng, rng)
+    Inject(tp, expr, b, rng) ->
+      val expr' = expr.infExpr
+      val tp =
+        with override val uctx = Check("Can only inject effect constants", rng)
+        tp.infResolveX()
+      Inject(tp, expr', b, rng)
+
+fun infPat(p: compiler/syntax/syntax/pattern<userType>)
+  match p
+    PatWild(rng) -> PatWild(rng)
+    PatLit(l) -> PatLit(l)
+    PatVar(binder) -> PatVar(binder.infPatValueBinder)
+    PatAnn(pat, tp, rng) ->
+      val pat' = pat.infPat
+      val tp' = 
+        with override val uctx = Check("Patterns must be values", rng)
+        tp.infResolveType()
+      PatAnn(pat', tp', rng)
+    PatCon(name, args, r1, r2) -> PatCon(name, args.map(fn((mbNm, p')) (mbNm, p'.infPat)), r1, r2)
+    PatParens(pat, nm, rng) -> PatParens(pat.infPat, nm, rng)
+
+fun infHandlerBranch(HandlerBranch(name, pars, expr, opSort, nmRng, rng): handlerBranch<userType>)
+  val pars' = pars.map(infHandlerValueBinder)
+  val expr' = expr.infExpr
+  HandlerBranch(name, pars', expr', opSort, nmRng, rng)
+
+fun infBranch(Branch(pat, guards): compiler/syntax/syntax/branch<userType>)
+  val pat' = pat.infPat
+  val guards' = guards.map(infGuard)
+  Branch(pat', guards')
+
+fun infGuard(Guard(test, body): compiler/syntax/syntax/guard<userType>)
+  val test' = test.infExpr
+  val body' = body.infExpr
+  Guard(test', body')
+
+// Infer the kinds for a type definition
+fun infTypeDef(tb)
+
+
+
 // TODO: Lots more

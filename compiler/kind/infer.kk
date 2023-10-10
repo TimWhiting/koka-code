@@ -405,7 +405,16 @@ fun infGuard(Guard(test, body): compiler/syntax/syntax/guard<userType>)
   Guard(test', body')
 
 // Infer the kinds for a type definition
-fun infTypeDef(tb)
+fun infTypeDef(tb: typeBinder<infKind>, td: compiler/syntax/syntax/dypteDef<userType, userType, userKind>)
+  match td
+    Synonym(syn, args, tp, rng, vis, doc) ->
+      val infgamma = args.map(bindTypeBinder)
+      val k = freshKind()
+      with extendInfGamma(infgamma)
+      with override val uctx = Infer(rng)
+      val tp' = tp.infUserType(k)
+      val tbinder = unifyBinder(tbinder, syn, rng, infgamma, k)
+      Synonym(tbinder', infgamma, tp', rng, vis, doc)
 
 
 

@@ -32,6 +32,7 @@ import compiler/kind/infer-kind
 import compiler/kind/infer-effect
 import compiler/kind/unify
 import newstd/data/linearset
+import newstd/data/linearmap
 
 // Kindcheck a program and calculate types
 fun inferKinds(
@@ -415,6 +416,323 @@ fun infTypeDef(tb: typeBinder<infKind>, td: compiler/syntax/syntax/dypteDef<user
       val tp' = tp.infUserType(k)
       val tbinder = unifyBinder(tbinder, syn, rng, infgamma, k)
       Synonym(tbinder', infgamma, tp', rng, vis, doc)
+    DataType(newTp, args, constrs, rng, vis, sort, ddef, isExtend, doc) ->
+      val infgamma = args.map(bindTypeBinder)
+      with extendInfGamma(infgamma)
+      val constrs' = constrs.map(infConstr)
+      // TODO: unify extended datatype kind with original
+      val resKind = if ddef.isOpen then infKindStar else freshKind
+      val tbinder' = unifyBinder(tbinder, newTp, rng, infgamma, resKind)
+      if !isExtend then ()
+      else
+        val (qname, kind) = findInfKind(newtp.tbinderName, newtp.tbinderRange)
+        with override val uctx = Check("extended type must have the same kind as the open type", newTp.tbinderRange)
+        unify(newTp.tbinderRange, tbinder'.tbinderKind, kind)
+        DataType(tbinder', infgamma, constrs', rng, vis, ddef, isExtend, doc)
+
+fun unifyBinder(tb: typeBinder<infKind>, rng: range, infgamma: list<typeBinder<infKind>>, resKind: infKind)
+  val kind = infKindFunN(infgamma.map(typeBinderKind), resKind)
+  with override val uctx = Infer(rng)
+  unify(rng, tb.tbinderKind, kind)
+  tb
+
+fun tbinderKind(TypeBinder(nm, k, _, _): typeBinder<k>): k
+  k
+
+fun infConstr(UserCon(name, exists0, params, mbresult, rngName, rng, vis, doc): userCon)
+  val infgamma = exists0.map(bindTypeBinder)
+  with extendInfGamma(infgamma)
+  val params' = params.map(infConValueBinder)
+  val result' = mbresult.map fn(t)
+    with override val utx = Check("Constructor results must be values", rng)
+    t.infUserType(infKindStar)
+    t
+  UserCon(name, infgamma, params', result', rngName, rng, vis, doc)
+
+fun infConValueBinder((vis,ValueBinder(name, tp, mbExpr, nameRng, rng)): (visibility, valueBinder<userType, maybe<expr<userType>>>))
+  with override val uctx = Check("Constructor parameters must be values", rng)
+  val tp' = infUserType(infKindStar, tp)
+  (vis, ValueBinder(name, tp', mbExpr, nameRng, rng))
+
+fun infUserType(expected: infKind, userType: userType)
+  val rng = userType.getRange
+  match userType
+    TpQuan(quant, tnmae, tp, rng) ->
+      val ikind = match quant
+        QSome -> expected
+        _ -> 
+          unify(rng, expected, infKindStar)
+          expected
+      val tname' = tname.bindTypeBinder
+      extendInfGamma([tname'])
+      with checkQuant(rng)
+      val tp' = infUserType(ikind, tp)
+      TpQuan(quant, tname', tp', rng)
+    TpQual(preds, tp) ->
+      with checkArg(rng)
+      val preds' = preds.map(fn(p) infParam(infKindStar, p))
+      val tp' = infUserType(expected, tp)
+      TpQual(preds', tp')
+    TpFun(args, eff, tp, rng) ->
+      unify(rng, expected, infKindStar)
+      // somewhat involved since we auto-wrap labels L into effects E here
+      val ekind = freshKind()
+      with checkEff(rng)
+      val etp = infUserType(ekind, eff)
+      val skind = subst(ekind)
+      val eff' = match skind
+        KICon(k) | k == kindLabel -> makeEffectExtend(etp, makeEffectEmpty)
+        KICon(k) | k == kindHandled -> makeEffectExtend(makeHandled(etp, rng), makeEffectEmpty) // TODO: check if there is an effect declaration
+        KICon(k) | k == kindHandled1 -> makeEffectExtend(makeHandled1(etp, rng), makeEffectEmpty) // TODO: check if there is an effect declaration
+        _ ->
+          with checkEff(rng)
+          unify(rng, KICon(kindEffect), skind)
+          etp
+      with checkRes(rng)
+      val tp' = infUserType(infKindStar, tp)
+      TpFun(args', eff', tp', rng)
+    TpApp(TpCon(nm), [lab, tl], rng) | nm == nameEffectExtend ->
+      with checkApp(rng)
+      val tp' = infUserType(infKindFunN([KICon(kindLabel), KICon(kindEFfect)], expected), tp)
+      with checkExtendTail(rng)
+      val tl' = infUserType(KICon(kindEffect), tl)
+      // somewhat involved since we allow fixed effects to be used as labels
+      // the append nodes are just used temporarily (see resolveApp in this file)
+      val lkind = fresKind()
+      with override val uctx = Infer(rng)
+      val ltp = infUserType(lkind, lab)
+      val skind = subst(lkind)
+      match skind
+        KICon(kind) | kind == kindEffect -> makeEffectAppend(ltp, tl')
+        KICon(kind) | kind == kindHandled ->
+          // TODO: check effects environment if really effect?
+          with checkExtendLabel(rng)
+          unify(rng, KICon(kindHandled), skind)
+          TpApp(tp', [makeHandled(ltp, rng), tl'], rng)
+        KICon(kind) | kind == kindHandled1 ->
+          // TODO: check effects environment if really effect?
+          with checkExtendLabel(rng)
+          unify(rng, KICon(kindHandled1), skind)
+          TpApp(tp', [makeHandled1(ltp, rng), tl'], rng)
+        _ ->
+          with checkExtendLabel(rng)
+          unify(rng, KICon(kindLabel), skind)
+          TpApp(tp', [ltp, tl'], rng)
+    TpApp(tp, args, rng) ->
+      val kinds = args.map(fn(_) freshKind())
+      with checkApp(rng)
+      val tp' = infUserType(infKindFunN(kinds, expected), tp)
+      val args' = args.zip(kinds).map fn((arg, kind)) 
+        with override val uctx = Infer(rng)
+        infUserType(kind, arg)
+      TpApp(tp', args', rng)
+    TpVar(nm, rng) ->
+      val (qname, kind) = findInfKind(nm, rng)
+      unify(rng, expected, kind)
+      TpVar(qname, rng)
+    TpCon(nm, rng) ->
+      val (qname, kind) = findInfKind(nm, rng)
+      unify(rng, expected, kind)
+      TpCon(qname, rng)
+    TpParens(tp, rng) ->
+      val tp' = infUserType(expected, tp)
+      TpParens(tp', rng)
+    TpAnn(tp, userKind) ->
+      val kind = userKind.userKindToKind
+      unify(rng, expected, kind)
+      with checkAnn(rng)
+      val tp' = infUserType(kind, tp)
+      TpAnn(tp', kind)
+
+fun infParam(expected: infKind, (nm, tp): (name, userType))
+  (nm, tp.inferUserType(expected, tp))
+
+fun checkQuant(rng, f)
+  with override val uctx = Check("Can only quantify over types", rng)
+  f()
+
+fun checkPred(rng, f)
+  with override val uctx = Check("The left-hand side of a \"=>\" can only contain predicates", rng)
+  f()
+
+fun checkArg(rng, f)
+  with override val uctx = Check("The parameters of a function type must be types", rng)
+  f()
+
+fun checkEff(rng, f)
+  with override val uctx = Check("The effect of a function type must be an effect type", rng)
+  f()
+
+fun checkRes(rng, f)
+  with override val uctx = Check("The result of a function type must be a type", rng)
+  f()
+
+fun checkAnnot(rng, f)
+  with override val uctx = Check("The inferred kind doesn't match the annotated kind", rng)
+  f()
+
+fun checkApp(rng, f)
+  with override val uctx = Check("The type cannot be applied to those arguments", rng)
+  f()
+
+fun checkExtendTail(rng, f)
+  with override val uctx = Check("The extension of an effect must be an effect type", rng)
+  f()
+
+fun checkExtendLabel(rng, f)
+  with override val uctx = Check("The elements of an effect must be effect constants", rng)
+  f()
+
+fun kindArity(kind: kind)
+  match kind
+    KApp(KApp(kcon, k1), k2) | kcon == kindArrow -> Cons(k1, kindArity(k2))
+    _ -> []
+
+// Resolve kinds: from InfKind to Kind, and UserType to Type
+fun resolveTypeDef(isRec: bool, recNames: list<name>, td: typeDef<kUserType<infKind>, userType, infKind>)
+  match td
+    Synonym(syn, params, tp, rng, vis, doc) ->
+      val syn' = syn.resolveTypeBinderDef
+      val params' = params.map(resolveTypeBinder)
+      val typeVars = params'.map(fn(p) freshTypeVar(p, Bound))
+      val tvarMap = params'.map(name).zip(typeVars)
+      val tp' = resolveType(tvarMap, True, tp)
+      // eta-expand type synonyms
+      val kind = syn'.typeBinderKind
+      val arity = kind.arity
+      val etaKinds = arity.drop(typeVars.length)
+      val (etaTp, etaParams) = 
+        if etaKinds.is-nil then
+          (tp', typeVars)
+        else
+          val etaVars = etaKinds.map(fn(k) TypeVar(uniqueId("eta"), k, Bound))
+          (typeApp(tp', etaVars.map(TVar)), typeVars ++ etaVars)
+      addRangeInfo(rng, Decl("alias", syn'.name, syn.name.mangleTypeName))
+      Synonym(SynInfo(syn'.name, syn.tBinderKind, etaParams, etaParams, etaTp, etaTp.maxSynonymRank + 1, rng, vis, doc))
+    DataType(newtp, params, constrs, rng, vis, sort, ddef, isExtend, doc) ->
+      val newtp' = 
+        if isExtend then
+          val (qname, ikind) = findInfKind(newTp.tbinderName, newTp.tbinderRange)
+          val kind = ikind.resolveKind
+          TypeBinder(qname, kind, newTp.tbinderNameRange, newTp.tbinderRange)
+        else
+          newTp.resolveTypeBinderDef
+      val params' = params.map(resolveTypeBinder)
+      val typeResult = TCon(TypeCon(newtp'.name, newtp'.tBinderKind))
+      val typeVars =
+        val (kargs, kres) = extractKindFun(newTp'.tBinderKind)
+        if params.is-nil && !kargs.is-nil then
+          kargs.map(fn(karg) TypeVar(uniqueId("k"), karg, Bound)) // invent parameters if they are not given (and it has an arrow kind)
+        else
+          params'.map(fn(p) freshTypeVar(p, Bound))
+      val tvarMap = params'.map(name).zip(typeVars)
+      val qname = newtp'.name
+      val fname = qname.unqualify
+      val name = if fname.isHandlerName then fname.fromHandlerName else fname
+      val nameDoc = name.pretty.color(colors.colorType)
+      val consinfos = constrs.map(fn(c) resolveConstructor(newtp'.name, sort, !ddef.isOpen, constrs.length == 1, typeResult, typeVars, tvarMap, c))
+      val (constrs', conInfos0) = consinfos.unzip
+      // check recursion
+      if sort.is-retractive then
+        ()
+      else
+        fun fromOpsName(nm: name)
+          if nm.isOperationsName then [nm.fromOperationsName] else []
+        val effNames = recNames.map(fromOpsName).concat
+        if conInfos0.any(fn(ci) occursNegativeCon(recNames ++ effNames, ci)) then
+          addError(rng, "Type".text |+| nameDoc |+| "is declared as being".text |-| "(co)inductive but it occurs recursively in a negative position.".text |-|
+            " hint: declare it as a 'type rec' (or 'effect rec)' to allow negative occurences")
+        else ()
+      // create datadef and coninfos with correct ValueRepr and ordered fields
+      fun emitError(d)
+        addError(rng, "Type".text |+| nameDoc |+| d)
+      fun emitWarning(d)
+        addWarning(rng, "Type".text |+| nameDoc |+| d)
+      val resultHasKindStar = typeResult.kind.hasKindStarResult
+      val maxMembers = conInfos0.map(fn(ci) ci.params.length).maximum
+      val conCount = conInfos0.length
+      val willNeedStructTag = ddef.isValue && conCount > 1 && maxMembers >= 1
+      val extraFields = 
+        if ddef.isOpen then 1 // open datatype tag
+        elif willNeedStructTag then 1 // explicit struct tag
+        else 0
+      val (ddef1, conInfos1) = createDataDef(emitError, emitWarning, lookupDataInfo, platform, qname, resultHasKindStar, isRec, sort, extraFields, ddef, conInfos)
+      val dataInfo = DataInfo(sort, newtp'.name, newtp'.tBinderKind, typeVars, conInfos1, rng, ddef1, vis, doc)
+      // TODO: Assertion
+      addRangeInfo(rng, Decl(sort.show, newtp'.name, mangleTypeName(newtp'.name)))
+      Data(dataInfo, isExtend)
+
+fun occursNegativeCon(names: list<name>, ci: conInfo)
+  val (_, _, rho) = ci.ktype.splitPredType
+  match rho.splitFunType
+    Just((pars, eff, res)) -> pars.map(snd).any(fn(p) p.occursNegative(names)) || res.occursNegative(names)
+    _ -> False
+
+fun occursNegative(tp: ktype, names: list<name>)
+  occurs(names, False, tp)
+
+fun occurs(tp: ktype, names: list<name>, isNeg: bool)
+  match tp
+    TForAll(vars, preds, tp) -> tp.occurs(names, isNeg)
+    TFun(args, eff, res) -> args.map(snd).any(fn(p) p.occurs(names, !isNeg)) || eff.occurs(names, !isNeg) || res.occurs(names, isNeg)
+    TCon(tcon) -> if names.any(fn(n) n == tcon.name) then isNeg else False
+    TVar(tvar) -> False
+    TApp(tp, args) -> Cons(tp, args).any(fn(t) t.occurs(names, isNeg))
+    TSyn(_, _, t) -> t.occurs(names, isNeg)
+
+fun showTypeBinder(TypeBinder(name, kind, _, _): typeBinder<kind>)
+  name.show ++ ":" ++ kind.show
+
+fun resolveTypeBinderDef(TypeBinder(name, infkind, rngName, rng): typeBinder<infKind>)
+  val infkind' = infkind.resolveKind
+  val qname = name.qualifyDef
+  addRangeInfo(rngName, Id(qname, NITypeCon(infkind'), True))
+  TypeBinder(qname, infkind', rngName, rng)
+
+fun resolveTypeBinder(TypeBinder(name, infkind, rngName, rng): typeBinder<infKind>)
+  val infkind' = infkind.resolveKind
+  addRangeInfo(rngName, Id(qname, NITypeCon(infkind'), True))
+  TypeBinder(name, infkind', rngName, rng)
+
+fun resolveKind(infkind: infKind)
+  val skind = subst(infkind)
+  fun resolve(k: infKind)
+    match skind
+      KIVar(id) -> kindStar // default unconstrained parameter to kind star
+      KICon(k') -> k'
+      KIApp(k1, k2) -> KApp(k1.resolve, k2.resolve)
+  skind.resolve
+
+val nameTVMapEmpty = linearMap([], fn(n1: name, n2: name) n1 == n2, fn(tv1: typeVar, tv2: typeVar) tv1 == tv2, show, show)
+
+fun resolveConstructor(typeName: name, typeSort: dataKind, isSingleton: bool, typeResult: ktype, typeParams: list<typeVar>,
+  idmap: name-map<name, typeVar>, UserCon(name, exists0, params, mbResult, rngName, rng, vis, doc): userCon<kUserType<infKind>, userType, infKind>)
+  val qname = name.qualifyDef
+  val exist' = exists0.map(resolveTypeBinder)
+  val existVars = exist'.map(fn(e) freshTypeVar(e, Bound))
+  val idmap' = (nameTVMapEmpty + exist.map(name).zip(existVars)).union(idmap) // assume left biased union 
+  val params' = params.map(fn(p) resolveConParam(p, idmap'))
+  val result = match mbResult
+    Nothing -> TypeApp(typeResult, typeParams.map(TVar))
+    Just(tp) -> resolveType(idmap', False, tp)
+  val scheme = quantifyType(typeParams ++ existVars, if params'.is-nil then result else TypeFun(params'.map(fn((_, p)) (p.binderName, p.binderType)), typeTotal, result))
+  addRangeInfo(rng, Decl("con", qname, qname.mangleConName))
+  addRangeInfo(rngName, Id(qname, NICon(scheme), True))
+  val fields = params'.map(snd).map-indexed(fn(i, b) (if b.binderName.isNil then (i + 1).newFieldName else b.binderName, b.binderType))
+  (UserCon(qname, exist', params', Just(result), rngName, rng, vis, doc), 
+  ConInfo(qname, typeName, typeParams, existVars, fields, scheme, typeSort, rngName, 
+    params'.map(fn((_, b)) b.nameRange), params'.map(fst), isSingleton, [], valueReprZero // Initialized later at the datadef
+    , vis, doc))
+
+fun resolveConParam(idmap: name-map<name, typeVar>, (vis, ValueBinder(name, tp, mbExpr, nameRng, rng)): (visibility, valueBinder<userType, maybe<expr<userType>>>))
+  val tp' = resolveType(idmap, False, tp)
+  val expr = match mbExpr
+    Nothing -> Nothing
+    Just(e) -> Just(fail("kind/infer/resolveConParam: optional parameter expression in constructor"))
+  addRangeInfo(nameRng, Id(name, NIValue(tp'), True))
+
+
+
 
 
 

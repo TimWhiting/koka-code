@@ -8,6 +8,7 @@ import compiler/type/assumption
 import compiler/common/syntax
 import compiler/platform/config
 
+pub infixr 5 (|->)
 type evidence
   Ev(evName: tName, pred: pred, evRange: range)
 

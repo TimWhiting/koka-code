@@ -12,6 +12,7 @@ import compiler/kind/pretty
 import newstd/data/linearmap
 import newstd/data/linearset
 
+pub infixr 5 (|->)
 // Inference Kind: These kinds contain meta kind variables
 type infKind
   KIVar(kid: id)

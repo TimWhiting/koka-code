@@ -3,6 +3,8 @@ import newstd/data/linearset
 import compiler/common/name
 import compiler/type/typevar
 
+pub infixr 5 (|->)
+
 fun isTopLevel(d: def)
   val freeVar = d.defExpr.freeVars.list.map(fn(TName(nm)) nm).filter(fn(nm) !nm.isQualified && d.defName.unqualify != nm)
   val freeTv = d.defExpr.freeTypeVars

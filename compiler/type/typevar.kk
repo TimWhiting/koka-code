@@ -6,6 +6,8 @@ import compiler/type/kind
 import compiler/kind/kind
 import compiler/common/syntax
 
+pub infixr 5 (|->)
+
 alias tvs = linearSet<typeVar>
 alias sub = linearMap<typeVar, ktype>
 

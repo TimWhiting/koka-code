@@ -70,6 +70,12 @@ pub fun unions(l: list<linearMap<k,v>>): <exn|e> linearMap<k,v>
   val fst = l.head.unjust
   l.foldl(fst, fn(x, y) x.addAll(y.list))
 
+pub fun (+)(l1: linearMap<k,v>, l2: linearMap<k,v>): e linearMap<k,v>
+  l1.addAll(l2.list)
+
+pub fun (+)(l1: linearMap<k,v>, l2: list<(k,v)>): e linearMap<k,v>
+  l1.addAll(l2)
+
 pub fun union(l1: linearMap<k,v>, l2: linearMap<k,v>): e linearMap<k,v>
   l1.addAll(l2.list)
 

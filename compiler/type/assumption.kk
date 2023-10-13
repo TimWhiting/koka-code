@@ -15,6 +15,8 @@ import compiler/platform/config
 import compiler/core/corevar
 import compiler/type/typevar
 
+pub infixr 5 (|->)
+
 type nameInfo
   InfoVal(vis: visibility, cname: name, typ: scheme, range: range, isVar: bool)
   InfoFun(vis: visibility, cname: name, typ: scheme, arity: (int, int), fipt: fipT, range: range)

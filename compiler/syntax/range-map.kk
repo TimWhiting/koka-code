@@ -11,6 +11,8 @@ import compiler/type/pretty
 import newstd/data/sort
 import newstd/data/linearset
 
+pub infixr 5 (|->)
+
 alias range-map = list<(range, rangeInfo)>
 
 fun mangleConName(nm: name)
@@ -19,7 +21,7 @@ fun mangleConName(nm: name)
 fun mangleTypeName(nm: name)
   prepend("type", nm)
 
-fun mange(nm: name, tp: ktype)
+fun mangle(nm: name, tp: ktype)
   nm
 
 type rangeInfo

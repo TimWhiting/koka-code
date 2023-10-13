@@ -14,6 +14,7 @@ import compiler/type/pretty
 import compiler/type/assumption
 import newstd/data/linearmap
 
+pub infixr 5 (|->)
 // inf gamma
 // Environment mapping names to type schemes. Due to overloading
 // there may be multiple entries for the same name

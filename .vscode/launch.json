@@ -25,7 +25,7 @@
       "stopAtEntry": false,
       "cwd": "${workspaceRoot}/.koka/v2.4.3/clang-debug",
       "environment": [],
-      "externalConsole": false,
+      "externalConsole": true,
       "MIMode": "lldb"
     },
     // {

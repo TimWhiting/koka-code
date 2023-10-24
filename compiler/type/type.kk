@@ -26,10 +26,10 @@ fun show(tp: ktype): div string
     TVar(v) -> v.tid.show
     TApp(t, args) -> t.show ++ " " ++ args.show
     TSyn(syn, args, t) -> syn.name.show ++ " " ++ args.show ++ " " ++ t.show
-
+  
 type pred
   PredSub(a: ktype, b: ktype)
-  PredIFace(n: name, tps: list<ktype>)
+  PredIFace(n: name, tps: list<ktype>) 
 
 fun show(p: pred): div string
   match p

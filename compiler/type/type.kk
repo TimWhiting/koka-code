@@ -39,7 +39,7 @@ fun show(p: pred): div string
 // Various synonyms of types
 pub alias scheme = ktype
 pub alias sigma = ktype // polymorphic type
-pub alias tau = ktype // monomorphic type
+pub alias tau = ktype // monomorphic type 
 pub alias rho = ktype // unqualified type
 pub alias keffect = tau
 

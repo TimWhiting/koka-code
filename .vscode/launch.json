@@ -8,13 +8,13 @@
       "name": "(lldb) Launch",
       "type": "cppdbg",
       "request": "launch",
-      "program": "${workspaceRoot}/.koka/v2.4.3/gcc-debug/testcompiler_syntax_parse",
+      "program": "${workspaceRoot}/.koka/v2.4.3/gcc-debug/higher_dash_order_dash_programs_koka_rosetta_tic_dash_tac_dash_toe_game",
       "args": [],
       "stopAtEntry": false,
       "cwd": "${workspaceRoot}/.koka/v2.4.3/gcc-debug",
       "environment": [],
-      "externalConsole": false,
-      // "MIMode": "lldb"
+      "externalConsole": true,
+      "MIMode": "gdb"
     },
     {
       "name": "(lldb) Launch Macos",

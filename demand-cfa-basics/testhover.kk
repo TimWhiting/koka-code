@@ -17,8 +17,8 @@ fun main()
     fn(x4)
       y0(x4)
   )(fn(x3) x3)(False)
-  // a1(id).println
-  // a1(fn(i) i + 1).println
+  a1(id).println
+  a1(fn(i) i + 1).println
   something(1, 1)
   something(2, 3)
   ()

@@ -17,7 +17,7 @@ type unifyContext
 effect unifyContextEff
   val uctx: unifyContext
 
-fun unify(rng: range, k1: infKind, k2: infKind)
+fun kunify(rng: range, k1: infKind, k2: infKind)
   val sk1 = subst(k1)
   val sk2 = subst(k2)
   match mgu(sk1, sk2)

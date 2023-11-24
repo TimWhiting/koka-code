@@ -3,6 +3,7 @@ import compiler/common/range
 import compiler/common/failure
 import compiler/common/name
 import compiler/common/name-prim
+import compiler/common/syntax
 import compiler/platform/config
 import compiler/kind/kind
 import compiler/kind/unify
@@ -12,7 +13,7 @@ import compiler/type/kind
 import compiler/type/pretty
 import compiler/type/operations
 import compiler/core/core
-
+import newstd/data/linearset
 
 effect unify
   final ctl unifyError(e: unifyErr): a
@@ -86,7 +87,7 @@ fun unifyLabels(ls1: list<ktype>, ls2: list<ktype>, closed1: bool, closed2: bool
               val ll2' = ll2.subst
               unifyLabels(ll1', ll2', closed1, closed2)
 
-fun unifyEffectVar(tv1: typeVar, tp2: ktype): unify ()
+fun unifyEffectVar(tv1: typeVar, tp2: ktype): <pure,unify> ()
   val (ls2, tl2) = tp2.extractOrderedEffect // ls2 must be non-empty
   match tl2.expandSyn 
     // e ~ <div,exn|e> ~> e := <div,exn|e'>
@@ -151,24 +152,26 @@ fun unifies(l1: list<ktype>, l2: list<ktype>): <pure,unify> ()
     _ -> throw("type/unify unifies")
 
 // Unify a type variable with a type
-fun unifyTVar(tv: typeVar, tp: ktype): unify ()
-  val etp = tp.expandSyn
-  if etp.freeTypeVars.any(fn(tv') tv'.is-meta && tv == tv') then
-    match etp
-      TVar(tv') | tv == tv' -> () // i.e. a ~ id<a>
-      _ -> unifyError(Infinite)
-  else
-    match etp
-      TVar(TypeVar(_, _, Bound)) -> unifyError(NoMatch) // can't unify with bound variables
-      TVar(TypeVar(id2, _, Meta)) | id <= id2 ->
-        if id < id2 then unifyTVar(tv2, TVar(tv)) else () // TODO: Kind Check?
-      _ ->
-        if !matchKind(kind, tp.getKind) then
-          trace("unifyTVar: kinds: typevar var:\n" ++ kind.show ++ "\nand:\n" ++ tp.getKind.show ++ "\ntype:\n" ++ tp.show)
-          unifyError(NoMatchKind)
-        else
-          extendSub(tv, tp)
-          ()
+fun unifyTVar(tv: typeVar, tp: ktype): <pure,unify> ()
+  match tv
+    TypeVar(id, k, Meta) -> 
+      val etp = tp.expandSyn
+      if etp.freeTypeVars.fuv.list.any(fn(tv') tv == tv') then
+        match etp
+          TVar(tv') | tv == tv' -> () // i.e. a ~ id<a>
+          _ -> unifyError(Infinite)
+      else
+        match etp
+          TVar(TypeVar(_, _, Bound)) -> unifyError(NoMatch) // can't unify with bound variables
+          TVar(tv2 as TypeVar(id2, _, Meta)) | id <= id2 ->
+            if id < id2 then unifyTVar(tv2, TVar(tv)) else () // TODO: Kind Check?
+          _ ->
+            if !matchKind(k, tp.kind) then
+              trace("unifyTVar: kinds: typevar var:\n" ++ k.show ++ "\nand:\n" ++ tp.kind.show ++ "\ntype:\n" ++ tp.show)
+              unifyError(NoMatchKind)
+            else
+              extendSub(tv, tp)
+    _ -> throw("type/unify unifyTVar: valued with skolem or bound variable")
 
 // Unify two types
 fun unify(t1: ktype, t2: ktype): <pure,unify> ()
@@ -227,7 +230,121 @@ fun unify(t1: ktype, t2: ktype): <pure,unify> ()
       unify(stp1, stp2)
       unifyPreds(spreds1, spreds2)
       // No need to check for escaping skolems as we don't unify to bound variables
-    
+    // Special unsafe(!) handling of continuations; just for cps translation :-( 
+    (TSyn(syn1, args1, tp1), TSyn(syn2, args2, tp2)) | syn1.name == nameTpCont && syn2.name == nameTpCont ->
+      val n = args1.length
+      unify(args1.take(n - 1), args2.take(n - 1))
+    (TSyn(syn1, args1, tp1), TFun([(_, tpar)], teff, tres)) | syn1.name == nameTpCont ->
+      unifies(args1.take(2), [tpar, teff])
+    // synonyms
+    (TSyn(syn1, args1, tp1), TSyn(syn2, args2, tp2)) ->
+      if syn1.rank > syn2.rank then unify(tp1, t2) else unify(t1, tp2)
+    (TSyn(_, _, tp1), tp2) -> unify(tp1, tp2)
+    (tp1, TSyn(_, _, tp2)) -> unify(tp1, tp2)
+    // No match
+    (TVar(TypeVar(_, kind, Skolem)), TVar(TypeVar(_, _, Skolem))) ->
+      unifyError(NoMatchSkolem(kind))
+    _ -> unifyError(NoMatch)
 
+/// entails(skolems, known, preds) 
+/// 
+/// Returns both predicates that need to be proved and a core transformer 
+///  that applies the evidence for `preds` and abstracts for those in `known`. 
+/// The `preds` are entailed by `known` and predicates containing a type variable in `skolems` must
+/// be entailed completely by other predicates (not containing such skolems).
+fun entails(skolems: tvs, known: list<evidence>, evs: list<evidence>): unify (list<evidence>, expr -> e expr)
+  match evs
+    Nil -> (Nil, id)
+    evs | unsafe-total({known.map(pred) == evs.map(pred)}) -> (Nil, id) // TODO: should construct evidence from known to preds (simple one-to-one name mapping)
+    Cons(ev, evs) ->
+      match ev.pred
+        PredIFace(name, [_, _, _]) | name == namePredHeapDiv -> // can always be solved
+          entails(skolems, known, evs)
+        _ -> unifyError(NoEntail)
 
+// Subsumption
+// subsume(free, t1, t2) holds if `t2` can be instantiated to `t1` where
+// `free` are the free type variables in the assumption.
+// Returns under which predicates this holds and a core transformer that needs to be
+// applied to the expression of type `t2`. Also returns a new type for the expected type `tp1` where 'some'
+// types have been properly substituted (and may be quantified).
+fun subsume(rng: range, free: tvs, tp1: ktype, tp2: ktype): unify (ktype, list<evidence>, expr -> e expr)
+  // skolemize, instantiate and unify
+  val (sks, evs1, rho1, core1) = skolemizeEx(rng, tp1)
+  val (tvs, evs2, rho2, core2) = skolemizeEx(rng, tp2)
+  unify(rho2, rho1)
+  // escape check: no skolems should escape into the environment
+  // entailment check: predicates should be entailed
+  // TODO: we should check for skolems since predicates with skolems must be entailed directly
+  val sub = getSubst()
+  val allfree = free ++ tp1.freeTypeVars
+  val escaped = sub.list.filter(fn((tv, tp)) allfree.any(fn(t) t == tv)).map(snd).freeTypeVars.fsv // TODO: 
+  if escaped.disjoint(sks.tvsNew) then ()
+  else unifyError(NoSubsume)
+  val (evsEnt, coreEnt) = entails(sks.tvsNew, sub |-> evs1, sub |-> evs2)
+  // final type
+  val (vars, ssub) = freshSub(Bound, sks)
+  val subx = ssub |-> sub
+  val tp = quantifyType(vars, qualifyType(evs1.map(fn(ev) subx |-> ev.pred)), subx |-> rho1) // TODO: do rho1 and we get skolem errors: see Prelude.choose
+  // return
+  (tp, subx |-> evsEnt, 
+    fn(expr) addTypeLambdas(vars, // generalize 
+      subx |-> coreEnt( // apply evidence evs2 & abstract evidence evs1
+        addTypeApps(tvs, expr)))) // instantiate
 
+/// Does a function type match the given arguments? if the first argument 'matchSome' is ture,
+/// it is considered a match even if not all arguments to the function are supplied
+fun matchArguments(matchSome: bool, rng: range, free: tvs, tp: ktype, fixed: list<ktype>, namedArgs: list<(name,ktype)>): unify ()
+  val rho1 = instantiate(rng, tp)
+  match rho1.splitFunType
+    Nothing -> unifyError(NoMatch)
+    Just((pars, _, _)) ->
+      if fixed.length + namedArgs.length > pars.length then unifyError(NoMatch)
+      else // subsume fixed parameters
+        val (fpars, npars) = pars.split-at(fixed.length)
+        fpars.map(snd).zip(fixed).map(fn((tpars, targ)) subsume(rng, free, tpar.unOptional, targ))
+        // subsume named parameters
+        namedArgs.map fn((name, targ))
+          match npars.lookup(fn(n) n == name)
+            Nothing -> unifyError(NoMatch)
+            Just(tpar) -> subsume(rng, free, tpar, targ.makeOptional)
+        // check the rest is optional
+        val rest = npars.filter(fn((nm, tpar)) !(namedArgs.map(fst).any(fn(n) n == nm)))
+        if matchSome || rest.all(is-optional) then ()
+        else unifyError(NoMatch)
+
+/// Does a type have the given named arguments?
+fun matchNamed(rng: range, tp: ktype, n: int, namedArgs: list<name>): unify ()
+  val rho1 = instantiate(tp, rng)
+  match rho1.splitFunType
+    Nothing -> unifyError(NoMatch)
+    Just((pars, _, _)) ->
+      if n + namedArgs.length > pars.length then unifyError(NoMatch)
+      else
+        val npars = pars.drop(n)
+        val names = npars.map(fst)
+        if namedArgs.all(fn(n) names.any(fn(n') n == n')) then 
+          val rest = npars.filter(fn((nm, tp)) !(namedArgs.any(fn(n) n == nm))).map(snd)
+          if res.all(fn(tp) tp.isOptional) then ()
+          else unifyError(NoMatch)
+        else unifyError(NoMatch)
+
+/// Do two types overlap on the argument types? Used to check for overlapping definitions of overloaded identifiers.
+fun overlaps(rng: range, free: tvs, tp1: ktype, tp2: ktype): unify ()
+  val rho1 = instantiate(tp1, rng)
+  val rho2 = instantiate(tp2, rng)
+  match (rho1.splitFunType, rho2.splitFunType)
+    // Values always overlap
+    (Nothing, _) -> ()
+    (_, Nothing) -> ()
+    // rest
+    (Just((targs1, _, _)), Just((targs2, _, _))) ->
+      val (fixed1, optional1) = targs.map(snd).span(fn(tp) !tp.is-optional)
+      val (fixed2, optional2) = targs.map(snd).span(fn(tp) !tp.is-optional)
+      val hi = max(fixed1.length, fixed2.length)
+      val fo1 = (fixed1 ++ optional1.map(unOptional)).take(hi)
+      val fo2 = (fixed2 ++ optional2.map(unOptional)).take(hi)
+      if fo1.length != fo2.length then unifyError(NoMatch) // one has more fixed arguments than the other can ever get
+      else
+        unifies(fo1, fo2)
+        ()

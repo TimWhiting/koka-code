@@ -568,6 +568,9 @@ fun (==)(t1: ktype, t2: ktype): pure bool
 fun (==)(p1: pred, p2: pred): pure bool
   matchPred(p1, p2)
 
+fun (==)(p1: list<pred>, p2: list<pred>): pure bool
+  matchPreds(p1, p2)
+
 fun matchType(tp1: ktype, tp2: ktype)
   match (tp1.expandSyn, tp2.expandSyn)
     (TForAll(vs1, ps1, t1), TForAll(vs2, ps2, t2)) -> vs1.zipwith(vs2, (==)).all(id) && matchPreds(ps1, ps2) && matchType(t1, t2)

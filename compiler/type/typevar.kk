@@ -19,6 +19,13 @@ val emptyTvs = linearSet([], typeVarEq, typeVarShow)
 val typeEq= fn(tp1: ktype, tp2: ktype) tp1 == tp2
 val emptySub = linearMap([], typeVarEq, typeEq, typeVarShow, show)
 
+fun fuv(tvs: tvs): linearSet<typeVar>
+  tvs.filter(fn(tv) tv.flavour.is-meta)
+fun fsv(tvs: tvs): linearSet<typeVar>
+  tvs.filter(fn(tv) tv.flavour.is-skolem)
+fun fbv(tvs: tvs): linearSet<typeVar>
+  tvs.filter(fn(tv) tv.flavour.is-bound)
+
 fun subNew(l: list<(typeVar, ktype)>): exn sub
   if l.all(fn((tv, t)) tv.kind == t.kind) then
     linearMap(l, typeVarEq, typeEq, typeVarShow, show)

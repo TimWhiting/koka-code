@@ -10,7 +10,9 @@ fun g(x)
 
 fun main()
   val x = f(True)
+
   val x' = f(False)
+  
   println(g(Cons(1, Nil)))
   println(g(Cons(Cons(3, Nil), Cons(Cons(4, Nil), Nil))) )
   println(x)

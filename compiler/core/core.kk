@@ -474,16 +474,16 @@ fun runUniquePhase(start: int, f: () -> <uniquePhase|e> a): e a
     fun getUnique() u
     fun setUnique(i) u := i
     fun updateUnique(g) 
-        u := g(u)
+        u := g(u) 
         u
-  f()
+  f() 
 
 effect corePhase
   fun getCoreDefs(): defGroups
   fun setCoreDefs(dgs: defGroups): ()
   fun phaseError(s: string): a
 
-fun newUnique(): <uniquePhase> int
+fun newUnique(): <uniquePhase> int 
   updateUnique(fn(i) i + 1)
 
 fun uniques(n: int): <uniquePhase> list<int>

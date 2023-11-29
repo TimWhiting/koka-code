@@ -37,7 +37,7 @@ type unifyErr
   NoMatchSkolem(k: kind)
   NoMatchEffect(e1: ktype, e2: ktype)
   NoSubsume
-  NoEntail
+  NoEntail 
   Infinite
   NoArgMatch(i1: int, i2: int)
 
@@ -87,7 +87,7 @@ fun unifyLabels(ls1: list<ktype>, ls2: list<ktype>, closed1: bool, closed2: bool
               val ll2' = ll2.subst
               unifyLabels(ll1', ll2', closed1, closed2)
 
-fun unifyEffectVar(tv1: typeVar, tp2: ktype): <pure,unify> ()
+fun unifyEffectVar(tv1: typeVar, tp2: ktype): <pure,unify,uniquePhase> ()
   val (ls2, tl2) = tp2.extractOrderedEffect // ls2 must be non-empty
   match tl2.expandSyn 
     // e ~ <div,exn|e> ~> e := <div,exn|e'>
@@ -179,9 +179,9 @@ fun unify(t1: ktype, t2: ktype): <pure,unify> ()
     // effects
     (TApp(TCon(tc1)), TApp(TCon(tc2))) | tc2 == tconEffectExtend && tc1 == tconEffectExtend ->
       unifyEffect(t1, t2)
-    (TApp(TCon(tc1)), TVar(tv2)) | tc1 == tconEffectExtend && tv2.is-meta ->
+    (TApp(TCon(tc1)), TVar(tv2)) | tc1 == tconEffectExtend && tv2.flavour.is-meta ->
       unifyEffectVar(tv2, t2)
-    (TVar(tv1), TApp(TCon(tc2))) | tc2 == tconEffectExtend && tv1.is-meta ->
+    (TVar(tv1), TApp(TCon(tc2))) | tc2 == tconEffectExtend && tv1.flavour.is-meta ->
       unifyEffectVar(tv1, t1)
     // type variables
     (TVar(v1), TVar(v2)) | v1 == v2 -> () // TODO: Kind check?
@@ -199,15 +199,15 @@ fun unify(t1: ktype, t2: ktype): <pure,unify> ()
       elif len1 < len2 then
         unify(t1, TApp(u1, us2.take(len2 - len1)))
         unifies(ts1, us2.drop(len2 - len1))
-      else
+      else 
         unify(TApp(t1, ts1.take(len1 - len2)), u1)
         unifies(ts1.drop(len1 - len2), us2)
     // functions
     (TFun(args1, eff1, res1), TFun(args2, eff2, res2)) | args1.length == args2.length ->
-      unifies(res1 ++ args1.map(snd), res2 ++ args2.map(snd))
+      unifies([res1] ++ args1.map(snd), [res2] ++ args2.map(snd))
       fun effErr(e: unifyErr)
         match e
-          NoMatch -> NoMatchEffect(eff1, eff2)
+          NoMatch  -> NoMatchEffect(eff1, eff2)
           NoMatchEffect -> NoMatchEffect(eff1, eff2)
           _ -> e
       with withError(effErr)

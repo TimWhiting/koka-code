@@ -16,4 +16,11 @@ fun main()
   println(g(Cons(1, Nil)))
   println(g(Cons(Cons(3, Nil), Cons(Cons(4, Nil), Nil))) )
   println(x)
-  println(x')
+  // val y = g([1])
+
+  // val y' = g([[3], [4]])
+
+  // println(x)
+  // println(x')
+  // println(y)
+  // println(y')

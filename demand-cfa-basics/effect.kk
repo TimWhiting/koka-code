@@ -1,10 +1,12 @@
 effect <a> ctl yield( item : a ) : ()
   
-fun iterate(xs : list<a>) : yield<a> ()
+fun iterate(xs : list<a>, show : a -> string) : yield<a> ()
   match xs
     Cons(x, xx) ->
+      val y = x
+      y.show.trace      
       yield(x)
-      iterate(xx)
+      iterate(xx,show)
     Nil -> ()
 
 fun main()
@@ -16,4 +18,4 @@ fun main()
       else
         println(a)
         resume(())
-  [0, 1, 2, 3].iterate
+  [0, 1, 2, 3].iterate(show)

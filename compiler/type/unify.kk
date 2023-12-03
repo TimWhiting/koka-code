@@ -31,7 +31,7 @@ fun subst(x: ktype): <pure,unify> ktype
   getSubst() |-> x
 
 type unifyErr
-  NoMatch
+  NoMatchType
   NoMatchKind
   NoMatchPred
   NoMatchSkolem(k: kind)
@@ -162,7 +162,7 @@ fun unifyTVar(tv: typeVar, tp: ktype): <pure,unify> ()
           _ -> unifyError(Infinite)
       else
         match etp
-          TVar(TypeVar(_, _, Bound)) -> unifyError(NoMatch) // can't unify with bound variables
+          TVar(TypeVar(_, _, Bound)) -> unifyError(NoMatchType) // can't unify with bound variables
           TVar(tv2 as TypeVar(id2, _, Meta)) | id <= id2 ->
             if id < id2 then unifyTVar(tv2, TVar(tv)) else () // TODO: Kind Check?
           _ ->
@@ -207,13 +207,13 @@ fun unify(t1: ktype, t2: ktype): <pure,unify> ()
       unifies([res1] ++ args1.map(snd), [res2] ++ args2.map(snd))
       fun effErr(e: unifyErr)
         match e
-          NoMatch  -> NoMatchEffect(eff1, eff2)
+          NoMatchType  -> NoMatchEffect(eff1, eff2)
           NoMatchEffect -> NoMatchEffect(eff1, eff2)
           _ -> e
-      with withError(effErr)
+      with withErr(effErr)
       unify(eff1, eff2)
     // quantified types
-    (TForall(vars1, preds1, tp1), (TForall(vars2, preds2, tp2))) | vars1.length == vars2.length && preds1.length == preds2.length ->
+    (TForAll(vars1, preds1, tp1), (TForAll(vars2, preds2, tp2))) | vars1.length == vars2.length && preds1.length == preds2.length ->
       // match kidns of quanitifers
       matchKinds(vars1.map(getKind), vars2.map(getKind))
       // replace with shared bound variables in both types
@@ -244,7 +244,7 @@ fun unify(t1: ktype, t2: ktype): <pure,unify> ()
     // No match
     (TVar(TypeVar(_, kind, Skolem)), TVar(TypeVar(_, _, Skolem))) ->
       unifyError(NoMatchSkolem(kind))
-    _ -> unifyError(NoMatch)
+    _ -> unifyError(NoMatchType)
 
 /// entails(skolems, known, preds) 
 /// 
@@ -297,37 +297,37 @@ fun subsume(rng: range, free: tvs, tp1: ktype, tp2: ktype): unify (ktype, list<e
 fun matchArguments(matchSome: bool, rng: range, free: tvs, tp: ktype, fixed: list<ktype>, namedArgs: list<(name,ktype)>): unify ()
   val rho1 = instantiate(rng, tp)
   match rho1.splitFunType
-    Nothing -> unifyError(NoMatch)
+    Nothing -> unifyError(NoMatchType)
     Just((pars, _, _)) ->
-      if fixed.length + namedArgs.length > pars.length then unifyError(NoMatch)
+      if fixed.length + namedArgs.length > pars.length then unifyError(NoMatchType)
       else // subsume fixed parameters
         val (fpars, npars) = pars.split-at(fixed.length)
         fpars.map(snd).zip(fixed).map(fn((tpars, targ)) subsume(rng, free, tpar.unOptional, targ))
         // subsume named parameters
         namedArgs.map fn((name, targ))
           match npars.lookup(fn(n) n == name)
-            Nothing -> unifyError(NoMatch)
+            Nothing -> unifyError(NoMatchType)
             Just(tpar) -> subsume(rng, free, tpar, targ.makeOptional)
         // check the rest is optional
         val rest = npars.filter(fn((nm, tpar)) !(namedArgs.map(fst).any(fn(n) n == nm)))
         if matchSome || rest.all(is-optional) then ()
-        else unifyError(NoMatch)
+        else unifyError(NoMatchType)
 
 /// Does a type have the given named arguments?
 fun matchNamed(rng: range, tp: ktype, n: int, namedArgs: list<name>): unify ()
   val rho1 = instantiate(tp, rng)
   match rho1.splitFunType
-    Nothing -> unifyError(NoMatch)
+    Nothing -> unifyError(NoMatchType)
     Just((pars, _, _)) ->
-      if n + namedArgs.length > pars.length then unifyError(NoMatch)
+      if n + namedArgs.length > pars.length then unifyError(NoMatchType)
       else
         val npars = pars.drop(n)
         val names = npars.map(fst)
         if namedArgs.all(fn(n) names.any(fn(n') n == n')) then 
           val rest = npars.filter(fn((nm, tp)) !(namedArgs.any(fn(n) n == nm))).map(snd)
           if res.all(fn(tp) tp.isOptional) then ()
-          else unifyError(NoMatch)
-        else unifyError(NoMatch)
+          else unifyError(NoMatchType)
+        else unifyError(NoMatchType)
 
 /// Do two types overlap on the argument types? Used to check for overlapping definitions of overloaded identifiers.
 fun overlaps(rng: range, free: tvs, tp1: ktype, tp2: ktype): unify ()
@@ -344,7 +344,7 @@ fun overlaps(rng: range, free: tvs, tp1: ktype, tp2: ktype): unify ()
       val hi = max(fixed1.length, fixed2.length)
       val fo1 = (fixed1 ++ optional1.map(unOptional)).take(hi)
       val fo2 = (fixed2 ++ optional2.map(unOptional)).take(hi)
-      if fo1.length != fo2.length then unifyError(NoMatch) // one has more fixed arguments than the other can ever get
+      if fo1.length != fo2.length then unifyError(NoMatchType) // one has more fixed arguments than the other can ever get
       else
         unifies(fo1, fo2)
         ()

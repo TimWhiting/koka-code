@@ -12,9 +12,12 @@ pub infixr 5 (|->)
 type evidence
   Ev(evName: tName, pred: pred, evRange: range)
 
-fun (|->)(s: sub, e: evidence)
+fun (|->)(s: sub, e: evidence): pure evidence
   val newPred = typevar/(|->)(s, e.pred)
   e(pred=newPred)
+
+fun (|->)(s: sub, l: list<evidence>): pure list<evidence>
+  l.map(fn(e) s |-> e)
 
 fun freeTypeVars(e: evidence)
   typevar/freeTypeVars(e.pred)

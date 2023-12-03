@@ -66,9 +66,6 @@ fun subRemove(s: sub, tvars: list<typeVar>): sub
 fun subFind(s: sub, tv: typeVar): exn tau
   s.get(tv)
 
-fun (+)(s1: sub, s2: sub): pure sub
-  s1.subCompose(s2)
-
 fun subCompose(s1: sub, s2: sub): pure sub
   s1.union(s1 |-> s2)
 
@@ -91,6 +88,11 @@ fun (|->)(s: sub, pred: pred): pure pred
     PredSub(sub, super) -> PredSub(s |-> sub, s |-> super)
     PredIFace(iface, args) -> PredIFace(iface, args.map(fn(t) s |-> t))
 
+fun (|->)(s: sub, l: list<pred>): pure list<pred>
+  l.map(fn(p) s |-> p)
+
+fun (|->)(s: sub, l: list<ktype>): pure list<ktype>
+  l.map(fn(p) s |-> p)
 
 fun single(tv: typeVar) 
   linearSet([tv], typeVarEq, typeVarShow)
@@ -194,6 +196,60 @@ fun boundTypeVars(tp: ktype): pure tvs
 fun boundTypeVars(TName(_, tp): tName): pure tvs
   tp.boundTypeVars
 
+fun (|->)(s: sub, tn: tName): pure tName
+  match tn
+    TName(n, tp) -> TName(n, s |-> tp)
+
+fun (|->)(s: sub, tn: list<tName>): pure list<tName>
+  tn.map(fn(t) s |-> t)
+
+fun (|->)(s: sub, p: pattern): pure pattern
+  match p
+    PatVar(tn, pat) -> PatVar(s |-> tn, s |-> pat)
+    PatCon(tn, args, repr, targs, exists0, tres,  conInfo, skip) ->
+      val sub' = s.subRemove(exists0)
+      PatCon(s |-> tn, sub' |-> args, repr, sub' |-> targs, exists0, sub' |-> tres, conInfo, skip)
+    PatWild -> PatWild
+    PatLit(l) -> PatLit(l)
+
+fun (|->)(s: sub, p: list<pattern>): pure list<pattern>
+  p.map(fn(p') s |-> p')
+
+fun (|->)(s: sub, e: expr): pure expr
+  match e
+    Lam(tn, eff, e) -> Lam(s |-> tn, s |-> eff, s |-> e)
+    Var(tn, x) -> Var(s |-> tn, x)
+    App(a, b) -> App(s |-> a, s |-> b)
+    TypeLam(tvs, e) -> 
+      val sub' = s.subRemove(tvs)
+      TypeLam(tvs, sub' |-> e)
+    TypeApp(e, tp) -> TypeApp(s |-> e, s |-> tp)
+    Con(tn, repr) -> Con(s |-> tn, repr)
+    ELit(l) -> ELit(l)
+    Let(defGroups, e) -> Let(defGroups.map(fn(dg) s |-> dg), s |-> e)
+    Case(es, bs) -> Case(s |-> es, bs.map(fn(b) s |-> b))
+
+fun (|->)(s: sub, l: list<expr>): pure list<expr>
+  l.map(fn(e) s |-> e)
+
+fun (|->)(s: sub, dg: defGroup): pure defGroup
+  match dg
+    DefRec(defs) -> DefRec(defs.map(fn(d) s |-> d))
+    DefNonRec(e) -> DefNonRec(s |-> e)
+
+fun (|->)(s: sub, Def(name, scheme, expr, vis, isVal, inl, nameRng, doc): def): pure def
+  Def(name, s |-> scheme, s |-> expr, vis, isVal, inl, nameRng, doc)
+
+fun (|->)(s: sub, Branch(p, e): branch): pure branch
+  val sub' = s.subRemove(p.boundTypeVars.list)
+  Branch(s |-> p, sub' |-> e)
+
+fun (|->)(s: sub, g: guard): pure guard
+  match g
+    Guard(e, e2) -> Guard(s |-> e, s |-> e2)
+
+fun (|->)(s: sub, gs: list<guard>): pure list<guard>
+  gs.map(fn(g) s |-> g)
 
 // TODO: More
 fun freshTypeVar(k: kind, fl: flavour)

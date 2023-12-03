@@ -1,7 +1,6 @@
 # TODO
 
 ## All dependencies ready
-- [ ] type/unify 535
 - [ ] backend/c/parc 1037
 - [ ] backend/c/parcreuse 731
 - [ ] backend/c/parcreusespec 341

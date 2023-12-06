@@ -4,6 +4,14 @@ fun a1(f1)
 fun s4(ls: list<int>): list<int>
   ls.map(fn(i) i + 1)
 
+fun map2(ls: list<int>, f: (int) -> int): list<int>
+  match ls
+    Cons(x, xx) -> Cons(f(x), map2(xx, f))
+    Nil -> Nil
+
+fun s2(ls: list<int>): list<int>
+  ls.map2(fn(z) z + 1)
+
 fun something(x1, y1: int)
   x1 + y1
 
@@ -29,7 +37,9 @@ fun main()
 
   val x1 = s4([1, 2, 3])
 
-  val x2 = xs()
+  val x2 = s2([1, 2, 3])
+
+  val x3 = xs()
 
   ()
   // val f1 = fn((x1, y1)) something(x1, y1)

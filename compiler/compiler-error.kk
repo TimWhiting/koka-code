@@ -1,17 +1,7 @@
-type ktype
-  TForAll(r: ktype) // Cannot make this rho
-  TDefault()
+import newstd/data/linearset
+import compiler/common/name
+import compiler/common/name-collections
 
-alias rho = ktype // unqualified type
-
-extern cast(a: a): <> b
-  c inline "#1"
-
-fun maxSynonymRank(t: rho): int
-  match t
-    TForAll(r) -> maxSynonymRank(r.cast.unsafe-decreasing)
-    TDefault() -> 0
-
-fun main(): <console> ()
-  val h = TForAll(TDefault.cast)
-  maxSynonymRank(h).println
+alias deps = linearSet<name>
+fun depsUnions(l: list<deps>): deps
+  l.foldl(namesEmpty, fn(s: deps, a: deps) s + a)

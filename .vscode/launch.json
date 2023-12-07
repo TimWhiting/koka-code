@@ -58,6 +58,12 @@
     {
       "type": "koka",
       "request": "launch",
+      "program": "${workspaceRoot}/scratch/bug.kk",
+      "name": "Bug"
+    },
+    {
+      "type": "koka",
+      "request": "launch",
       "program": "${workspaceRoot}/higher-order-programs/koka/rosetta/tic-tac-toe/game",
       "name": "TicTacToe",
       "args": "--core"

@@ -53,6 +53,9 @@ fun showLine(line: int)
 fun posMoves8(p: pos, cs: list<char>): pos
   cs.foldl(p, posMove8)
 
+fun posMoves8(cs: sslice, p: pos): pos
+  cs.string.list.foldl(p, posMove8)
+
 fun posMove8(Pos(s, o, l, c), ch: char): pos
   val o1 = if o < 0 then o else o+1
   match ch

@@ -1,2 +1,4 @@
 fun show(m: maybe<a>, showA: (a) -> e string): e string
-  m.show-maybe(showA)
+  match m
+    Just(m') -> "Just(" ++ showA(m') ++ ")"
+    Nothing -> "Nothing"

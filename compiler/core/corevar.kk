@@ -47,7 +47,9 @@ fun boundVars(p: pattern): pure linearSet<tName>
 fun freeVars(defGroups: defGroups, e: expr): pure linearSet<tName>
   match defGroups
     [] -> e.freeVars
-    Cons(dg, dgs) -> dg.freeVars + (freeVars(dgs, e) - dg.boundVars)
+    Cons(dg, dgs) -> 
+      val fv1: linearSet<tName> = (freeVars(dgs, e) - dg.boundVars)
+      dg.freeVars + fv1
 
 fun freeVars(defg: defGroup): pure linearSet<tName>
   defg.flatten.map(freeVars).unions

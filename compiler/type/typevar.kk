@@ -110,8 +110,13 @@ fun freeTypeVars(pred: pred): pure tvs
 
 fun freeTypeVars(tp: ktype): pure tvs
   match tp
-    TForAll(vars, preds, t) -> (t.freeTypeVars + preds.freeTypeVars) - vars
-    TFun(args, eff, res) -> args.map(fn(a) a.snd.freeTypeVars).unions + res.freeTypeVars + eff.freeTypeVars
+    TForAll(vars, preds, t) -> 
+      val tv1 :tvs = t.freeTypeVars + preds.freeTypeVars
+      tv1 - vars
+    TFun(args, eff, res) -> 
+      val tv1: tvs = args.map(fn(a) a.snd.freeTypeVars).unions 
+      val tv2: tvs = tv1 + res.freeTypeVars
+      tv2 + eff.freeTypeVars
     TCon -> emptyTvs
     TVar(tv) -> single(tv)
     TApp(t, args) -> t.freeTypeVars + args.map(fn(a) a.freeTypeVars).unions
@@ -125,7 +130,9 @@ fun freeTypeVars(es: list<expr>): pure tvs
 
 fun freeTypeVars(e0: expr): pure tvs
   match e0
-    Lam(tn, eff, e) -> tn.freeTypeVars + eff.freeTypeVars + e.freeTypeVars
+    Lam(tn, eff, e) -> 
+      val tv1: tvs = tn.freeTypeVars + eff.freeTypeVars
+      tv1 + e.freeTypeVars
     Var(tn) -> tn.freeTypeVars
     App(a, b) -> a.freeTypeVars + b.freeTypeVars
     TypeLam(tvs, e) -> e.freeTypeVars - tvs
@@ -145,13 +152,18 @@ fun freeTypeVars(d: def): pure tvs
 
 fun freeTypeVars(bs: branch): pure tvs
   match bs
-    Branch(p, e) -> (e.freeTypeVars - p.boundTypeVars) + p.freeTypeVars
+    Branch(p, e) -> 
+      val tv1: tvs = e.freeTypeVars - p.boundTypeVars
+      tv1 + p.freeTypeVars
 
 fun freeTypeVars(p: pattern): pure tvs
   match p
     PatVar(tn, pat) -> tn.freeTypeVars + pat.freeTypeVars
     PatCon(tn, args, _, targs, exists0, tres) ->
-      (tn.freeTypeVars + args.freeTypeVars + targs.freeTypeVars + tres.freeTypeVars) - exists0
+      val tv1:tvs = tn.freeTypeVars + args.freeTypeVars
+      val tv2:tvs = tv1 + targs.freeTypeVars 
+      val tv3:tvs = tv2 + tres.freeTypeVars
+      tv3 - exists0
     PatWild -> emptyTvs
     PatLit(_) -> emptyTvs
 
@@ -175,7 +187,10 @@ fun boundTypeVars(p: pattern): pure tvs
   match p
     PatVar(tn, pat) -> tn.boundTypeVars + pat.boundTypeVars
     PatCon(tn, args, _, targs, exists0, tres) ->
-      tn.boundTypeVars + args.boundTypeVars + targs.boundTypeVars + tres.boundTypeVars + exists0.tvsNew
+      val tv1: tvs = tn.boundTypeVars + args.boundTypeVars
+      val tv2: tvs = tv1 + targs.boundTypeVars
+      val tv3: tvs = tv2 + tres.boundTypeVars
+      tv3 + exists0.tvsNew
     PatWild -> emptyTvs
     PatLit(_) -> emptyTvs
 
@@ -187,8 +202,12 @@ fun boundTypeVars(l: list<ktype>): pure tvs
 
 fun boundTypeVars(tp: ktype): pure tvs
   match tp
-    TForAll(vars, preds, t) -> preds.freeTypeVars + t.boundTypeVars + vars
-    TFun(args, eff, res) -> args.map(snd).boundTypeVars + res.boundTypeVars + eff.boundTypeVars
+    TForAll(vars, preds, t) -> 
+      val tv1: tvs = preds.freeTypeVars + t.boundTypeVars
+      tv1 + vars
+    TFun(args, eff, res) -> 
+      val tv1: tvs = args.map(snd).boundTypeVars + res.boundTypeVars 
+      tv1 + eff.boundTypeVars
     TSyn(_, _, t) -> t.boundTypeVars
     TApp(t, arg) -> t.boundTypeVars + arg.boundTypeVars
     _ -> emptyTvs

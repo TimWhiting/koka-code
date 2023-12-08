@@ -967,7 +967,12 @@ fun deps(l: list<inlineDef>): div deps
   depsUnions(l.map(fn(i) i.expr.dep))
 
 fun deps(c: core): div deps
-  (depsUnions(c.defs.flatten.map(dep)) + depsUnions(c.typeDefs.flatten.map(dep)) + c.imports.filter(fn(i) i.visibility.is-public).map(fn(i) i.importName)) - c.coreName
+  val defDeps: deps = depsUnions(c.defs.flatten.map(dep))
+  val tDeps: deps = depsUnions(c.typeDefs.flatten.map(dep))
+  val iDeps: list<name> = c.imports.filter(fn(i) i.visibility.is-public).map(fn(i) i.importName)
+  val x: deps = defDeps + tDeps
+  val y: deps = x + iDeps
+  y - c.coreName
 
 fun dep(td: typeDef): div deps
   match td

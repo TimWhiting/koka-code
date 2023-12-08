@@ -136,7 +136,7 @@ fun gammaUnion(g1: gamma, g2: gamma)
   g2.unionWith(g1, fn(xs1, xs2) xs1 ++ xs2)
 
 fun gammaUnions(gs: list<gamma>)
-  gs.foldl(empty, gammaUnion)
+  gs.foldl(compiler/type/assumption/empty, gammaUnion)
 
 fun gammaFilter(g: gamma, mod: name)
   g.filter(fn(k, _) k.qualifier == mod)

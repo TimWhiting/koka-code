@@ -285,7 +285,8 @@ fun subsume(rng: range, free: tvs, tp1: ktype, tp2: ktype): <unify,pure,compFlag
   // entailment check: predicates should be entailed
   // TODO: we should check for skolems since predicates with skolems must be entailed directly
   val sub = getSubst()
-  val allfree = (free + tp1.freeTypeVars).list
+  val tvs1 : tvs = (free + tp1.freeTypeVars)
+  val allfree = tvs1.list
   val escaped = sub.list.filter(fn((tv, _)) allfree.any(fn(t) t == tv)).map(snd).freeTypeVars.fsv
   if escaped.disjoint(sks.tvsNew) then ()
   else unifyError(NoSubsume)

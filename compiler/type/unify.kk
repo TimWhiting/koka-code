@@ -357,3 +357,6 @@ fun overlaps(rng: range, free: tvs, tp1: ktype, tp2: ktype): <unify,pure,compFla
       else
         unifies(fo1, fo2)
         ()
+
+fun test0()
+  "".println

@@ -266,7 +266,7 @@ fun dEndsWithT(l:list<string>, rpost: string, n:int)
 fun texts(d: doc): list<string>
   match d
     Empty -> []
-    Char(c) -> [c.show]
+    Char(c) -> [c.show-char]
     Text(s) -> [s]
     Line(br) -> if br then [] else ["\n"]
     Union(x, _) -> x.texts
@@ -280,7 +280,7 @@ fun texts(d: doc): list<string>
 fun rtexts(d: doc): list<string> // reversed text fragments
   match d
     Empty -> []
-    Char(c) -> [c.show]
+    Char(c) -> [c.show-char]
     Text(s) -> [s.list.reverse.string]
     Line(br) -> if br then [] else ["\n"]
     Union(x, _) -> x.rtexts
@@ -320,7 +320,7 @@ fun renderPrettyB(rfrac: float64, w: int, xdoc: doc): div string
       Cons((i, d), ds) ->
         match d
           Empty -> best(b, n, k, ds)
-          Char(c) -> c.show ++ best(b, n, k + 1, ds)
+          Char(c) -> c.show-char ++ best(b, n, k + 1, ds)
           Text(s) -> s.show ++ best(b, n, k + s.count, ds)
           Line -> "\n" ++ best(b, i, i, ds)
           Cat(x, y) -> best(b, n, k, Cons((i, x), Cons((i, y), ds)))
@@ -406,7 +406,7 @@ fun asString(d: doc)
 fun displayS(simple: simpleDoc): string
   match simple
     SEmpty -> ""
-    SChar(_, c, x) -> c.show ++ x.displayS
+    SChar(_, c, x) -> c.show-char ++ x.displayS
     SText(_, s, x) -> s ++ x.displayS
     SLine(i, x) -> "\n" ++ spaces(i) ++ x.displayS
     SColorOpen(_, _, x) -> x.displayS
@@ -434,7 +434,7 @@ fun displayP(w: int, simple: simpleDoc): <printer,colorSettings,div> ()
         if curCol + 1 >= w  && i + 1 < w then
           display(curCol, SLine(i + 1, simp.skipSpaces), oldSettings)
         else
-          write(c.string)
+          write(c.show-char)
           display(curCol + 1, x, oldSettings)
       SText(i, s, x) ->
         if curCol + s.count >= w && i + s.count < w then
@@ -498,3 +498,6 @@ fun spaces(n: int): string
     _ -> if n <= 0 then "" else replicate(" ", n).join
 
 val defaultWidth = 160
+
+fun test()
+  ("test".text |+| "hello".text)

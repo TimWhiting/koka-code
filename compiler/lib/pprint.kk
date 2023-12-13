@@ -245,9 +245,9 @@ fun dStartsWithT(l: list<string>, pre: string, n: int)
     Cons(s, xs) ->
       val m = s.count
       if m >= n then
-        s.slice.substr(0,n).string == pre
+        s.slice.take(n).string == pre
       else
-        pre.slice.substr(0,m).string == s && dStartsWithT(xs, pre.slice.substr(m,pre.count).string, n - m)
+        pre.slice.take(m).string == s && dStartsWithT(xs, pre.slice.subslice(m,pre.count).string, n - m)
 
 // TODO: Optimize a bunch of this
 fun dEndsWith(d: doc, s: string): bool
@@ -259,9 +259,9 @@ fun dEndsWithT(l:list<string>, rpost: string, n:int)
     Cons(s, xs) ->
       val m = s.count
       if m >= n then
-        s.slice.substr(0,n).string == rpost
+        s.slice.take(n).string == rpost
       else
-        rpost.slice.substr(0,m).string == s && dEndsWithT(xs, rpost.slice.substr(m,rpost.count).string, n - m)
+        rpost.slice.take(m).string == s && dEndsWithT(xs, rpost.slice.subslice(m,rpost.count).string, n - m)
 
 fun texts(d: doc): list<string>
   match d

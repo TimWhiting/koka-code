@@ -142,7 +142,7 @@ fun range(m: maybe<range>): range
 
 fun sourceFromRange(Range(start, end)): string
   if start.off >= 0 then
-     " ".replicate(start.col - 1).join ++ start.source.contents.slice.substr(start.off, end.off).string
+     " ".replicate(start.col - 1).join ++ start.source.contents.slice.subslice(start.off, end.off).string
   else
     val l1 = if start.line >= bigLine then 1 else start.line
     val l2 = if end.line >= bigLine then 
@@ -161,4 +161,4 @@ fun sourceFromRange(Range(start, end)): string
 
 fun rawSourceFromRange(Range(start, end)): string
   val s: sslice = start.source.contents.slice
-  s.substr(start.off, end.off).string
+  s.subslice(start.off, end.off).string

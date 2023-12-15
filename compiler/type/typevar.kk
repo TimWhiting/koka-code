@@ -12,12 +12,9 @@ pub infixr 5 (|->)
 alias tvs = linearSet<typeVar>
 alias sub = linearMap<typeVar, ktype>
 
-val typeVarEq = fn(tv1: typeVar, tv2: typeVar) tv1 == tv2
-val typeVarShow = fn(tv: typeVar) tv.show
-val emptyTvs = linearSet([], typeVarEq, typeVarShow)
+val emptyTvs = linearSet([])
 
-val typeEq= fn(tp1: ktype, tp2: ktype) tp1 == tp2
-val emptySub = linearMap([], typeVarEq, typeEq, typeVarShow, show)
+val emptySub = linearMap([])
 
 fun fuv(tvs: tvs): linearSet<typeVar>
   tvs.filter(fn(tv) tv.flavour.is-meta)
@@ -28,7 +25,7 @@ fun fbv(tvs: tvs): linearSet<typeVar>
 
 fun subNew(l: list<(typeVar, ktype)>): exn sub
   if l.all(fn((tv, t)) tv.kind == t.kind) then
-    linearMap(l, typeVarEq, typeEq, typeVarShow, show)
+    linearMap(l)
   else
     throw("type/typevar: subNew kind mismatch")
 
@@ -55,7 +52,7 @@ fun subSingle(tvar: typeVar, tau: tau)
     throw("type/typevar: subSingle: recursive type " ++ tvar.show)
   if tau.kind != tvar.kind then
     throw("type/typevar: subSingle: kind mismatch " ++ tau.show ++ " " ++ tvar.show)
-  linearMap([(tvar, tau)], typeVarEq, typeEq, typeVarShow, show)
+  linearMap([(tvar, tau)])
 
 fun subLookup(s: sub, tv: typeVar): maybe<tau>
   s.maybeGet(tv)
@@ -95,10 +92,10 @@ fun (|->)(s: sub, l: list<ktype>): pure list<ktype>
   l.map(fn(p) s |-> p)
 
 fun single(tv: typeVar) 
-  linearSet([tv], typeVarEq, typeVarShow)
+  linearSet([tv])
 
 fun tvsNew(tv: list<typeVar>) 
-  linearSet(tv, typeVarEq, typeVarShow)
+  linearSet(tv)
 
 fun freeTypeVars(preds: list<pred>): pure tvs
   preds.foldl(emptyTvs, fn(acc: tvs, p: pred) acc + p.freeTypeVars)

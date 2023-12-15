@@ -7,7 +7,7 @@ import compiler/kind/kind
 // Map identifiers to /nice/ strings.
 alias nice = id-map<string>
 
-val niceEmpty = linearMap([], fn(i1: int, i2: int) i1 == i2, fn(s1, s2: string) s1 == s2, show, show)
+val niceEmpty = linearMap([])
 
 effect niceEff<k>
   fun extendNice(tv: k): ()

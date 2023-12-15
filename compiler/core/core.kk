@@ -783,9 +783,9 @@ fun getEffect(e: expr): keffect
 // TODO: More here
 
 // Type variables
-val tnamesEmpty = linearSet([], fn(a, b) a.getName == b.getName, fn(a) a.show)
+val tnamesEmpty = linearSet([])
 fun tnames(l: list<tName>): linearSet<tName>
-  linearSet(l, fn(a, b) a.getName == b.getName, fn(a) a.show)
+  linearSet(l)
 
 fun (>)(t1: tName, t2: tName): bool
   name/compare(t1.getName, t2.getName) == Gt
@@ -967,12 +967,13 @@ fun deps(l: list<inlineDef>): div deps
   depsUnions(l.map(fn(i) i.expr.dep))
 
 fun deps(c: core): div deps
-  val defDeps: deps = depsUnions(c.defs.flatten.map(dep))
-  val tDeps: deps = depsUnions(c.typeDefs.flatten.map(dep))
-  val iDeps: list<name> = c.imports.filter(fn(i) i.visibility.is-public).map(fn(i) i.importName)
-  val x: deps = defDeps + tDeps
-  val y: deps = x + iDeps
-  y - c.coreName
+  val x0 : deps = depsUnions(c.defs.flatten.map(dep))
+  val x1 : deps = depsUnions(c.typeDefs.flatten.map(dep))
+  val x2 : deps = x0 + x1
+  val x3 : list<name> = c.imports.filter(fn(i) i.visibility.is-public).map(fn(i) i.importName)
+  val x4 : deps = x2 + x3
+  x4 - c.coreName
+
 
 fun dep(td: typeDef): div deps
   match td

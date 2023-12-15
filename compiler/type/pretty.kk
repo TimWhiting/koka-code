@@ -27,7 +27,7 @@ val precPred = 5
 
 alias tvScheme = linearMap<typeVar, (prec -> doc)>;
 
-val rankedDefault = linearMap([], fn(t1: typeVar, t2: typeVar) t1 == t2, fn(_, _) True, show, fn(_) "")
+val rankedDefault = linearMap([])
 
 fun keyword(s: string)
   s.text.color(colors.colorTypeKeyword)

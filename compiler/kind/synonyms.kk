@@ -36,7 +36,7 @@ fun withSynonyms(synonyms0: synonyms, f: () -> <synonymsEff,exn,compFlags|e> a):
   f()
 
 fun synonymsNew(ls: list<synInfo>)
-  linearMap(ls.map(fn(si) (si.name, si)), fn(n1: name, n2: name) n1 == n2, eqS, show, showS)
+  linearMap(ls.map(fn(si) (si.name, si)))
 fun synonymsExtend(synonyms: synonyms, k: synInfo)
   synonyms.set(k.name, k)
 fun synonymsLookup(synonyms: synonyms, name: name)
@@ -53,11 +53,9 @@ fun synonymsFilter(synonyms: synonyms, modName: name)
 fun synonymsCompose(syns1: synonyms, syns2: synonyms)
   unions([syns2, syns1])
 
-val eqS = fn(s1:synInfo, s2:synInfo) s1 == s2
-val showS = fn(s:synInfo) s.show
 fun single(name: name, s: synInfo): synonyms
-  linearMap([(name, s)], (==), eqS, show, showS)
-val emptySynonyms:synonyms = linearMap([], fn(n1: name, n2: name) n1 == n2, eqS, show, showS)
+  linearMap([(name, s)])
+val emptySynonyms:synonyms = linearMap([])
 
 fun extractSynonyms(c: core): <pure,compFlags> synonyms
   c.typeDefs.map(extractTypeDefGroup).unions

@@ -5,7 +5,7 @@ pub value struct linearMap<k,v>
   // pub showK: some<e> (k) -> e string
   // pub showV: some<e> (v) -> e string
 
-pub fun show(l: linearMap<k,v>, showK: (k) -> e string = show, showV: (v) -> e string): e string
+pub fun show(l: linearMap<k,v>, ?showK: (k) -> e string = show, ?showV: (v) -> e string = show): e string
   "{" ++ l.list.show-list(fn(e) showK(e.fst) ++ ": " ++ showV(e.snd)) ++ "}"
 
 pub fun (==)(l1: linearMap<k,v>, l2: linearMap<k,v>, ?eqK: (k, k) -> e bool = (==), ?eqV: (v, v) -> e bool = (==)): e bool
@@ -44,18 +44,18 @@ pub fun getDefault(m: linearMap<k,v>, k: k, v: v, ?(==): (k, k) -> e bool): e v
 
 fun getDefault(l: list<(k,v)>, k: k, v: v, ?(==): (k, k) -> e bool): e v
   match l
-    Cons((kk, vv), rst) -> if eq(kk, k) then vv else rst.getDefault(k, v, eq)
+    Cons((kk, vv), rst) -> if kk == k then vv else rst.getDefault(k, v, (==))
     Nil -> v
 
 /// Overwrite any existing key with value
-pub fun set(m: linearMap<k,v>, k: k, v: v, ?(==)): e linearMap<k,v>
+pub fun set(m: linearMap<k,v>, k: k, v: v, ?(==): (k, k) -> e bool): e linearMap<k,v>
   m(list=m.list.update(k, fn(_, v1) v1, v, (==)))
 
 /// Add only if key is not present in the map
-pub fun add(m: linearMap<k,v>, k: k, b: v, ?(==)): e linearMap<k,v>
+pub fun add(m: linearMap<k,v>, k: k, b: v, ?(==): (k, k) -> e bool): e linearMap<k,v>
   m(list=m.list.update(k, fn(x, _) x, b, (==)))
 
-pub fun addAll(m: linearMap<k,v>, l: list<(k,v)>): e linearMap<k,v>
+pub fun addAll(m: linearMap<k,v>, l: list<(k,v)>, ?(==): (k, k) -> e bool): e linearMap<k,v>
   match l
     Nil -> m
     Cons((k, v), rst) -> addAll(m.add(k, v), rst)
@@ -66,27 +66,27 @@ pub fun foldr(m: linearMap<k,v>, acc: a, f: (k, v, a) -> e a): e a
 pub fun map(m: linearMap<k,v>, f: (k, v) -> e (k, v)): e linearMap<k,v>
   m(list=m.list.map(fn((k,v)) f(k,v)))
 
-pub fun unions(l: list<linearMap<k,v>>): <exn|e> linearMap<k,v>
+pub fun unions(l: list<linearMap<k,v>>, ?(==): (k, k) -> <exn|e> bool): <exn|e> linearMap<k,v>
   val fst = l.head.unjust
   l.foldl(fst, fn(x, y) x.addAll(y.list))
 
-pub fun (+)(l1: linearMap<k,v>, l2: linearMap<k,v>): e linearMap<k,v>
+pub fun (+)(l1: linearMap<k,v>, l2: linearMap<k,v>, ?(==): (k, k) -> e bool): e linearMap<k,v>
   l1.addAll(l2.list)
 
-pub fun (+)(l1: linearMap<k,v>, l2: list<(k,v)>): e linearMap<k,v>
+pub fun (+)(l1: linearMap<k,v>, l2: list<(k,v)>, ?(==): (k, k) -> e bool): e linearMap<k,v>
   l1.addAll(l2)
 
-pub fun union(l1: linearMap<k,v>, l2: linearMap<k,v>): e linearMap<k,v>
+pub fun union(l1: linearMap<k,v>, l2: linearMap<k,v>, ?(==): (k, k) -> e bool): e linearMap<k,v>
   l1.addAll(l2.list)
 
 pub fun filter(m: linearMap<k,v>, f: (k, v) -> e bool): e linearMap<k,v>
   m(list=m.list.filter(fn((k,v)) f(k,v)))
 
-pub fun remove(m: linearMap<k,v>, k: k): e linearMap<k,v>
-  m(list=m.list.filter(fn((k1,_)) !(m.eq)(k, k1)))
+pub fun remove(m: linearMap<k,v>, k: k, ?(==): (k, k) -> e bool): e linearMap<k,v>
+  m(list=m.list.filter(fn((k1,_)) !(k == k1)))
 
-pub fun removeAll(m: linearMap<k,v>, l: list<k>): e linearMap<k,v>
-  m(list=m.list.filter(fn((k1,_)) !l.any(fn(k2) (m.eq)(k1, k2))))
+pub fun removeAll(m: linearMap<k,v>, l: list<k>, ?(==): (k, k) -> e bool): e linearMap<k,v>
+  m(list=m.list.filter(fn((k1,_)) !l.any(fn(k2) k1 == k2)))
 
-pub fun unionWith(m1: linearMap<k,v>, m2: linearMap<k,v>, f: (v, v) -> e v): e linearMap<k,v>
+pub fun unionWith(m1: linearMap<k,v>, m2: linearMap<k,v>, f: (v, v) -> e v, ?(==): (k, k) -> e bool): e linearMap<k,v>
   m2.list.foldl(m1, fn(x, (k, y)) x.update(k, y, f))

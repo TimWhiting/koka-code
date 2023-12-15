@@ -14,6 +14,6 @@ fun (==)(m1: maybe<a>, m2: maybe<a>, ?(==): (a, a) -> e bool): e bool
 
 fun (==)(l1: list<a>, l2: list<a>, ?eqA: (a, a) -> e bool = (==)): e bool
   match (l1, l2)
-    (Cons(x1, xs1), Cons(x2, xs2)) -> eqA(x1,x2) && (==)(xs1, xs2, eqA)
+    (Cons(x1, xs1), Cons(x2, xs2)) -> eqA(x1,x2) && (==)(xs1, xs2, eqA.unsafe-decreasing)
     (Nil, Nil) -> True
     (_, _) -> False

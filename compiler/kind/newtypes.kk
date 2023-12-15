@@ -27,7 +27,7 @@ fun withNewtypes(newtps0: newtypes, f: () -> <newtypesEff,exn,compFlags|e> a): <
   f()
 
 fun newtypesNew(lst: list<dataInfo>): newtypes
-  linearMap(lst.map(fn(di) (di.name, di)), (==), eqD, show, showD)
+  linearMap(lst.map(fn(di) (di.name, di)))
 fun newtypesExtend(newtps: newtypes, name: name, k: dataInfo)
   newtps.set(name, k)
 fun newtypesLookupAny(newtps: newtypes, name: name)
@@ -43,11 +43,9 @@ fun newtypesFind(newtps: newtypes, name: name)
 fun newtypesCompose(ntps1: newtypes, ntps2: newtypes)
   unions([ntps2, ntps1])
 
-val eqD = fn(d1:dataInfo, d2:dataInfo) d1 == d2
-val showD = fn(d:dataInfo) d.show
 fun single(name: name, d: dataInfo): newtypes
-  linearMap([(name, d)], (==), eqD, show, showD)
-val emptyNewtypes:newtypes = linearMap([], fn(n1: name, n2: name) n1 == n2, eqD, show, showD)
+  linearMap([(name, d)])
+val emptyNewtypes:newtypes = linearMap([])
 
 fun extractNewtypes(c: core): <pure,compFlags> newtypes
   c.typeDefs.map(extractTypeDefGroup).unions

@@ -19,7 +19,7 @@ alias ids = list<id>
 alias id-map<a> = linearMap<int, a>
 // A set of identifiers
 alias id-set = linearSet<int>
-val emptyIds = linearSet([], fn(id1: id, id2: id) id1 == id2, show)
+val emptyIds = linearSet([])
 
 /// Identifiers are unique compiler generated identities
 alias id = int;

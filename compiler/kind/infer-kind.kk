@@ -27,7 +27,7 @@ fun (==)(k1: infKind, k2: infKind): div bool
     _ -> False
 
 alias infKGamma = linearMap<name, infKind>
-val infKGammaEmpty = linearMap([], fn(n1: name, n2: name) n1 == n2, fn(k1: infKind, k2: infKind) k1 == k2, show, show)
+val infKGammaEmpty = linearMap([])
 
 val infKindStar = KICon(kindStar)
 val infKindHandled = KICon(kindHandled)
@@ -65,7 +65,7 @@ fun infExtractKindFun(infkind: infKind)
 alias ksub = id-map<infKind>
 alias kvs = id-set
 
-val ksubEmpty = linearMap([], fn(id1: id, id2: id) id1 == id2, fn(ik1: infKind, ik2: infKind) ik1 == ik2, show, show)
+val ksubEmpty = linearMap([])
 fun ksubSingle(id: id, infkind: infKind)
   ksubEmpty.add(id, infkind)
 

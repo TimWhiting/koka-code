@@ -64,25 +64,18 @@ fun freeVars(Def(_, _, e): def): pure linearSet<tName>
   e.freeVars
 
 // Term substitutions
-
-fun (|->)(sub: list<(tName, expr)>, dgs: defGroups): pure defGroups
-  dgs.map(fn(dg) sub |-> dg)
+fun (|->)(sub: list<(tName, expr)>, l: list<a>, ?s: (list<(tName, expr)>, a) -> pure a = (|->)): pure list<a>
+  l.map(fn(x) s(sub, x))
 
 fun (|->)(sub: list<(tName, expr)>, dg: defGroup): pure defGroup
   match dg
     DefRec(defs) -> DefRec(sub |-> defs)
     DefNonRec(def) -> DefNonRec(sub |-> def)
 
-fun (|->)(sub: list<(tName, expr)>, defs: list<def>): pure list<def>
-  defs.map(fn(d) sub |-> d)
-
 fun (|->)(sub: list<(tName, expr)>, d: def): pure def
   val dname = d.defName
   val sub' = sub.filter(fn((nm, _)) nm.getName != dname)
   d(defExpr = sub' |-> d.defExpr)
-
-fun (|->)(sub: list<(tName, expr)>, exs: list<expr>): pure list<expr>
-  exs.map(fn(ex) sub |-> ex)
 
 fun (|->)(sub: list<(tName, expr)>, ex: expr): pure expr
   match ex
@@ -101,16 +94,10 @@ fun (|->)(sub: list<(tName, expr)>, ex: expr): pure expr
       Let(sub' |-> dgs, sub' |-> e)
     Case(exprs, bs) -> Case(sub |-> exprs, sub |-> bs)
 
-fun (|->)(sub: list<(tName, expr)>, bs: list<branch>): pure list<branch>
-  bs.map(fn(b) sub |-> b)
-
 fun (|->)(sub: list<(tName, expr)>, Branch(patts, guards): branch): pure branch
   val bvpat = patts.map(boundVars).unions
   val sub' = sub.filter(fn((nm, _)) !bvpat.member(nm))
   Branch(patts, sub' |-> guards)
-
-fun (|->)(sub: list<(tName, expr)>, guards: list<guard>): pure list<guard>
-  guards.map(fn(g) sub |-> g)
 
 fun (|->)(sub: list<(tName, expr)>, Guard(test, expr): guard): pure guard
   Guard(sub |-> test, sub |-> expr)

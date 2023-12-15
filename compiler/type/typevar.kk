@@ -66,39 +66,14 @@ fun subFind(s: sub, tv: typeVar): exn tau
 fun subCompose(s1: sub, s2: sub): pure sub
   s1.union(s1 |-> s2)
 
-fun (|->)(s1: sub, s2: sub): pure sub
-  s2.map(fn(k, v) (k, s1 |-> v))
-
-fun (|->)(s: sub, tp: ktype): pure tau
-  match tp
-    TForAll(vars, preds, t) ->
-      val sub' = s.subRemove(vars)
-      TForAll(vars, preds.map(fn(p:pred) (|->)(sub', p)), sub' |-> t)
-    TFun(args, eff, res) -> TFun(args.map(fn(a) (a.fst, s |-> a.snd)), s |-> eff, s |-> res)
-    TCon -> tp
-    TVar(tv) -> s.subFind(tv)
-    TApp(t, args) -> TApp(s |-> t, args.map(fn(t') s |-> t'))
-    TSyn(syn, xs, t) -> TSyn(syn, xs, s |-> t)
-
-fun (|->)(s: sub, pred: pred): pure pred
-  match pred
-    PredSub(sub, super) -> PredSub(s |-> sub, s |-> super)
-    PredIFace(iface, args) -> PredIFace(iface, args.map(fn(t) s |-> t))
-
-fun (|->)(s: sub, l: list<pred>): pure list<pred>
-  l.map(fn(p) s |-> p)
-
-fun (|->)(s: sub, l: list<ktype>): pure list<ktype>
-  l.map(fn(p) s |-> p)
-
 fun single(tv: typeVar) 
   linearSet([tv])
 
 fun tvsNew(tv: list<typeVar>) 
   linearSet(tv)
 
-fun freeTypeVars(preds: list<pred>): pure tvs
-  preds.foldl(emptyTvs, fn(acc: tvs, p: pred) acc + p.freeTypeVars)
+fun freeTypeVars(ps: list<a>, ?f: (a) -> pure tvs = freeTypeVars): pure tvs
+  ps.map(f).unions
 
 fun freeTypeVars(pred: pred): pure tvs
   match pred
@@ -118,12 +93,6 @@ fun freeTypeVars(tp: ktype): pure tvs
     TVar(tv) -> single(tv)
     TApp(t, args) -> t.freeTypeVars + args.map(fn(a) a.freeTypeVars).unions
     TSyn(_, xs, t) -> t.freeTypeVars + xs.map(freeTypeVars).unions
-
-fun freeTypeVars(l: list<ktype>): pure tvs
-  l.map(freeTypeVars).unions
-
-fun freeTypeVars(es: list<expr>): pure tvs
-  es.map(freeTypeVars).unions
 
 fun freeTypeVars(e0: expr): pure tvs
   match e0
@@ -164,12 +133,6 @@ fun freeTypeVars(p: pattern): pure tvs
     PatWild -> emptyTvs
     PatLit(_) -> emptyTvs
 
-fun freeTypeVars(ps: list<pattern>): pure tvs
-  ps.map(freeTypeVars).unions
-
-fun freeTypeVars(gds: list<guard>): pure tvs
-  gds.map(freeTypeVars).unions
-
 fun freeTypeVars(gd: guard): pure tvs
   match gd
     Guard(e, e2) -> e.freeTypeVars + e2.freeTypeVars
@@ -177,8 +140,8 @@ fun freeTypeVars(gd: guard): pure tvs
 fun freeTypeVars(TName(_, tp): tName): pure tvs
   tp.freeTypeVars
 
-fun freeTypeVars(l: list<tName>): pure tvs
-  l.map(freeTypeVars).unions
+fun boundTypeVars(l: list<a>, ?f: (a) -> pure tvs = boundTypeVars): pure tvs
+  l.map(f).unions
 
 fun boundTypeVars(p: pattern): pure tvs
   match p
@@ -190,12 +153,6 @@ fun boundTypeVars(p: pattern): pure tvs
       tv3 + exists0.tvsNew
     PatWild -> emptyTvs
     PatLit(_) -> emptyTvs
-
-fun boundTypeVars(l: list<pattern>): pure tvs
-  l.map(boundTypeVars).unions
-
-fun boundTypeVars(l: list<ktype>): pure tvs
-  l.map(boundTypeVars).unions
 
 fun boundTypeVars(tp: ktype): pure tvs
   match tp
@@ -212,12 +169,31 @@ fun boundTypeVars(tp: ktype): pure tvs
 fun boundTypeVars(TName(_, tp): tName): pure tvs
   tp.boundTypeVars
 
+fun (|->)(s1: sub, s2: sub): pure sub
+  s2.map(fn(k, v) (k, s1 |-> v))
+
+fun (|->)(s: sub, l: list<a>, ?f: (sub, a) -> e a = (|->)): e list<a>
+  l.map(fn(a) f(s, a))
+
+fun (|->)(s: sub, tp: ktype): pure tau
+  match tp
+    TForAll(vars, preds, t) ->
+      val sub' = s.subRemove(vars)
+      TForAll(vars, preds.map(fn(p:pred) (|->)(sub', p)), sub' |-> t)
+    TFun(args, eff, res) -> TFun(args.map(fn(a) (a.fst, s |-> a.snd)), s |-> eff, s |-> res)
+    TCon -> tp
+    TVar(tv) -> s.subFind(tv)
+    TApp(t, args) -> TApp(s |-> t, args.map(fn(t') s |-> t'))
+    TSyn(syn, xs, t) -> TSyn(syn, xs, s |-> t)
+
+fun (|->)(s: sub, pred: pred): pure pred
+  match pred
+    PredSub(sub, super) -> PredSub(s |-> sub, s |-> super)
+    PredIFace(iface, args) -> PredIFace(iface, args.map(fn(t) s |-> t))
+
 fun (|->)(s: sub, tn: tName): pure tName
   match tn
     TName(n, tp) -> TName(n, s |-> tp)
-
-fun (|->)(s: sub, tn: list<tName>): pure list<tName>
-  tn.map(fn(t) s |-> t)
 
 fun (|->)(s: sub, p: pattern): pure pattern
   match p
@@ -227,9 +203,6 @@ fun (|->)(s: sub, p: pattern): pure pattern
       PatCon(s |-> tn, sub' |-> args, repr, sub' |-> targs, exists0, sub' |-> tres, conInfo, skip)
     PatWild -> PatWild
     PatLit(l) -> PatLit(l)
-
-fun (|->)(s: sub, p: list<pattern>): pure list<pattern>
-  p.map(fn(p') s |-> p')
 
 fun (|->)(s: sub, e: expr): pure expr
   match e
@@ -244,9 +217,6 @@ fun (|->)(s: sub, e: expr): pure expr
     ELit(l) -> ELit(l)
     Let(defGroups, e) -> Let(defGroups.map(fn(dg) s |-> dg), s |-> e)
     Case(es, bs) -> Case(s |-> es, bs.map(fn(b) s |-> b))
-
-fun (|->)(s: sub, l: list<expr>): pure list<expr>
-  l.map(fn(e) s |-> e)
 
 fun (|->)(s: sub, dg: defGroup): pure defGroup
   match dg
@@ -263,9 +233,6 @@ fun (|->)(s: sub, Branch(p, e): branch): pure branch
 fun (|->)(s: sub, g: guard): pure guard
   match g
     Guard(e, e2) -> Guard(s |-> e, s |-> e2)
-
-fun (|->)(s: sub, gs: list<guard>): pure list<guard>
-  gs.map(fn(g) s |-> g)
 
 // TODO: More
 fun freshTypeVar(k: kind, fl: flavour)

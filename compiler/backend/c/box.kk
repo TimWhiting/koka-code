@@ -10,9 +10,10 @@ import compiler/type/pretty
 import compiler/kind/kind
 import compiler/common/failure
 import compiler/platform/config
+import compiler/common/color-scheme
 
 // Box / unbox transformation
-alias boxEff = <uniquePhase,compFlags,coreOptions,documentation,pure>
+alias boxEff = <uniquePhase,compFlags,documentation,pure,colorSchemeEffect,ppEnvEff>
 
 fun boxCore(c: core): boxEff core
   c(defs=boxDefGroups(c.defs))
@@ -171,7 +172,7 @@ fun boxVarAtTp(tp: ktype)
 fun unboxVarAtTp(tp: ktype)
   Var(TName(nameUnbox, tp), InfoExternal([(C(CDefault), "unbox(#1)")]))
 
-fun boxCoerceFun(toParTps: list<(name, ktype)>, toEffTp: ktype, toResTp: ktype, fromParTps: list<(name, ktype)>, fromEffTp: ktype, fromResTp: ktype, ex: expr)
+fun boxCoerceFun(toParTps: list<(name, ktype)>, toEffTp: ktype, toResTp: ktype, fromParTps: list<(name, ktype)>, fromEffTp: ktype, fromResTp: ktype, ex: expr): <colorSchemeEffect,compFlags,pure,documentation,ppEnvEff,uniquePhase> expr
   val names = toParTps.map(fn(_) uniqueName("b"))
   val pars = names.zipwith(toParTps.map(snd), fn(n, t) TName(n,t))
   val args = pars.map(fn(p) Var(p, InfoNone))

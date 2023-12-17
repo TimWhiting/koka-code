@@ -13,6 +13,8 @@ import compiler/common/failure
 import compiler/platform/config
 import compiler/common/syntax
 import newstd/data/linearset
+import compiler/common/color-scheme
+import compiler/common/nice
 
 fun genLocalGroups(dgs: defGroups): asmEff list<doc>
   dgs.map(genLocalGroup)
@@ -624,11 +626,11 @@ fun genAppNormal(f: expr, args: list<expr>)
     // special: cfield-of
     (Var(cfieldOf), [App(Var(_), [App(Var(dup), [Var(c)])]), ELit(LitString(conName)), ELit(LitString(fieldName))]) | cfieldOf.getName == nameFieldAddrOf && dup.getName == nameDup ->
       val doc = genFieldAddress(c, conName.readQualified, fieldName.readQualified)
-      ([], "(kk_box_t*)".text |.| parens(doc))
+      ([], doc)
     (Var(cfieldOf), [App(Var(_), [Var(c)]), ELit(LitString(conName)), ELit(LitString(fieldName))]) | cfieldOf.getName == nameFieldAddrOf ->
       val drop = genDupDropCall(False, c.typeOf, c.getName.cppName).map(fn(x) x |.| semi)
       val doc = genFieldAddress(c, conName.readQualified, fieldName.readQualified)
-      (drop, "(kk_box_t*)".text |.| parens(doc))
+      (drop, doc)
     
     // Add/sub small constant
     (Var(add), [arg, ELit(LitInt(i))]) | add.getName == nameIntAdd && i.isSmallInt -> // arg + i
@@ -691,7 +693,7 @@ fun genAssignFields(tmp: doc, conName: tName, crepr: conRepr, reuseName: tName, 
   (decls, tmpDecl, ctxPath ++ assigns, result)
 
 fun genFieldAddress(conVar: tName, conName: name, fieldName: name)
-  parens("&".text |.| conAsNameX(conName) |.| arguments([conVar.getName.cppName]) |.| "->".text |.| fieldName.unqualify.cppName)
+  "kk_field_addr_create".text |.| arguments([conAsNameX(conName) |.| arguments([conVar.getName.ppName]) |.| "->".text |.| fieldName.unqualify.ppName])
 
 fun genCCtxSetContextPath(conVar: tName, conName: name, fieldName: name)
   "kk_cctx_setcp".text |.| arguments([conVar.getName.cppName, "offsetof".text |.| tupled(["struct".text |+| conName.cppName, fieldName.unqualify.cppName])])
@@ -809,7 +811,7 @@ fun genExprExternal(tname: tName, formats: list<(target, string)>, args: list<do
         ([], genHoleCall(tname.typeOf.resultType))
   val format = getFormat(tname, formats)
   val argDocs = args.map(fn(d) if d.asString.list.all(fn(c) c.is-alpha || c.is-digit || c == '_') then d else d.parens)
-  fun ppExternalF(name: name, k: list<char>): <compFlags,coreOptions,documentation,pure> doc
+  fun ppExternalF(name: name, k: list<char>): <compFlags,documentation,pure,colorSchemeEffect,ppEnvEff> doc
     match k
       Nil -> empty
       Cons('\\', Cons('#', xs)) -> char('#') |.| ppExternalF(name, xs)

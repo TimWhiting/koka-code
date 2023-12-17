@@ -18,12 +18,28 @@ fun (<)(p1: pos, p2: pos): bool
     p1.col < p2.col
 
 fun (<=)(p1: pos, p2: pos): bool
-  if p1.line <= p2.line then
+  if p1.line < p2.line then
     True
   elif p1.line > p2.line then
     False 
   else
     p1.col <= p2.col
+
+fun (>)(p1: pos, p2: pos): bool
+  if p1.line > p2.line then
+    True
+  elif p1.line < p2.line then
+    False 
+  else
+    p1.col > p2.col
+
+fun (>=)(p1: pos, p2: pos): bool
+  if p1.line > p2.line then
+    True
+  elif p1.line < p2.line then
+    False 
+  else
+    p1.col >= p2.col
 
 fun compare(p1: pos, p2: pos): order
   match p1.line.compare(p2.line)
@@ -67,6 +83,9 @@ val tabSize = 2 // Always 2 in koka
 
 // source range
 value struct range (pub start: pos, pub end: pos)
+
+fun rangeLength(Range(p1, p2)): int
+  p2.off - p1.off
 
 fun (==)(r1: range, r2: range): bool
   r1.start == r2.start && r1.end == r2.end
@@ -116,7 +135,7 @@ fun after(r: range)
   Range(r.end, r.end)
 
 fun minPos(p1: pos, p2: pos): pos
-  if p1.line <= 0 then
+  if p1.line <= 0 then // for combining nullRanges sensibly
     p2
   elif p2.line <= 0 then
     p1

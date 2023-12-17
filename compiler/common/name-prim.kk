@@ -177,6 +177,9 @@ val nameEffectOpen  =  ".open".coreTypesName // preludeName ".open"
 val nameInitially   = "initially".coreHndName
 val nameFinally     = "finally".coreHndName
 
+fun nameClauseTailNoOp(n: n, ?show: (n) -> e string): e name
+  coreHndName("clause-tail-noop" ++ show(n))
+
 fun isClauseTailName(n: name): maybe<int>
   val s = n.nameId
   if s.starts-with("clause-tail").bool && s.list.drop(11).all(is-digit) then

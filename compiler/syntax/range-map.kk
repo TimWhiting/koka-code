@@ -32,7 +32,7 @@ type rangeInfo
   RIId(name: name, ninfo: nameInfo, isDefinition: bool) // qualified name, info, is the definition
 
 value type nameInfo
-  NIValue(tp: ktype)
+  NIValue(tp: ktype, isAnnotated: bool) // already has type annotation
   NICon(tp: ktype)
   NITypeCon(k: kind)
   NITypeVar(k: kind)
@@ -104,17 +104,34 @@ fun lookup(rm: range-map, r: range)
   val prioritized = rinfos.sortBy(cmp).groupBy(eq)
   (prioritized, rm')
 
-fun findAt(rm: range-map, p: pos)
+fun findIn(r: range, rm: range-map): list<(range, rangeInfo)>
+  val s = r.start
+  val e = r.end
+  rm.filter(fn((ri, _)) ri.start >= s || ri.end <= e)
+
+fun findAt(rm: range-map, p: pos): maybe<list<(range, rangeInfo)>>
   fun containsPos(r: range)
     r.start <= p && p <= r.end
   fun shortestRange(rm': range-map)
     match rm'
-      Cons((r1, ri1), Cons((r2, ri2), rst)) -> 
-        if r1.length < r2.length then shortestRange(Cons((r1, ri1),rst)) 
-        else shortestRange(Cons((r2, ri2),rst))
-      Cons(r, Nil) -> Just(r)
       Nil -> Nothing
+      rs -> Just(minimumByList(rs, fn((r1, _), (r2, _)) r1.rangeLength.compare(r2.rangeLength)))
   rm.filter(fn(r) r.fst.containsPos).shortestRange
+
+fun minlist(mx: maybe<list<a>>, y: a, ?cmp: (a, a) -> order): maybe<list<a>>
+  Just(
+    match mx
+      Nothing -> [y]
+      Just(Nil) -> [y]
+      Just(Cons(x, xs')) ->
+        match cmp(x, y)
+          Gt -> [y]
+          Eq -> Cons(y, Cons(x, xs'))
+          _ -> Cons(x, xs')
+  )
+
+fun minimumByList(xs: list<a>, ?cmp: (a, a) -> order): list<a>
+  xs.foldl(Nothing, fn(a, b) minlist(a, b, cmp)).default([])
 
 fun riType(ri: rangeInfo)
   match ri
@@ -141,7 +158,7 @@ fun (|->)(s: sub, ri: rangeInfo): pure rangeInfo
 
 fun (|->)(s: sub, ni: nameInfo): pure nameInfo
   match ni
-    NIValue(tp) -> NIValue(s |-> tp)
+    NIValue(tp, isAnnotated) -> NIValue(s |-> tp, isAnnotated)
     NICon(tp) -> NICon(s |-> tp)
     _ -> ni
 

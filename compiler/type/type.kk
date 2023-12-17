@@ -542,7 +542,7 @@ fun isOptional(tp: ktype): bool
   match tp.expandSyn
     TApp(TCon(tc), [_]) -> tc == tconOptional
     _ -> False
-fun makeOptional(tp: ktype): ktype
+fun makeOptionalType(tp: ktype): ktype
   TApp(typeOptional, [tp])
 
 fun unOptional(tp: ktype): ktype

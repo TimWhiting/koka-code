@@ -86,7 +86,8 @@ fun synTypeDef(td: compiler/core/core/typeDef, modName: name): list<compiler/syn
     compiler/core/core/Synonym -> []
     Data(di) | di.name.isHiddenName -> []
     Data(di, isExtend) ->
-      di.synAccessors(modName) ++ (
+      val accessors = if !di.isOpen && !di.isExtend then di.synAccessors(modName) else []
+      accessors ++ (
         if di.constrs.length == 1 && !di.isOpen && !di.constrs.head.unjust.name.isHiddenName && di.kind.hasKindStarResult then
           [synCopyCon(di, modName, di.constrs.head)]
         else []
@@ -105,7 +106,7 @@ fun synCopyCon(di: dataInfo, ci: conInfo, modName: name)
   val fullTp = 
     val (vars, preds, rho) = ci.t.splitPredType
     match rho.splitFunType
-      Just((args, eff, res)) -> TForAll(vars, preds, TFun([(argName, res)] ++ args.map(fn((nm, t)) (nm, if !ci.hasAccessor(nm, t) then t else t.makeOptional)), eff, res))
+      Just((args, eff, res)) -> TForAll(vars, preds, TFun([(argName, res)] ++ args.map(fn((nm, t)) (nm, if !ci.hasAccessor(nm, t) then t else t.makeOptionalType)), eff, res))
       Nothing -> TForAll(vars, preds, TFun([(argName, rho)], typeTotal, rho))
   fun vvar(n)
     Var(n, False, rc)
@@ -257,7 +258,7 @@ fun infExternal(ex: compiler/syntax/syntax/external, names: list<name>)
       val cname = canonicalName(names.filter(fn(n) n == qname).length, qname)
       if name.isHiddenName then ()
       else
-        addRangeInfo(nameRng, RIId(qname, NIValue(tp'), True))
+        addRangeInfo(nameRng, RIId(qname, NIValue(tp', True), True))
         addRangeInfo(rng, RIDecl("external", qname, cname.mangle(tp')))
       (compiler/core/core/External(cname, tp', pinfos, calls.map(fn(c) c.formatCall(tp')), vis, fipT, nameRng, doc), Cons(qname, names))
     compiler/syntax/syntax/ExternalImport(imps, rng) -> (compiler/core/core/ExternalImport(imps, rng), names)
@@ -707,7 +708,7 @@ fun resolveKind(infkind: infKind)
       KIApp(k1, k2) -> KApp(k1.resolve, k2.resolve)
   skind.resolve
 
-val nameTVMapEmpty = linearMap([], fn(n1: name, n2: name) n1 == n2, fn(tv1: typeVar, tv2: typeVar) tv1 == tv2, show, show)
+val nameTVMapEmpty = linearMap([])
 
 fun resolveConstructor(typeName: name, typeSort: dataKind, isSingleton: bool, typeResult: ktype, typeParams: list<typeVar>,
   idmap: name-map<typeVar>, UserCon(name, exists0, params, mbResult, rngName, rng, vis, doc): userCon<kUserType<infKind>, userType, infKind>)

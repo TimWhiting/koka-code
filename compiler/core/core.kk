@@ -51,6 +51,12 @@ fun makeVector(tp: ktype, exprs: list<expr>): expr
   val vectorFromList = Var(TName(nameVector, TForAll([a], [], TFun([(nameNil, TApp(typeList, [TVar(a)]))], typeTotal, TApp(typeVector, [TVar(a)])))), InfoArity(1, 1))
   App(TypeApp(vectorFromList, [tp]), [makeList(tp, exprs)])
 
+fun wrapOptional(tp: ktype, ex: expr): expr
+  val a = TypeVar(0, kindStar, Bound)
+  val tpOptional = TForAll([a], [], TFun([(nameNil, TVar(a))], typeTotal, makeOptionalType(TVar(a))))
+  val conInfo = ConAsJust(nameTpOptional, DataAsMaybe, valueReprScan(1), nameOptionalNone, 0)
+  App(TypeApp(Con(TName(nameOptional, tpOptional), conInfo), [tp]), [ex])
+
 fun makeList(tp: ktype, exprs: list<expr>): expr
   val a = TypeVar(0, kindStar, Bound)
   val nilTp = TForAll([a], [], TApp(typeList, [TVar(a)]))

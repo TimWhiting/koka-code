@@ -28,6 +28,9 @@ val platform64c = Platform(8, 8, 4, 8) // Compressed
 val platformJS = Platform(8, 4, 8, 0)
 val platformCS = Platform(8, 4, 8, 0)
 
+fun (==)(p1: platform, p2: platform): bool
+  p1.ptrSize == p2.ptrSize && p1.sizeSize == p2.sizeSize && p1.fieldSize == p2.fieldSize && p1.headerSize == p2.headerSize
+
 fun hasCompressedFields(p: platform): bool
   p.ptrSize != p.fieldSize
 
@@ -164,12 +167,12 @@ type operationSort
 
 fun show(o: operationSort): string
   match o
-    OpVal -> "OpVal"
-    OpFun -> "OpFun"
-    OpExcept -> "OpExcept"
-    OpControlRaw -> "OpControlRaw"
-    OpControl -> "OpControl"
-    OpControlErr -> "OpControlErr"
+    OpVal -> "val"
+    OpFun -> "fun"
+    OpExcept -> "brk"
+    OpControlRaw -> "rawctl"
+    OpControl -> "ctl"
+    OpControlErr -> ""
 
 type dataKind
   Inductive

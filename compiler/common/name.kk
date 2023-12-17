@@ -192,6 +192,9 @@ fun toVarName(Name(m, _, n, _)): name
     cs -> cs.toLowers
   m.newQualified(new.string)
 
+fun nameStartsWith(n: name, s: string): bool
+  n.nameId.starts-with(s).bool
+
 // Various special names
 fun newHiddenName(s: string): name
   newName("." ++ s)
@@ -255,6 +258,25 @@ fun newHiddenExternalName(n: name): name
 
 fun isHiddenExternalName(n: name): bool
   n.hiddenNameStartsWith("extern")
+
+fun toImplicitParamName(n: name): name
+  prepend("?", n)
+
+fun isImplicitParamName(n: name): bool
+  n.nameId.starts-with("?").bool
+
+fun plainImplicitParamName(n: name): name
+  if n.isImplicitParamName then n.nameModule.newQualified(n.nameId.slice.drop(1).string)
+  else n
+
+fun namedImplicitParamName(pname: name, ename: name): name
+  (pname.plainImplicitParamName.nameId ++ "," ++ ename.nameId).newName.toImplicitParamName()
+
+fun splitImplicitParamName(n: name): (name, name)
+  val (pre, post) = n.plainImplicitParamName.nameId.list.span(fn(c) c != ',')
+  match post
+    Cons(_, ename) | !pre.is-nil -> (pre.string.newName, ename.string.newName)
+    _ -> (n, n.plainImplicitParamName)
 
 // Create a constructor creator name from the constructor name.
 // Used if special creation functions are used for the constructor.

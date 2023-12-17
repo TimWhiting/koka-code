@@ -1,5 +1,21 @@
 # TODO
 
+## Changes
+- [ ] syntax/promote
+- [ ] syntax/parse
+- [ ] syntax/lexer
+- [ ] static/bindingGroups
+- [ ] core/parse
+- [ ] (finish kind/infer)
+- [ ] kind/inferMonad
+- [ ] lib/printer
+- [ ] type/assumption
+- [ ] type/operations
+- [ ] type/pretty
+- [ ] type/unify
+- [ ] common/colorScheme
+- [ ] error effect for core passes
+
 ## All dependencies ready
 - [ ] backend/c/parc 1037
 - [ ] backend/c/parcreuse 731

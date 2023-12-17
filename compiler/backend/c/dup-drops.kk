@@ -16,10 +16,10 @@ fun genBoxUnbox(nm: name, info: dataInfo, drepr: dataRepr)
 fun genBoxCall(tp: ktype, arg: doc)
   val prim = "box"
   match tp.cType
-    CFun -> primName_t(prim, "function_t") |.| tupled([arg, contextDoc])
-    CPrim(v) | v == "kk_unit_t" || v == "bool" || v == "kk_string_t" -> primName_t(prim, v) |.| parens(arg)
+    CFun -> primNameType(prim, "function_t") |.| tupled([arg, contextDoc])
+    CPrim(v) | v == "kk_unit_t" || v == "bool" || v == "kk_string_t" -> primNameType(prim, v) |.| parens(arg)
     CData(nm) -> primName(prim, nm.cppName) |.| tupled([arg, contextDoc])
-    _ -> primName_t(prim, tp.cppType.show) |.| tupled([arg, contextDoc])
+    _ -> primNameType(prim, tp.cppType.show) |.| tupled([arg, contextDoc])
 
 fun genUnboxCallOwned(tp: ktype, arg: doc)
   genUnboxCall(tp, arg, "KK_OWNED".text)
@@ -30,11 +30,11 @@ fun genUnboxCallBorrowed(tp: ktype, arg: doc)
 fun genUnboxCall(tp: ktype, arg: doc, argBorrow: doc)
   val prim = "unbox"
   match tp.cType
-    CFun -> primName_t(prim, "function_t") |.| tupled([arg, contextDoc]) // no borrow
-    CPrim(v) | v == "kk_unit_t" || v == "bool" || v == "kk_string_t" -> primName_t(prim, v) |.| arg.parens // no borrow, no context
-    CPrim(v) -> primName_t(prim, v) |.| tupled(if v.cPrimCanBeBoxed then [arg, argBorrow, contextDoc] else [arg, contextDoc])
+    CFun -> primNameType(prim, "function_t") |.| tupled([arg, contextDoc]) // no borrow
+    CPrim(v) | v == "kk_unit_t" || v == "bool" || v == "kk_string_t" -> primNameType(prim, v) |.| arg.parens // no borrow, no context
+    CPrim(v) -> primNameType(prim, v) |.| tupled(if v.cPrimCanBeBoxed then [arg, argBorrow, contextDoc] else [arg, contextDoc])
     CData(nm) -> primName(prim, nm.cppName) |.| tupled([arg, argBorrow, contextDoc])
-    CBox -> primName_t(prim, tp.cppType.show) |.| tupled([arg, contextDoc])
+    CBox -> primNameType(prim, tp.cppType.show) |.| tupled([arg, contextDoc])
 
 fun dataStructAsMaybeSplit(l: list<conInfo>)
   match l
@@ -150,11 +150,11 @@ fun genDupDropFields(isDup: bool, drepr: dataRepr, ci: conInfo, cfields: list<(n
 
 fun genDupDropCallX(prim: string, tp: ktype, args: doc)
   match tp.cType
-    CFun -> [primName_t(prim, "function_t") |.| args]
-    CBox -> [primName_t(prim, "box_t") |.| args]
+    CFun -> [primNameType(prim, "function_t") |.| args]
+    CBox -> [primNameType(prim, "box_t") |.| args]
     CPrim(v) | v == "kk_integer_t" || v == "kk_string_t" || v == "kk_vector_t" || v == "kk_evv_t" || v == "kk_ref_t" || v == "kk_reuse_t" || v == "kk_box_t"
-      -> [primName_t(prim, v) |.| args]
-    CPrim -> []
+      -> [primNameType(prim, v) |.| args]
+    CPrim -> [text("kk_skip_" ++ prim) |.| args] // [] // text "value" |.| args
     CData(nm) -> [primName(prim, nm.cppName) |.| args]
 
 fun genDupCall(tp: ktype, arg: doc)

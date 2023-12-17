@@ -15,9 +15,10 @@ import compiler/lib/pprint
 import compiler/platform/config
 import compiler/common/file
 import compiler/lib/printer
+import compiler/common/color-scheme
 import std/os/path
 
-alias asmEff = <pure,asm,compFlags,uniquePhase,newtypes,printer,subst,documentation,coreOptions,niceEff<typeVar>,precEff,prettyTypeEff>
+alias asmEff = <pure,asm,compFlags,uniquePhase,colorSchemeEffect,newtypesEff,printer,subst,documentation,niceEff<typeVar>,ppEnvEff,precEff,prettyTypeEff>
 
 // Put the things that need overriding in here
 effect subst
@@ -276,7 +277,7 @@ fun cTypeCon(tp: typeCon): cType
   elif nm == nameTpRef || nm == nameTpLocalVar then CPrim("kk_ref_t")
   elif nm == nameTpBox || nm == nameTpAny then CPrim("kk_box_t")
   elif nm == nameTpReuse then CPrim("kk_reuse_t")
-  elif nm == nameTpFieldAddr then CPrim("kk_box_t*")
+  elif nm == nameTpFieldAddr then CPrim("kk_field_addr_t")
   else CData(nm.typeClassName)
 
 fun typeClassName(n: name)
@@ -430,7 +431,7 @@ val reserved = [
   // C keywords
   "async", "await", "break", "case", "catch", "continue", "const", "debugger",
   "default", "delete", "do", "else", "finally", "for", "function", "if", "in",
-  "instanceof", "new", "return", "switch", "this", "throw", "try", "typeof",
+  "instanceof", "new", "return", "register", "switch", "this", "throw", "try", "typeof",
   "var", "void", "while", "with", "yield",
   // reserved for future use
   "class", "enum", "export", "extends", "import", "super",
@@ -450,13 +451,14 @@ fun conTestNameX(nm: name): doc
 fun conTagName(c: conInfo): doc
   cppName(makeHiddenName("tag", c.name))
 
-fun primName_t(prim: string, s: string)
+fun primName(prim: string, d: doc)
+  if prim == "" then d else
+    d |.| "_".text |.| prim.text
+
+fun primNameType(prim: string, s: string)
   val start = if s.starts-with("kk_").is-just then "" else "kk_"
   val end = match s.ends-with("_t") { Just(x) -> x.string; _ -> s}  
   primName(prim, (start ++ end).text)
-
-fun primName(prim: string, d: doc)
-  d |.| "_".text |.| prim.text
 
 fun conBaseCastName(c: conInfo): doc
   cppName(makeHiddenName("base", c.name))

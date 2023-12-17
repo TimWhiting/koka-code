@@ -13,7 +13,7 @@ import compiler/type/kind
 import compiler/kind/kind
 import compiler/lib/pprint
 
-alias openEff = <openEffect, compFlags, uniquePhase, pure, documentation, coreOptions>
+alias openEff = <openEffect, compFlags, uniquePhase, pure, documentation>
 
 effect openEffect
   fun getGamma(): gamma

@@ -12,13 +12,13 @@ fun s2(ls2: list<int>): list<int>
 fun s4(ls: list<int>): list<int>
   ls.map2(fn(i) i + 1)
 
-fun map2(ls0: list<int>, f0: (int) -> int): list<int>
+fun map2'(ls0: list<int>, f0: (int) -> int): list<int>
   match ls0
-    Cons(x00, xx00) -> Cons(f0(x00), map2(xx00, f0))
+    Cons(x00, xx00) -> Cons(f0(x00), map2'(xx00, f0))
     Nil -> Nil
 
-fun s2(ls1: list<int>): list<int>
-  ls1.map2(fn(z) z + 1)
+fun s2'(ls1: list<int>): list<int>
+  ls1.map2'(fn(z) z + 1)
 
 fun something(x1, y1: int)
   x1 + y1

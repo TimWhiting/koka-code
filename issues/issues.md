@@ -1,23 +1,12 @@
 # Notes on some issues:
 Solved Previously:
-- [x] WASM Support https://github.com/koka-lang/koka/issues/32
-- [x] Inline function https://github.com/koka-lang/koka/issues/36
-- [x] Documentation fix https://github.com/koka-lang/koka/issues/92
-- [x] Dockerfile https://github.com/koka-lang/koka/issues/96
-- [x] Kind error? https://github.com/koka-lang/koka/issues/105
-- [x] Documentation? https://github.com/koka-lang/koka/issues/118
+- [x] Inline function https://github.com/koka-lang/koka/issues/36 ??
+- [x] Documentation? https://github.com/koka-lang/koka/issues/118 ??
 - [x] Better error message with type inference after default handler insertion around main: https://github.com/koka-lang/koka/issues/126 (need to do better in language server though to proactively do this)
-- [x] genFunDefSig error https://github.com/koka-lang/koka/issues/151
 - [x] Nested masks: https://github.com/koka-lang/koka/issues/153
 - [x] Nested masks: https://github.com/koka-lang/koka/issues/154
-- [x] Ctail error: https://github.com/koka-lang/koka/issues/184
-- [x] Kind mismatch: https://github.com/koka-lang/koka/issues/185
-- [x] mixed raw / scan fields: https://github.com/koka-lang/koka/issues/187
-- [x] crash: https://github.com/koka-lang/koka/issues/188
-- [x] color scheme: https://github.com/koka-lang/koka/issues/190
-- [x] open type codegen: https://github.com/koka-lang/koka/issues/198
-- [x] main val versus fun: https://github.com/koka-lang/koka/issues/201
-- [x] Fixed nested match error: https://github.com/koka-lang/koka/issues/207
+- [x] crash: https://github.com/koka-lang/koka/issues/188 ??
+- [x] main val versus fun: https://github.com/koka-lang/koka/issues/201 ??
 
 Potentially Solved:?
 - [ ] Effect opening and tail resumptive analysis https://github.com/koka-lang/koka/issues/72

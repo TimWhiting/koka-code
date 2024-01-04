@@ -1,4 +1,9 @@
 # Notes on some issues:
+Ask Daan if we talk about names:
+https://github.com/koka-lang/koka/issues/265
+Qualified name issue still in monad2
+
+
 Solved Previously:
 - [x] Inline function https://github.com/koka-lang/koka/issues/36 ??
 - [x] Better error message with type inference after default handler insertion around main: https://github.com/koka-lang/koka/issues/126 (need to do better in language server though to proactively do this)
@@ -44,3 +49,6 @@ https://github.com/koka-lang/koka/issues/197
 
 ## Volunteers
 - https://github.com/koka-lang/koka/issues/204
+
+## For recursive hdiv:
+https://github.com/koka-lang/koka/issues/311

@@ -3,7 +3,7 @@ alias elem = int
 
 fun sequences(xs : list<elem>) {
     match(xs) {
-        Cons(a, Cons(b, xs)) {
+        Cons(a, Cons(b, xs)) -> {
             if(a > b) then descending(b, [a], xs)
             else ascending(b, (fn(x) { Cons(a, x) }), xs)
         }

@@ -16,9 +16,6 @@ fun (|->)(s: sub, e: evidence): pure evidence
   val newPred = typevar/(|->)(s, e.pred)
   e(pred=newPred)
 
-fun (|->)(s: sub, l: list<evidence>): pure list<evidence>
-  l.map(fn(e) s |-> e)
-
 fun free-type-vars(e: evidence)
   typevar/free-type-vars(e.pred)
 

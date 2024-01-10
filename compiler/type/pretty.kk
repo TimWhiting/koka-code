@@ -125,7 +125,7 @@ fun niceTypes(tps: list<ktype>): ppTypeEff list<doc>
     tp.ppType.color(colors.colorType)
 
 fun niceList(schemes: list<ktype>, f: (ktype) -> ppTypeEff doc): ppTypeEff list<doc>
-  schemes.map(fn(tp) tp.freeTypeVars).unions.list.map(extendNice)
+  schemes.map(fn(tp) tp.free-type-vars).unions.list.map(extendNice)
   schemes.map(f)
 
 // Pretty print a type

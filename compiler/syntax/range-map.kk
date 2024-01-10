@@ -145,8 +145,8 @@ fun riType(ri: rangeInfo)
 fun (|->)(s: sub, rm: range-map): pure range-map
   rm.map(fn((r, ri)) (r, s |-> ri))
 
-fun freeTypeVars(rm: range-map): pure tvs
-  rm.map(snd).map(freeTypeVars).unions
+fun free-type-vars(rm: range-map): pure tvs
+  rm.map(snd).map(free-type-vars).unions
 
 fun boundTypeVars(rm: range-map): pure tvs
   rm.map(snd).map(boundTypeVars).unions
@@ -162,9 +162,9 @@ fun (|->)(s: sub, ni: nameInfo): pure nameInfo
     NICon(tp) -> NICon(s |-> tp)
     _ -> ni
 
-fun freeTypeVars(ri: rangeInfo): pure tvs
+fun free-type-vars(ri: rangeInfo): pure tvs
   match ri
-    RIId(_, i) -> freeTypeVars(i)
+    RIId(_, i) -> free-type-vars(i)
     _ -> emptyTvs
 
 fun boundTypeVars(ri: rangeInfo): pure tvs
@@ -172,10 +172,10 @@ fun boundTypeVars(ri: rangeInfo): pure tvs
     RIId(_, i) -> boundTypeVars(i)
     _ -> emptyTvs
 
-fun freeTypeVars(ni: nameInfo): pure tvs
+fun free-type-vars(ni: nameInfo): pure tvs
   match ni
-    NIValue(tp) -> freeTypeVars(tp)
-    NICon(tp) -> freeTypeVars(tp)
+    NIValue(tp) -> free-type-vars(tp)
+    NICon(tp) -> free-type-vars(tp)
     _ -> emptyTvs
 
 fun boundTypeVars(ni: nameInfo): pure tvs

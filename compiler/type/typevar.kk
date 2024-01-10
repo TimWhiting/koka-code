@@ -48,7 +48,7 @@ fun subSingle(tvar: typeVar, tau: tau)
   // ID. If we want to avoid this, we must ensure that all IDs are distinct; in particular,
   // the IDs of built-in types such as .select must be distinct from further IDs generated
   // by the compiler.
-  if tau.freeTypeVars.member(tvar) then
+  if tau.free-type-vars.member(tvar) then
     throw("type/typevar: subSingle: recursive type " ++ tvar.show)
   if tau.kind != tvar.kind then
     throw("type/typevar: subSingle: kind mismatch " ++ tau.show ++ " " ++ tvar.show)
@@ -72,73 +72,73 @@ fun single(tv: typeVar)
 fun tvsNew(tv: list<typeVar>) 
   linearSet(tv)
 
-fun freeTypeVars(ps: list<a>, ?f: (a) -> pure tvs = freeTypeVars): pure tvs
+fun free-type-vars(ps: list<a>, ?f: (a) -> pure tvs = free-type-vars): pure tvs
   ps.map(f).unions
 
-fun freeTypeVars(pred: pred): pure tvs
+fun free-type-vars(pred: pred): pure tvs
   match pred
-    PredSub(sub, super) -> sub.freeTypeVars + super.freeTypeVars
-    PredIFace(_, args) -> args.map(freeTypeVars).unions
+    PredSub(sub, super) -> sub.free-type-vars + super.free-type-vars
+    PredIFace(_, args) -> args.map(free-type-vars).unions
 
-fun freeTypeVars(tp: ktype): pure tvs
+fun free-type-vars(tp: ktype): pure tvs
   match tp
     TForAll(vars, preds, t) -> 
-      val tv1 :tvs = t.freeTypeVars + preds.freeTypeVars
+      val tv1 :tvs = t.free-type-vars + preds.free-type-vars
       tv1 - vars
     TFun(args, eff, res) -> 
-      val tv1: tvs = args.map(fn(a) a.snd.freeTypeVars).unions 
-      val tv2: tvs = tv1 + res.freeTypeVars
-      tv2 + eff.freeTypeVars
+      val tv1: tvs = args.map(fn(a) a.snd.free-type-vars).unions 
+      val tv2: tvs = tv1 + res.free-type-vars
+      tv2 + eff.free-type-vars
     TCon -> emptyTvs
     TVar(tv) -> single(tv)
-    TApp(t, args) -> t.freeTypeVars + args.map(fn(a) a.freeTypeVars).unions
-    TSyn(_, xs, t) -> t.freeTypeVars + xs.map(freeTypeVars).unions
+    TApp(t, args) -> t.free-type-vars + args.map(fn(a) a.free-type-vars).unions
+    TSyn(_, xs, t) -> t.free-type-vars + xs.map(free-type-vars).unions
 
-fun freeTypeVars(e0: expr): pure tvs
+fun free-type-vars(e0: expr): pure tvs
   match e0
     Lam(tn, eff, e) -> 
-      val tv1: tvs = tn.freeTypeVars + eff.freeTypeVars
-      tv1 + e.freeTypeVars
-    Var(tn) -> tn.freeTypeVars
-    App(a, b) -> a.freeTypeVars + b.freeTypeVars
-    TypeLam(tvs, e) -> e.freeTypeVars - tvs
-    TypeApp(e, tp) -> e.freeTypeVars + tp.freeTypeVars
-    Con(tn) -> tn.freeTypeVars
+      val tv1: tvs = tn.free-type-vars + eff.free-type-vars
+      tv1 + e.free-type-vars
+    Var(tn) -> tn.free-type-vars
+    App(a, b) -> a.free-type-vars + b.free-type-vars
+    TypeLam(tvs, e) -> e.free-type-vars - tvs
+    TypeApp(e, tp) -> e.free-type-vars + tp.free-type-vars
+    Con(tn) -> tn.free-type-vars
     ELit -> emptyTvs
-    Let(defGroups, e) -> defGroups.map(freeTypeVars).unions + e.freeTypeVars
-    Case(es, bs) -> es.freeTypeVars + bs.map(freeTypeVars).unions
+    Let(defGroups, e) -> defGroups.map(free-type-vars).unions + e.free-type-vars
+    Case(es, bs) -> es.free-type-vars + bs.map(free-type-vars).unions
 
-fun freeTypeVars(dg: defGroup): pure tvs
+fun free-type-vars(dg: defGroup): pure tvs
   match dg
-    DefRec(defs) -> defs.map(freeTypeVars).unions
-    DefNonRec(e) -> freeTypeVars(e)
+    DefRec(defs) -> defs.map(free-type-vars).unions
+    DefNonRec(e) -> free-type-vars(e)
 
-fun freeTypeVars(d: def): pure tvs
-  d.ktype.freeTypeVars + d.defExpr.freeTypeVars
+fun free-type-vars(d: def): pure tvs
+  d.ktype.free-type-vars + d.defExpr.free-type-vars
 
-fun freeTypeVars(bs: branch): pure tvs
+fun free-type-vars(bs: branch): pure tvs
   match bs
     Branch(p, e) -> 
-      val tv1: tvs = e.freeTypeVars - p.boundTypeVars
-      tv1 + p.freeTypeVars
+      val tv1: tvs = e.free-type-vars - p.boundTypeVars
+      tv1 + p.free-type-vars
 
-fun freeTypeVars(p: pattern): pure tvs
+fun free-type-vars(p: pattern): pure tvs
   match p
-    PatVar(tn, pat) -> tn.freeTypeVars + pat.freeTypeVars
+    PatVar(tn, pat) -> tn.free-type-vars + pat.free-type-vars
     PatCon(tn, args, _, targs, exists0, tres) ->
-      val tv1:tvs = tn.freeTypeVars + args.freeTypeVars
-      val tv2:tvs = tv1 + targs.freeTypeVars 
-      val tv3:tvs = tv2 + tres.freeTypeVars
+      val tv1:tvs = tn.free-type-vars + args.free-type-vars
+      val tv2:tvs = tv1 + targs.free-type-vars 
+      val tv3:tvs = tv2 + tres.free-type-vars
       tv3 - exists0
     PatWild -> emptyTvs
     PatLit(_) -> emptyTvs
 
-fun freeTypeVars(gd: guard): pure tvs
+fun free-type-vars(gd: guard): pure tvs
   match gd
-    Guard(e, e2) -> e.freeTypeVars + e2.freeTypeVars
+    Guard(e, e2) -> e.free-type-vars + e2.free-type-vars
 
-fun freeTypeVars(TName(_, tp): tName): pure tvs
-  tp.freeTypeVars
+fun free-type-vars(TName(_, tp): tName): pure tvs
+  tp.free-type-vars
 
 fun boundTypeVars(l: list<a>, ?f: (a) -> pure tvs = boundTypeVars): pure tvs
   l.map(f).unions
@@ -157,7 +157,7 @@ fun boundTypeVars(p: pattern): pure tvs
 fun boundTypeVars(tp: ktype): pure tvs
   match tp
     TForAll(vars, preds, t) -> 
-      val tv1: tvs = preds.freeTypeVars + t.boundTypeVars
+      val tv1: tvs = preds.free-type-vars + t.boundTypeVars
       tv1 + vars
     TFun(args, eff, res) -> 
       val tv1: tvs = args.map(snd).boundTypeVars + res.boundTypeVars 

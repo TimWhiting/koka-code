@@ -6,8 +6,8 @@ import compiler/type/typevar
 pub infixr 5 (|->)
 
 fun isTopLevel(d: def)
-  val freeVar = d.defExpr.freeVars.list.map(fn(TName(nm)) nm).filter(fn(nm) !nm.isQualified && d.defName.unqualify != nm)
-  val freeTv = d.defExpr.freeTypeVars
+  val freeVar = d.defExpr.freeVars.list.map(fn(TName(nm)) nm).filter(fn(nm) !nm.isQualified && d.def-name.unqualify != nm)
+  val freeTv = d.defExpr.free-type-vars
   freeVar.is-nil && freeTv.is-empty
 
 fun freeLocals(e: expr)
@@ -73,7 +73,7 @@ fun (|->)(sub: list<(tName, expr)>, dg: defGroup): pure defGroup
     DefNonRec(def) -> DefNonRec(sub |-> def)
 
 fun (|->)(sub: list<(tName, expr)>, d: def): pure def
-  val dname = d.defName
+  val dname = d.def-name
   val sub' = sub.filter(fn((nm, _)) nm.getName != dname)
   d(defExpr = sub' |-> d.defExpr)
 
@@ -89,7 +89,7 @@ fun (|->)(sub: list<(tName, expr)>, ex: expr): pure expr
     Con -> ex
     ELit -> ex
     Let(dgs, e) ->
-      val defnames = dgs.flatten.map(defName)
+      val defnames = dgs.flatten.map(def-name)
       val sub' = sub.filter(fn((nm, _)) !defnames.any(fn(n) n == nm.getName))
       Let(sub' |-> dgs, sub' |-> e)
     Case(exprs, bs) -> Case(sub |-> exprs, sub |-> bs)

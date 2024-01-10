@@ -108,7 +108,7 @@ fun dependencyExpr(ex: userExpr, modName: name): pure (userExpr, nameSet)
     Bind(def, body, rng) ->
       val (depDef, fv1) = def.dependencyDefFv(modName)
       val (depBody, fv2) = body.dependencyExpr(modName)
-      (Bind(depDef, depBody, rng), fv1 + (fv2 - def.defName))
+      (Bind(depDef, depBody, rng), fv1 + (fv2 - def.def-name))
     Let(group, body, rng) ->
       val (depGroups, fv1, names) = group.dependencyDefGroupFv(modName)
       val (depBody, fv2) = body.dependencyExpr(modName)
@@ -205,7 +205,7 @@ fun freeVar(mex: maybe<expr<t>>): pure nameSet
 fun freeVar(ex: expr<t>): pure nameSet
   match ex
     Lam(binders, body) -> binders.foldr(body.freeVar, fn(b, fv) fv - b.name)
-    Bind(def, body) -> body.freeVar - def.defName + def.defBody.freeVar
+    Bind(def, body) -> body.freeVar - def.def-name + def.def-body.freeVar
     Let(group, body) ->
       val (fv, bound) = group.freeBoundVar
       body.freeVar - bound + fv
@@ -230,10 +230,10 @@ fun freeVar(HandlerBranch(_, pars, expr): handlerBranch<t>): pure nameSet
 
 fun freeBoundVar(dg: defGroup<t>): pure (nameSet, nameSet)
   match dg
-    DefNonRec(d) -> (namesEmpty + d.defName, d.defBody.freeVar)
+    DefNonRec(d) -> (namesEmpty + d.def-name, d.def-body.freeVar)
     DefRec(defs) ->
-      val bound = defs.map(defName)
-      val free = defs.map(fn(d) d.defBody.freeVar).unions
+      val bound = defs.map(def-name)
+      val free = defs.map(fn(d) d.def-body.freeVar).unions
       (namesEmpty + bound, free - bound)
 
 // Dependencies
@@ -263,7 +263,7 @@ fun group(defs: list<userDef>, deps: deps): pure list<userDefGroup>
     val (xxs, xys) = xs.partition(isHidden) // and hidden names first inside those
     xxs ++ xys ++ ys
   // create a map from definition id's to definitions
-  val defMap = defs.map(fn(d) (d.defName, [d])).foldl(linearMap([], fn(n1:name, n2) n1 == n2, fn(d1: list<userDef>, d2: list<userDef>) False, fn(n) n.show, fn(u) "")) fn(acc, (id, v))
+  val defMap = defs.map(fn(d) (d.def-name, [d])).foldl(linearMap([], fn(n1:name, n2) n1 == n2, fn(d1: list<userDef>, d2: list<userDef>) False, fn(n) n.show, fn(u) "")) fn(acc, (id, v))
     acc.update(id, v, fn(old:list<userDef>, new) old ++ new)
   // create a definition group from a list of mutal recursive identifiers
   fun makeGroup(ids:list<name>)
@@ -340,7 +340,7 @@ fun groupTypeDefs(tdefs: list<userTypeDef>, deps: deps)
 //         -- determine strongly connected components
 //         defOrder = scc [(id,S.toList fvs) | (id,fvs) <- M.toList defDeps]
 //         -- create a map from definition id's to definitions.
-//         defMap   = M.fromList [(defName def,def) | def <- defs]
+//         defMap   = M.fromList [(def-name def,def) | def <- defs]
 //         -- create a definition group from a list of mutual recursive identifiers.
 //         makeGroup ids  = case ids of
 //                            [id] -> if S.member id (M.find id defDeps)

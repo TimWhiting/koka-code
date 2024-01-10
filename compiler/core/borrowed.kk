@@ -51,7 +51,7 @@ fun extractDefGroup(dg: defGroup)
 
 fun extractBorrowDef(d: def, rec: bool)
   match d.sort
-    DefFun(pinfos) | !pinfos.is-nil -> Just((d.defName, pinfos))
+    DefFun(pinfos) | !pinfos.is-nil -> Just((d.def-name, pinfos))
     _ -> Nothing
     
 

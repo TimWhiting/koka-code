@@ -95,7 +95,7 @@ fun monExpr(expr: expr, topLevel: bool): monadicEff trans<expr>
           val cont = match contBody
             // optimize (fun (y) {lex x = y in ..})
             Let([DefNonRec(d as Def(defExpr=Var(v)))], body) | v.getName == namey ->
-              Lam([TName(d.defName, d.ktype)], feff, body)
+              Lam([TName(d.def-name, d.ktype)], feff, body)
             // TODO: optimize (fun (y) {lift(expr)})?
             body -> Lam([tnamey], feff, body)
           f'(fn(ff) applies(args', fn(argss) appBind(resTp, feff, contBody.typeOf, ff, argss, cont)))

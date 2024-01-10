@@ -23,7 +23,7 @@ alias asmEff = <pure,asm,comp-flags,uniquePhase,colorSchemeEffect,newtypesEff,pr
 // Put the things that need overriding in here
 effect subst
   val substEnv: list<(tName, doc)> // substituting names
-  val cdefName: name // current definition
+  val cdef-name: name // current definition
   val cdefToHeader: bool // emit current def to header?
 
 effect asm
@@ -76,14 +76,14 @@ fun emitToCurrentDef(d: doc)
 fun setNameSubstitutions(subs, f)
   with override
     val substEnv = subs
-    val cdefName = cdefName
+    val cdef-name = cdef-name
     val cdefToHeader = cdefToHeader
   f()
 
 fun setDef(d: name, toHeader: bool, f)
   with override
     val substEnv = substEnv
-    val cdefName = d
+    val cdef-name = d
     val cdefToHeader = toHeader
   f()
 
@@ -100,7 +100,7 @@ fun newVarNames(i: int): asmEff list<name>
   Cons(newVarName("x"), newVarNames(i - 1))
 
 fun newDefVarName(s: string)
-  postpend("-" ++ s ++ newUnique().show, cdefName)
+  postpend("-" ++ s ++ newUnique().show, cdef-name)
 
 fun newCanonicalVarName(s: string)
   postpend("-" ++ s, modName)

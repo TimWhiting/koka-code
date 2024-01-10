@@ -179,10 +179,10 @@ fun extractDefGroup(d: defGroup, updateVis)
     DefNonRec(v) -> extractDef(v, updateVis)
 
 fun extractDef(d: def, updateVis)
-  single(d.defName.nonCanonicalName, createNameInfoX(updateVis(d.vis), d.defName, d.sort, d.nameRange, d.ktype))
+  single(d.def-name.nonCanonicalName, createNameInfoX(updateVis(d.vis), d.def-name, d.sort, d.nameRange, d.ktype))
 
 fun coreDefInfo(d: def)
-  (d.defName.nonCanonicalName, createNameInfoX(d.vis, d.defName, if d.sort.is-defFun && !d.isTopLevel then DefVal else d.sort, d.nameRange, d.ktype))
+  (d.def-name.nonCanonicalName, createNameInfoX(d.vis, d.def-name, if d.sort.is-defFun && !d.isTopLevel then DefVal else d.sort, d.nameRange, d.ktype))
 
 fun createNameInfoX(vis, name, sort, rng, tp)
   match sort
@@ -207,14 +207,14 @@ fun extractExternal(external: external, updateVis)
 
 // TODO: PRETTY PRINT && substitutions
 
-fun freeTypeVars(g: gamma): pure tvs
-  g.schemes.map(freeTypeVars).unions
+fun free-type-vars(g: gamma): pure tvs
+  g.schemes.map(free-type-vars).unions
 
 fun boundTypeVars(g: gamma): pure tvs
   g.schemes.map(boundTypeVars).unions
 
-fun freeTypeVars(info: nameInfo): pure tvs
-  info.typ.freeTypeVars
+fun free-type-vars(info: nameInfo): pure tvs
+  info.typ.free-type-vars
 
 fun boundTypeVars(info: nameInfo): pure tvs
   info.typ.boundTypeVars

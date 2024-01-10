@@ -31,12 +31,12 @@ alias id = int;
 //   core/(<)(id1, id2)
 
 /// Show quotes around the id
-fun show(id: id): <> string
-  "\"" ++ id.show ++ "\""
+fun id/show(id: id): <> string
+  "\"" ++ id.int/show ++ "\""
 
 /// Generate an 'Id' with a certain base name (which is ignored :-)
 fun gen-id(baseName: string, i: int): <> id
-  i.newId
+  i.new-id
 
 /// Create a fresh identifier
 fun new-id(i: int): <> id
@@ -46,7 +46,7 @@ fun new-id-from(id: id): <> id
   id + 1
 
 /// Dummy identifier
-val id-nil = 0.newId
+val id-nil = 0.new-id
 
 /// Only used internally to guarantee unique identifiers
 fun id-number(id: id): <> int

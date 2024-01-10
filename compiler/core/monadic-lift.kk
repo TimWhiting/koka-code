@@ -141,7 +141,7 @@ fun liftExpr(expr': expr, topLevel: bool): liftedEff expr
 
 fun liftLocalFun(e: expr, eff: keffect)
   val fvs = e.freeLocals.list
-  val tvs = e.freeTypeVars.list
+  val tvs = e.free-type-vars.list
   val (expr2, liftDef) = e.makeDef(fvs, tvs)
   emit(DefNonRec(liftDef))
   expr2
@@ -183,5 +183,5 @@ fun liftGuard(Guard(guard, body): guard)
 fun uniqueNameCurrentDef()
   val d = currentDef.last.unjust
   val i = newUnique()
-  val udefName = toHiddenUniqueName(i, "mlift", d.defName)
-  (udefName, d.kinline)
+  val udef-name = toHiddenUniqueName(i, "mlift", d.def-name)
+  (udef-name, d.kinline)

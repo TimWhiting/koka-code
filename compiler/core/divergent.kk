@@ -22,7 +22,7 @@ fun analyzeDivergence(defs0: list<def>)
 // Assumes that the defintions are uniquefied
 // A valid result is always to return 'True'
 fun isDivergent(d: def): <comp-flags, pure> bool
-  d.defExpr.isDivergentBody(d.defName)
+  d.defExpr.isDivergentBody(d.def-name)
 
 fun isDivergentBody(b: expr, dname: name)
   match b

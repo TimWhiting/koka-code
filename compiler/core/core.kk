@@ -87,7 +87,7 @@ fun makeDefsLet(defs0: list<def>, expr0: expr)
   fun make(defs, e)
     match defs
       Nil -> e
-      Cons(d, rdefs) | e.isUnit && defName(d:def) == nameNil && defExpr(d:def).isUnit -> make(rdefs, d.defExpr)
+      Cons(d, rdefs) | e.isUnit && def-name(d:def) == nameNil && defExpr(d:def).isUnit -> make(rdefs, d.defExpr)
       _ -> makeLet(defs.reverse.map(DefNonRec), e)
   make(defs0.reverse, expr0)
 
@@ -116,11 +116,11 @@ fun show(c: core): div string
 
 alias fixDefs = list<fixDef>;
 value type fixDef
-  FixDef(defName: name, f: fixity);
+  FixDef(def-name: name, f: fixity);
 
 fun show(f: fixDef): string
   match f
-    FixDef(defName, f') -> "FixDef(" ++ defName.show ++ "," ++ show(f') ++ ")"
+    FixDef(def-name, f') -> "FixDef(" ++ def-name.show ++ "," ++ show(f') ++ ")"
 
 alias kimports = list<kimport>;
 struct kimport
@@ -430,7 +430,7 @@ fun show(d: defGroup): div string
 
 // A value definition
 struct def
-  defName: name
+  def-name: name
   ktype: ktype
   defExpr: expr
   vis: visibility // private public
@@ -440,11 +440,11 @@ struct def
   doc: string;
 
 fun show(d: def): div string
-  "Def(" ++ d.defName.show ++ "," ++ d.ktype.show ++ "," ++ d.defExpr.show ++ "," ++ d.vis.show ++ "," ++
+  "Def(" ++ d.def-name.show ++ "," ++ d.ktype.show ++ "," ++ d.defExpr.show ++ "," ++ d.vis.show ++ "," ++
   d.sort.show ++ "," ++ d.kinline.show ++ "," ++ d.nameRange.show-full-range ++ "," ++ d.doc.show ++ ")"
 
 struct inlineDef
-  defName: name
+  def-name: name
   expr: expr
   isRec: bool
   kind: defInline
@@ -453,10 +453,10 @@ struct inlineDef
   paramSpecialize: list<bool>
 
 fun (==)(inl1: inlineDef, inl2: inlineDef): bool
-  name/(==)(inl1.defName, inl2.defName)
+  name/(==)(inl1.def-name, inl2.def-name)
 
 fun show(inl: inlineDef): div string
-  "InlineDef(" ++ inl.defName.show ++ "," ++ inl.expr.show ++ "," ++ inl.isRec.show ++ "," ++ inl.kind.show ++ "," ++ inl.cost.show ++ "," ++ inl.sort.show ++ "," ++ inl.paramSpecialize.show-list(show) ++ ")"
+  "InlineDef(" ++ inl.def-name.show ++ "," ++ inl.expr.show ++ "," ++ inl.isRec.show ++ "," ++ inl.kind.show ++ "," ++ inl.cost.show ++ "," ++ inl.sort.show ++ "," ++ inl.paramSpecialize.show-list(show) ++ ")"
 
 fun isVal(d: def): bool
   !d.sort.is-defFun
@@ -615,7 +615,7 @@ fun show(n: tName): string
   n.getName.show
 
 fun defTName(d: def): tName
-  TName(d.defName, d.ktype)
+  TName(d.def-name, d.ktype)
 
 fun defsTNames(defs: list<def>): list<tName>
   defs.map(defTName)

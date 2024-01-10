@@ -108,12 +108,12 @@ fun range/length(r: range): int
 fun range/is-after(r1: range, r2: range): bool
   r1.end <= r2.start
 
-val range/null = makeRange(pos/null, pos/null)
+val range/null = make-range(pos/null, pos/null)
 
 fun show-full-range(r: range): string
   r.showRange(True)
 
-fun makeRange(p1: pos, p2: pos): range
+fun make-range(p1: pos, p2: pos): range
   Range(min(p1, p2), max(p1, p2))
 
 fun source(r: range): source
@@ -156,7 +156,7 @@ fun default/range(m: maybe<range>): range
     Just(r) -> r
     Nothing -> null
 
-fun sourceFromRange(Range(start, end)): string
+fun source-from-range(Range(start, end)): string
   if start.off >= 0 then
      " ".replicate(start.col - 1).join ++ start.source.contents.slice.subslice(start.off, end.off).string
   else
@@ -175,6 +175,6 @@ fun sourceFromRange(Range(start, end)): string
           Nil -> ""
       Nil -> ""
 
-fun rawSourceFromRange(Range(start, end)): string
+fun raw-source-from-range(Range(start, end)): string
   val s: sslice = start.source.contents.slice
   s.subslice(start.off, end.off).string

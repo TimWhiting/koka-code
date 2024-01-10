@@ -19,8 +19,8 @@ fun (|->)(s: sub, e: evidence): pure evidence
 fun (|->)(s: sub, l: list<evidence>): pure list<evidence>
   l.map(fn(e) s |-> e)
 
-fun freeTypeVars(e: evidence)
-  typevar/freeTypeVars(e.pred)
+fun free-type-vars(e: evidence)
+  typevar/free-type-vars(e.pred)
 
 // fun boundTypeVars(e: evidence)
 //   typevar/boundTypeVars(e.pred)

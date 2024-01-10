@@ -6,14 +6,14 @@ import compiler/syntax/syntax
 import newstd/data/linearset
 
 fun promoteType(tp: userType): div userType
-  val free = tp.freeTypeVars
+  val free = tp.free-type-vars
   if free.is-empty then tp
   else
     val (someVars, forallVars) = free.list.partition(fn(x) x.isSomeVar)
     quantify(QSome, someVars.map(toTypeBinder), quantify(QForall, forallVars.map(toTypeBinder), tp))
 
 fun promoteFree(bound: list<userTypeBinder>, tps: list<userType>): div list<userTypeBinder>
-  (tps.freeTypeVars(freeTypeVars) - (namesEmpty + bound.map(name))).list.map(toTypeBinder)
+  (tps.free-type-vars(free-type-vars) - (namesEmpty + bound.map(name))).list.map(toTypeBinder)
 
 fun promote(somePars:list<userTypeBinder>, forallPars: list<userTypeBinder>, preds: list<userType>, mbResTp: maybe<(maybe<userType>, userType)>, uexpr: userExpr): pure userExpr
   fun resType(expr': userExpr)
@@ -61,7 +61,7 @@ fun promote(somePars:list<userTypeBinder>, forallPars: list<userTypeBinder>, pre
     val eff = effType.snd
     val funTp = TpFun(rargsTypes.reverse, eff, resType'.snd, expr'.range)
     // Quantify over free type variables
-    val implicit = (funTp.freeTypeVars - (quantified + names)).list
+    val implicit = (funTp.free-type-vars - (quantified + names)).list
     // Create fully quantified type
     val (impSome, impForall) = implicit.partition(isSomeVar)
     val fullTp =

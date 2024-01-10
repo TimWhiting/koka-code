@@ -63,7 +63,7 @@ fun uniquefy(c: core): pure core
 fun uniquefy(dgs: defGroups): pure defGroups
   with runUn(0)
   val locals = getLocals()
-  val topLevelDefs = dgs.flatten.map(defName).filter(fn(n) !n.isNil)
+  val topLevelDefs = dgs.flatten.map(def-name).filter(fn(n) !n.isNil)
   setLocals(topLevelDefs.foldl(locals, fn(acc, n) acc.add(n.unqualify)))
   dgs.map(fn(dg) fullLocalized({uniquefyDG(dg)}))
 
@@ -78,7 +78,7 @@ fun uniquefy(dg: defGroup): pure defGroup
     DefNonRec(d) -> DefNonRec(d.uniquefyDef)
     DefRec(defs) ->
       val locals = getLocals()
-      setLocals(defs.map(defName).filter(fn(n) !n.isNil).foldl(locals, fn(acc, n) acc.add(n)))
+      setLocals(defs.map(def-name).filter(fn(n) !n.isNil).foldl(locals, fn(acc, n) acc.add(n)))
       DefRec(defs.map(fn(d) d(defExpr=localized({d.defExpr.uniquefyExprX}))))
 
 fun uniquefyInnerDefGroup(dg: defGroup)
@@ -87,14 +87,14 @@ fun uniquefyInnerDefGroup(dg: defGroup)
     DefRec(defs) -> DefRec(uniquefyRecDefs(defs))
 
 fun uniquefyRecDefs(defs: list<def>)
-  val names = defs.map(fn(d) d.defName.uniquefyName)
+  val names = defs.map(fn(d) d.def-name.uniquefyName)
   val exprs = localized({defs.map(fn(d) d.defExpr.uniquefyExprX)})
-  names.zip(exprs).zip(defs).map(fn(((n, e), d)) d(defName=n, defExpr=e))
+  names.zip(exprs).zip(defs).map(fn(((n, e), d)) d(def-name=n, defExpr=e))
 
 fun uniquefyDef(d: def)
   val expr1 = localized({d.defExpr.uniquefyExprX})
-  val name1 = d.defName.uniquefyName
-  d(defName=name1, defExpr=expr1)
+  val name1 = d.def-name.uniquefyName
+  d(def-name=name1, defExpr=expr1)
 
 fun uniquefyExprX(e: expr)
   match e

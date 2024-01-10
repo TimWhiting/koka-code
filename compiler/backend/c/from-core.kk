@@ -33,7 +33,7 @@ fun cFromCore(cTarget: cTarget, b: buildType, sourceDir: path,
   with handler
     val cdefToHeader = False
     val substEnv = []
-    val cdefName = core.coreName
+    val cdef-name = core.coreName
   var rhdoc := []
   var rcdoc := []
   var ridoc := [] // initialization expressions

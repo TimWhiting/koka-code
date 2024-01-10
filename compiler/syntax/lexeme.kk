@@ -59,13 +59,13 @@ fun is-lparen(l: lex): bool
 fun is-rangle(l: lex): bool
   match l
     LexSpecial(">") -> True
-    LexOp(nm) | nm.showPlain == ">" -> True
+    LexOp(nm) | nm.show-plain == ">" -> True
     _ -> False
 
 fun is-langle(l: lex): bool
   match l
     LexSpecial("<") -> True
-    LexOp(nm) | nm.showPlain == "<" -> True
+    LexOp(nm) | nm.show-plain == "<" -> True
     _ -> False
 
 fun is-rbracket(l: lex): bool
@@ -171,12 +171,12 @@ pub fun lex/show(l: lex): <> string
     LexFloat(_, s) -> "float " ++ s.show
     LexChar(c) -> "char " ++ c.show
     LexString(s) -> "string \"" ++ s ++ "\""
-    LexId(n) -> "identifier \"" ++ n.show ++ "\""
-    LexOp(n) -> "operator \"" ++ n.show ++ "\""
-    LexPrefix(n) -> "prefix operator \"" ++ n.show ++ "\""
-    LexIdOp(n) -> "identifier (operator) \"" ++ n.show ++ "\""
-    LexWildCard(n) -> "wildcard \"" ++ n.show ++ "\""
-    LexModule(n, _) -> "module \"" ++ n.show ++ "\""
+    LexId(n) -> "identifier \"" ++ n.name/name/show ++ "\""
+    LexOp(n) -> "operator \"" ++ n.name/name/show ++ "\""
+    LexPrefix(n) -> "prefix operator \"" ++ n.name/name/show ++ "\""
+    LexIdOp(n) -> "identifier (operator) \"" ++ n.name/name/show ++ "\""
+    LexWildCard(n) -> "wildcard \"" ++ n.name/name/show ++ "\""
+    LexModule(n, _) -> "module \"" ++ n.name/name/show ++ "\""
     LexKeyword(k, d) -> "keyword \"" ++ k.show ++ "\"" ++ (if d.is-empty then "" else " (" ++ d ++ ")")
     LexSpecial(s) -> "special \"" ++ s ++ "\""
     LexComment(s) -> "comment \"" ++ s.show ++ "\""
@@ -185,5 +185,5 @@ pub fun lex/show(l: lex): <> string
     LexInsRCurly -> "end of statements ('}')"
     LexInsSemi -> "end of statement (';')"
     LexError(s) -> "error: " ++ s ++ ""
-    LexCons(n) -> "constructor \"" ++ n.show ++ "\""
-    LexTypeId(n, s) -> "typedid " ++ n.show ++ ":" ++ s
+    LexCons(n) -> "constructor \"" ++ n.name/name/show ++ "\""
+    LexTypeId(n, s) -> "typedid " ++ n.name/name/show ++ ":" ++ s

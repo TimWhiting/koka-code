@@ -29,7 +29,7 @@ effect currentDefEffect
 alias liftDefEff = <funLiftEffect, currentDefEffect, pure, uniquePhase, comp-flags>
 
 fun currentDefNames()
-  currentDef.map(fn(d) d.defName)
+  currentDef.map(fn(d) d.def-name)
 
 fun setCurrentDef(d: def, f)
   with override
@@ -91,7 +91,7 @@ fun liftDefGroup(defg: defGroup, topLevel: bool)
         val exprs = defs.map(fn(d) d.defExpr)
         val names = defs.map(defTName)
         val fvs = exprs.map(freeLocals).unions - names
-        val tvs = exprs.map(freeTypeVars).unions
+        val tvs = exprs.map(free-type-vars).unions
         val (callExprs, liftedDefs0) = pinfoss.zip(names.zip(exprDocs)).map(fn((infos, (name, doc))) makeDef(fvs.list, tvs.list, infos, name, doc)).unzip
         val subst = names.zip(callExprs)
         val liftedDefs = liftedDefs0.map(fn(d) d.substWithLiftedExpr(subst))
@@ -153,8 +153,8 @@ fun makeDef(fvs: list<tName>, tvs: list<typeVar>, pinfos: list<paramInfo>, origN
 fun uniqueNameCurrentDef()
   val current = currentDef.last.unjust
   val i = newUnique()
-  val udefName = toHiddenUniqueName(i,"lift",current.defName)
-  (udefName, current.kinline)
+  val udef-name = toHiddenUniqueName(i,"lift",current.def-name)
+  (udef-name, current.kinline)
 
 // Don't lift a simple function. A function is simple if it's body is simply an
 // application consisting of simple arguments.

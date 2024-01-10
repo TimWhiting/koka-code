@@ -163,7 +163,7 @@ fun unifyTVar(tv: typeVar, tp: ktype): <pure,unify> ()
   match tv
     TypeVar(id, k, Meta) -> 
       val etp = tp.expandSyn
-      if etp.freeTypeVars.fuv.list.any(fn(tv') tv == tv') then
+      if etp.free-type-vars.fuv.list.any(fn(tv') tv == tv') then
         match etp
           TVar(tv') | tv == tv' -> () // i.e. a ~ id<a>
           _ -> unifyError(Infinite)
@@ -285,9 +285,9 @@ fun subsume(rng: range, free: tvs, tp1: ktype, tp2: ktype): <unify,pure,comp-fla
   // entailment check: predicates should be entailed
   // TODO: we should check for skolems since predicates with skolems must be entailed directly
   val sub = getSubst()
-  val tvs1 : tvs = (free + tp1.freeTypeVars)
+  val tvs1 : tvs = (free + tp1.free-type-vars)
   val allfree = tvs1.list
-  val escaped = sub.list.filter(fn((tv, _)) allfree.any(fn(t) t == tv)).map(snd).freeTypeVars.fsv
+  val escaped = sub.list.filter(fn((tv, _)) allfree.any(fn(t) t == tv)).map(snd).free-type-vars.fsv
   if escaped.disjoint(sks.tvsNew) then ()
   else unifyError(NoSubsume)
   val (evsEnt, coreEnt) = entails(sks.tvsNew, sub |-> evs1, sub |-> evs2)

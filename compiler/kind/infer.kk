@@ -118,7 +118,7 @@ fun synCopyCon(di: dataInfo, ci: conInfo, modName: name)
   DefNonRec(Def(ValueBinder(nameCopy, (), Ann(expr, fullTp, rc), rc, rc), rc, di.vis, defFun([]), InlineAuto, ""))
 
 fun hasAccessor(ci: conInfo, nm: name, tp: ktype)
-  val tvs = tp.freeTypeVars
+  val tvs = tp.free-type-vars
   !(nm.isFieldName || nm == nameNil) && ci.existentials.all(fn(tv) !tvs.member(tv))
 
 fun nubBy(xs: list<a>, f: (a, a) -> bool): list<a>
@@ -164,7 +164,7 @@ fun synAccessors(di: dataInfo, modName: name)
 fun synTester(di: dataInfo, ci: conInfo)
   if ci.name.isHiddenName then []
   else
-    val defName = "is-".prepend(ci.name.unqualify.toVarName)
+    val def-name = "is-".prepend(ci.name.unqualify.toVarName)
     val arg = di.name.unqualify
     val rc = ci.range
     val patterns = ci.params.map(fn(_) (Nothing, PatWild(rc)))
@@ -173,7 +173,7 @@ fun synTester(di: dataInfo, ci: conInfo)
     val caseExpr = Case(Var(arg, False, rc), [branch1, branch2], rc)
     val expr = Lam([ValueBinder(arg, Nothing, Nothing, rc, rc)], caseExpr, rc)
     val doc = "// Automatically generated. Tests for the `" ++ ci.name.nameId ++ "` constructor of the `:" ++ di.name.nameId ++ "` type.\n"
-    [DefNonRec(Def(ValueBinder(defName, (), expr, rc, rc), rc, ci.vis, defFunEx([Borrow], Fip(AllocAtMost(0))), InlineAlways, doc))]
+    [DefNonRec(Def(ValueBinder(def-name, (), expr, rc, rc), rc, ci.vis, defFunEx([Borrow], Fip(AllocAtMost(0))), InlineAlways, doc))]
 
 fun synConstrTag(ci: conInfo)
   val nm = ci.name.unqualify.toOpenTagName

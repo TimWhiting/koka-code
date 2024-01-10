@@ -9,12 +9,12 @@ pub fun (==)(l1: linearMap<k,v>, l2: linearMap<k,v>, ?key/(==): (k, k) -> e bool
       Just(v') -> v' == x.snd
       Nothing -> False
 
-pub fun key/contains(l: linearMap<k,v>, k: k, (==): (k, k) -> e bool): e bool
+pub fun key/contains(l: list<(k,v)>, k: k, ?(==): (k, k) -> e bool): e bool
   l.any(fn((kk, _)) kk == k)
 
-fun update(l: list<(k,v)>, k: k, f: (v, v) -> e v, b: v, ?(==): (k, k) -> e bool): e list<(k,v)>
+fun update(l: list<(k,v)>, k: k, b: v, f: (v, v) -> e v, ?(==): (k, k) -> e bool): e list<(k,v)>
   match l
-    Cons((kk, vv), rst) -> if k == kk then Cons((kk, f(b, vv)), rst) else Cons((kk, vv), rst.update(k, f, b))
+    Cons((kk, vv), rst) -> if k == kk then Cons((kk, f(b, vv)), rst) else Cons((kk, vv), rst.update(k, b, f))
     Nil -> Cons((k, b), Nil) 
 
 fun get(l: list<(k,v)>, k: k, ?(==): (k, k) -> e bool): <exn|e> v
@@ -32,11 +32,11 @@ fun get-default(l: list<(k,v)>, k: k, v: v, ?(==): (k, k) -> e bool): e v
 
 /// Overwrite any existing key with value
 pub fun set(m: linearMap<k,v>, k: k, v: v, ?(==): (k, k) -> e bool): e linearMap<k,v>
-  m.update(k, fn(_, v1) v1, v)
+  m.update(k, v, fn(_, v1) v1)
 
 /// Add only if key is not present in the map
 pub fun add(m: linearMap<k,v>, k: k, b: v, ?(==): (k, k) -> e bool): e linearMap<k,v>
-  m.update(k, fn(x, _) x, b)
+  m.update(k, b, fn(x, _) x)
 
 pub fun add-all(m: linearMap<k,v>, l: list<(k,v)>, ?(==): (k, k) -> e bool): e linearMap<k,v>
   match l
@@ -69,4 +69,4 @@ pub fun remove-all(m: linearMap<k,v>, l: list<k>, ?(==): (k, k) -> e bool): e li
   m.filter(fn((k1,_)) !l.any(fn(k2) k1 == k2))
 
 pub fun union-with(m1: linearMap<k,v>, m2: linearMap<k,v>, f: (v, v) -> e v, ?(==): (k, k) -> e bool): e linearMap<k,v>
-  m2.foldl(m1, fn(x, (k, y)) x.update(k, f, y))
+  m2.foldl(m1, fn(x, (k, y)) x.update(k, y, f))

@@ -23,13 +23,13 @@ fun unrollRecDef(d: def)
 fun unrollBody(d: def, tpars: list<typeVar>, pars: list<tName>, eff: keffect, body: expr)
   match body
     Case(exprs, branches as Cons(Branch(pats))) | exprs.all(fn(x) x.cost == 0)
-      match branches.extractNonRecBranches(d.defName, [])
+      match branches.extractNonRecBranches(d.def-name, [])
         (nonrecbs, recbs) | nonrecbs.length > 0 && recbs.length > 0 ->
-          val dname = d.defName
+          val dname = d.def-name
           val rname = dname.uniqueTNameFrom
           val info = InfoArity(tpars.length, pars.length)
           val sub = [(dname, Var(rname, info))]
-          val rdef = d(defName=rname.getName, defExpr=(sub |-> d.defExpr), vis=Private)
+          val rdef = d(def-name=rname.getName, defExpr=(sub |-> d.defExpr), vis=Private)
           val rcall = App(TypeApp(Var(rname, info), tpars.map(fn(tv) TVar(tv)), pars.map(fn(v) Var(v, InfoNone))))
           val wild = Branch(pats.map(fn(_) PatWild), [Guard(exprTrue, rcall)])
           fun mkFun(b)

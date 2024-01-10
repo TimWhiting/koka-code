@@ -276,7 +276,7 @@ fun entails(skolems: tvs, known: list<evidence>, evs: list<evidence>): unify (li
 // Returns under which predicates this holds and a core transformer that needs to be
 // applied to the expression of type `t2`. Also returns a new type for the expected type `tp1` where 'some'
 // types have been properly substituted (and may be quantified).
-fun subsume(rng: range, free: tvs, tp1: ktype, tp2: ktype): <unify,pure,compFlags,uniquePhase|e> (ktype, list<evidence>, expr -> <unify,pure|e> expr)
+fun subsume(rng: range, free: tvs, tp1: ktype, tp2: ktype): <unify,pure,comp-flags,uniquePhase|e> (ktype, list<evidence>, expr -> <unify,pure|e> expr)
   // skolemize, instantiate and unify
   val (sks, evs1, rho1, _) = skolemizeEx(tp1, rng)
   val (tvs, evs2, rho2, _) = skolemizeEx(tp2, rng)
@@ -303,7 +303,7 @@ fun subsume(rng: range, free: tvs, tp1: ktype, tp2: ktype): <unify,pure,compFlag
 
 /// Does a function type match the given arguments? if the first argument 'matchSome' is ture,
 /// it is considered a match even if not all arguments to the function are supplied
-fun matchArguments(matchSome: bool, rng: range, free: tvs, tp: ktype, fixed: list<ktype>, namedArgs: list<(name,ktype)>): <unify,pure,compFlags,uniquePhase> ()
+fun matchArguments(matchSome: bool, rng: range, free: tvs, tp: ktype, fixed: list<ktype>, namedArgs: list<(name,ktype)>): <unify,pure,comp-flags,uniquePhase> ()
   val rho1 = instantiate(tp, rng)
   match rho1.splitFunType
     Nothing -> unifyError(NoMatchType)
@@ -323,7 +323,7 @@ fun matchArguments(matchSome: bool, rng: range, free: tvs, tp: ktype, fixed: lis
         else unifyError(NoMatchType)
 
 /// Does a type have the given named arguments?
-fun matchNamed(rng: range, tp: ktype, n: int, namedArgs: list<name>): <unify,pure,compFlags,uniquePhase> ()
+fun matchNamed(rng: range, tp: ktype, n: int, namedArgs: list<name>): <unify,pure,comp-flags,uniquePhase> ()
   val rho1 = instantiate(tp, rng)
   match rho1.splitFunType
     Nothing -> unifyError(NoMatchType)
@@ -339,7 +339,7 @@ fun matchNamed(rng: range, tp: ktype, n: int, namedArgs: list<name>): <unify,pur
         else unifyError(NoMatchType)
 
 /// Do two types overlap on the argument types? Used to check for overlapping definitions of overloaded identifiers.
-fun overlaps(rng: range, free: tvs, tp1: ktype, tp2: ktype): <unify,pure,compFlags,uniquePhase> ()
+fun overlaps(rng: range, free: tvs, tp1: ktype, tp2: ktype): <unify,pure,comp-flags,uniquePhase> ()
   val rho1 = instantiate(tp1, rng)
   val rho2 = instantiate(tp2, rng)
   match (rho1.splitFunType, rho2.splitFunType)

@@ -16,7 +16,7 @@ effect constructors
   fun constructorsFilter(modName: name): qname-map<conInfo>
   fun constructorsUnions(cs: list<qname-map<conInfo>>): qname-map<conInfo>
 
-fun withConstructors(cnstrs0: qname-map<conInfo>, f: () -> <constructors,exn,compFlags|e> a): <exn,compFlags|e> a
+fun withConstructors(cnstrs0: qname-map<conInfo>, f: () -> <constructors,exn,comp-flags|e> a): <exn,comp-flags|e> a
   var cnstrs := cnstrs0
   with handler
     fun constructorsExtend(name: name, k: conInfo)
@@ -45,13 +45,13 @@ fun single(name: name, c: conInfo): qname-map<conInfo>
 
 val empty = name-collections/qname-empty(eqC, showC)
 
-fun extractConstructors(c: core): <pure,compFlags> qname-map<conInfo>
+fun extractConstructors(c: core): <pure,comp-flags> qname-map<conInfo>
   c.typeDefs.map(extractTypeDefGroup).unions
 
-fun extractTypeDefGroup(g: typeDefGroup): <pure,compFlags> qname-map<conInfo>
+fun extractTypeDefGroup(g: typeDefGroup): <pure,comp-flags> qname-map<conInfo>
   g.map(extractTypeDef).unions
 
-fun extractTypeDef(d: typeDef): <pure,compFlags> qname-map<conInfo>
+fun extractTypeDef(d: typeDef): <pure,comp-flags> qname-map<conInfo>
   match d
     Data(dataInfo) | dataInfo.vis.is-public -> 
       fromList(dataInfo.constrs.filter(fn(ci) ci.vis.is-public).map(fn(ci) (ci.name, ci)), eqC, showC)

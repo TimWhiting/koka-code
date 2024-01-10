@@ -118,7 +118,7 @@ effect fixityEff
   fun getFixities(): fixities
   fun updateFixities(f: fixities -> pure fixities): ()
 
-alias fixEff = <fixityEff, pure, compFlags>
+alias fixEff = <fixityEff, pure, comp-flags>
 
 fun handleFixities(initial: fixities, f: () -> <fixityEff,pure|e> a): <pure|e> (a, fixities, list<doc>)
   var fixes := initial

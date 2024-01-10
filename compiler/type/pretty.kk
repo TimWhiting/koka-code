@@ -47,8 +47,8 @@ fun defaultDocEnv(f)
   with handler
     val colorizing = False
     val htmlBases = []
-    val htmlCss = "styles/" ++ compFlags.programName ++ ".css"
-    val htmlJs = "scripts/" ++ compFlags.programName ++ "-highlight.js"
+    val htmlCss = "styles/" ++ comp-flags.programName ++ ".css"
+    val htmlJs = "scripts/" ++ comp-flags.programName ++ "-highlight.js"
   f()
 
 fun defaultPPEnv(f)
@@ -58,7 +58,7 @@ fun defaultPPEnv(f)
 
 // Pretty print environment for types
 
-alias ppTypeEff = <ppTypeEnv,documentation,colorSchemeEffect,pure,niceEff<typeVar>,compFlags>
+alias ppTypeEff = <ppTypeEnv,documentation,colorSchemeEffect,pure,niceEff<typeVar>,comp-flags>
 
 effect precEff
   val prec: prec;
@@ -129,22 +129,22 @@ fun niceList(schemes: list<ktype>, f: (ktype) -> ppTypeEff doc): ppTypeEff list<
   schemes.map(f)
 
 // Pretty print a type
-fun pretty(t: ktype): <documentation,ppEnvEff,pure,compFlags,colorSchemeEffect> doc
+fun pretty(t: ktype): <documentation,ppEnvEff,pure,comp-flags,colorSchemeEffect> doc
   with handlePrettyEff
   with niceEnv
   t.ppType
 
-fun pretty(tv: typeVar): <documentation,ppEnvEff,pure,compFlags,colorSchemeEffect> doc
+fun pretty(tv: typeVar): <documentation,ppEnvEff,pure,comp-flags,colorSchemeEffect> doc
   with handlePrettyEff
   with niceEnv
   tv.ppTypeVar
 
-fun pretty(tc: typeCon): <documentation,ppEnvEff,pure,compFlags,colorSchemeEffect> doc
+fun pretty(tc: typeCon): <documentation,ppEnvEff,pure,comp-flags,colorSchemeEffect> doc
   with handlePrettyEff
   with niceEnv
   tc.ppTypeCon
 
-fun pretty(ts: typeSyn): <documentation,ppEnvEff,pure,compFlags,colorSchemeEffect> doc
+fun pretty(ts: typeSyn): <documentation,ppEnvEff,pure,comp-flags,colorSchemeEffect> doc
   with handlePrettyEff
   with niceEnv
   ts.ppTypeSyn
@@ -188,7 +188,7 @@ fun ppDeclType(tp: ktype, pinfos: list<paramInfo>)
       (Just(pparams), empty, if eff.isTypeTotal then empty else overridePrec(precArrow, {eff.ppType |.| space}) |.| overridePrec(precArrow, {rho.ppType})) 
     _ -> (Nothing, empty, tp.ppType)
 
-fun pretty(d: dataInfo): <documentation,ppEnvEff,pure,compFlags,colorSchemeEffect> doc
+fun pretty(d: dataInfo): <documentation,ppEnvEff,pure,comp-flags,colorSchemeEffect> doc
   with handlePrettyEff
   with niceEnv
   ppDataInfo(d, True, False)
@@ -246,7 +246,7 @@ fun ppVis(v: visibility)
     Public -> "pub ".keyword
 
 // Synonym info
-fun pretty(s: synInfo): <documentation,ppEnvEff,pure,compFlags,colorSchemeEffect> doc
+fun pretty(s: synInfo): <documentation,ppEnvEff,pure,comp-flags,colorSchemeEffect> doc
   with handlePrettyEff
   with niceEnv
   ppSynInfo(s)

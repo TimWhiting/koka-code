@@ -21,7 +21,7 @@ fun analyzeDivergence(defs0: list<def>)
 // Is a recursive definition group potentially divergent?
 // Assumes that the defintions are uniquefied
 // A valid result is always to return 'True'
-fun isDivergent(d: def): <compFlags, pure> bool
+fun isDivergent(d: def): <comp-flags, pure> bool
   d.defExpr.isDivergentBody(d.defName)
 
 fun isDivergentBody(b: expr, dname: name)
@@ -31,7 +31,7 @@ fun isDivergentBody(b: expr, dname: name)
     Lam(pars, _, e) -> e.isDivFun(pars, dname)
     _ -> True
 
-fun isDivFun(b: expr, pars: list<tName>, dname: name): <compFlags, pure> bool
+fun isDivFun(b: expr, pars: list<tName>, dname: name): <comp-flags, pure> bool
   match pars
     Nil -> True
     _ ->
@@ -90,7 +90,7 @@ effect divergent
   val rel: rel
   fun addCall(n: name, c: call): ()
 
-alias divEff = <divergent, compFlags, pure>
+alias divEff = <divergent, comp-flags, pure>
 
 fun setRel(r: rel, f: () -> divEff a): divEff a
   with override
@@ -98,7 +98,7 @@ fun setRel(r: rel, f: () -> divEff a): divEff a
     fun addCall(n, c) addCall(n, c)
   f()
 
-fun runDiv(dname: name, args: list<tName>, f: () -> divEff a): <compFlags, pure> list<call>
+fun runDiv(dname: name, args: list<tName>, f: () -> divEff a): <comp-flags, pure> list<call>
   var calls: list<call> := []
   with handler
     val rel = Rel(dname, args.map(fn(a) namesEmpty + a.getName), args.map(fn(a) namesEmpty))

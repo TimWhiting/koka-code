@@ -1,9 +1,9 @@
 import std/os/env
 
-pub effect val compFlags: compilerFlags;
+pub effect val comp-flags: compilerFlags;
 
-fun ".default-compFlags"(f){
-  with handler val compFlags = CompilerFlags(
+fun "@default-comp-flags"(f){
+  with handler val comp-flags = CompilerFlags(
     programName = "koka",
     version = "0.9.0",
     compiler = "koka",
@@ -33,4 +33,4 @@ fun os-config(): <exn,ndet> fileConfig
     "windows" -> FileConfig(".exe", ".dll", ".obj", ".lib", "", "\\", ";")
     "macos" -> FileConfig(".dylib", ".o", ".a", "lib", "", "/", ":")
 
-val sourceExt = ".kk"
+val source-ext = ".kk"

@@ -18,7 +18,7 @@ effect kGammaEff
   fun kgammaList(): list<(name, list<(name, kind)>)>
   fun kgammaFilter(modName: name): kGamma
 
-fun withKGamma(kg0: kGamma, f: () -> <kGammaEff,exn,compFlags|e> a): <exn,compFlags|e> a
+fun withKGamma(kg0: kGamma, f: () -> <kGammaEff,exn,comp-flags|e> a): <exn,comp-flags|e> a
   var kg := kg0
   with handler
     fun kgammaExtend(name: name, k: kind) kg := kgammaExtend(kg, name, k)
@@ -31,7 +31,7 @@ fun withKGamma(kg0: kGamma, f: () -> <kGammaEff,exn,compFlags|e> a): <exn,compFl
 
 fun kgammaUnions(ks: list<kGamma>)
   unions(ks)
-fun kgammaNewNub(xs: list<(name,kind)>): <compFlags, exn> kGamma
+fun kgammaNewNub(xs: list<(name,kind)>): <comp-flags, exn> kGamma
   xs.foldl(emptyKGamma, fn(m, (n,k)) m.insert(n,k))
 fun kgammaExtend(kg: kGamma, name: name, k: kind)
   kg.insert(name, k)
@@ -53,10 +53,10 @@ fun single(name: name, k: kind): kGamma
 
 val emptyKGamma = qname-empty(eqK, showK)
 
-fun extractKGamma(c: core): <exn,compFlags> kGamma
+fun extractKGamma(c: core): <exn,comp-flags> kGamma
   c.typeDefs.map(extractTypeDefGroup).unions
 
-fun extractTypeDefGroup(g: typeDefGroup): <exn,compFlags> kGamma
+fun extractTypeDefGroup(g: typeDefGroup): <exn,comp-flags> kGamma
   g.map(extractTypeDef).unions
 
 fun extractTypeDef(d: typeDef): kGamma

@@ -35,7 +35,7 @@ pub fun is-null(n: hashMap<k,v>): bool
 pub fun size(h: hashMap<k,v>): int
   size(h.map)
 
-pub fun size(h: hashMapI<k,v>): int
+pub fun internal/size(h: hashMapI<k,v>): int
   match h
     Empty -> 0
     Leaf -> 1

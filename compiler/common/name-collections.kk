@@ -42,15 +42,15 @@ fun qname-empty(eqA: (a, a) -> <div|e> bool, showA: (a) -> <div|e> string): qnam
 fun single(n: name, a: a, eqA: (a, a) -> <div|e> bool, showA: (a) -> <div|e> string): qname-map<a>
   linearMap([(n.unqualify, [(n, a)])])
 
-fun insert(m: qname-map<a>, n: name, a: a): <compFlags,exn> qname-map<a>
+fun insert(m: qname-map<a>, n: name, a: a): <comp-flags,exn> qname-map<a>
   m.update(n.unqualify, Cons((n, a), Nil)) fn(xs, ys)
     safeCombine("insert", xs, ys)
 
-fun fromList(l: list<(name,a)>, eqA: (a, a) -> <div|e> bool, showA: (a) -> <div|e> string): <compFlags,pure> qname-map<a>
+fun fromList(l: list<(name,a)>, eqA: (a, a) -> <div|e> bool, showA: (a) -> <div|e> string): <comp-flags,pure> qname-map<a>
   l.foldl(linearMap([])) fn(qm, (name, x))
     qm.insert(name, x)
 
-fun safeCombine(s: string, xs: list<(name,a)>, ys: list<(name,a)>): <compFlags,exn> list<(name,a)>
+fun safeCombine(s: string, xs: list<(name,a)>, ys: list<(name,a)>): <comp-flags,exn> list<(name,a)>
   if xs.any(fn(x) -> ys.any(fn(y) -> y.fst == x.fst)) then
     fail("common/name-collections " ++ s ++ ": overlapping names: " ++ xs.map(fn(x) -> x.fst.show).show ++ ys.map(fn(y) -> y.fst.show).show)
   xs ++ ys

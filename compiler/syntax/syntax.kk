@@ -410,7 +410,7 @@ fun removeTDefs(tdefs, tdefs0)
 fun removeDefs(defs, defs0)
   defs0.foldl(defs, fn(acc, def) acc.std/core/filter(fn(def') def'.defName != def.defName))
 
-fun addDefs(p: program<t,k>, tdefs0: list<typeDef<t,t,k>>, defs0: list<def<t>>): <exn,compFlags> program<t,k>
+fun addDefs(p: program<t,k>, tdefs0: list<typeDef<t,t,k>>, defs0: list<def<t>>): <exn,comp-flags> program<t,k>
   val tdefs' = match p.typeDefs
     [] -> [TypeDefRec(tdefs0)]
     [TypeDefRec(ts)] -> [TypeDefRec(ts.removeTDefs(tdefs0) ++ tdefs0)]

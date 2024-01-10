@@ -19,7 +19,7 @@ alias ids = list<id>
 alias id-map<a> = linearMap<int, a>
 // A set of identifiers
 alias id-set = linearSet<int>
-val emptyIds = linearSet([])
+val ids/null:id-set = []
 
 /// Identifiers are unique compiler generated identities
 alias id = int;
@@ -31,24 +31,23 @@ alias id = int;
 //   core/(<)(id1, id2)
 
 /// Show quotes around the id
-fun showId(id: id): <> string
+fun show(id: id): <> string
   "\"" ++ id.show ++ "\""
 
 /// Generate an 'Id' with a certain base name (which is ignored :-)
-fun genId(baseName: string, i: int): <> id
+fun gen-id(baseName: string, i: int): <> id
   i.newId
 
 /// Create a fresh identifier
-fun newId(i: int): <> id
+fun new-id(i: int): <> id
   i
 
-fun newIdFromId(id: id): <> id
+fun new-id-from(id: id): <> id
   id + 1
 
 /// Dummy identifier
-fun idNil(): <> id
-  0.newId
+val id-nil = 0.newId
 
 /// Only used internally to guarantee unique identifiers
-fun idNumber(id: id): <> int
+fun id-number(id: id): <> int
   id

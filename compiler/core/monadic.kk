@@ -11,7 +11,7 @@ import compiler/common/name
 import compiler/common/range
 import compiler/platform/config
 
-alias monadicEff = <compFlags,monadic,uniquePhase,pure>
+alias monadicEff = <comp-flags,monadic,uniquePhase,pure>
 
 effect monadic
   val currentDef: list<def>

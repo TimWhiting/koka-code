@@ -8,7 +8,7 @@ import compiler/lib/printer
 effect colorSchemeEffect
   val colors: colorScheme;
 
-fun ".default-colorSchemeEff"(f)
+fun "@default-colorSchemeEff"(f)
   handle(f)
     val colors = ColorScheme()
 
@@ -62,7 +62,7 @@ fun makeColorScheme(clr: color)
 
 // Read colors
 // Read a comma separated list of name=color pairs.
-fun readColorFlags(scheme: colorScheme, s: string)
+fun read-color-flags(scheme: colorScheme, s: string)
   fun split(xs: list<char>): list<string>
     val (pre, ys) = xs.span(fn(c) c != ',' && c != ';')
     match ys
@@ -71,10 +71,10 @@ fun readColorFlags(scheme: colorScheme, s: string)
       Nil -> Cons(pre.string, Nil)
       _ -> [pre.string, ""] // impossible case
 
-  s.list.split.foldl(scheme, fn(sc, s') sc.readColorFlag(s'))
+  s.list.split.foldl(scheme, fn(sc, s') sc.read-color-flag(s'))
 
 // Read a name=color flag.
-fun readColorFlag(scheme: colorScheme, s: string)
+fun read-color-flag(scheme: colorScheme, s: string)
   val (name, xs) = s.list.span(fn(c) c != '=' && c != ':')
   match xs
     Cons(c, clr) | c == '=' || c == ':' -> scheme.update(name.string, clr.string)

@@ -1,9 +1,9 @@
 import compiler/platform/config
 
-pub alias compilerEff = <compFlags, exn>
+pub alias compilerEff = <comp-flags, exn>
 
 fun raise(s: string): compilerEff a
-  if compFlags.buildVariant == "debug" then 
+  if comp-flags.buildVariant == "debug" then 
     throw(s) // Figure out stack traces
   else throw(s)
 

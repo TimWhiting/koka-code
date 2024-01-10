@@ -19,7 +19,7 @@ fun monadicLift()
 fun liftDefGroups(dgs: defGroups, topLevel: bool)
   dgs.map(fn(dg) dg.liftDefGroup(topLevel)).concat
 
-alias liftedEff = <lifted, uniquePhase, pure, compFlags>
+alias liftedEff = <lifted, uniquePhase, pure, comp-flags>
 effect lifted
   fun emit(dg: defGroup): ()
   fun collect(): list<defGroup>

@@ -74,7 +74,7 @@ fun skolemizeEx(tp: ktype, r: range)
   tp.instantiateExFl(Skolem, r)
 
 // General instantiation for skolemize and instantiate
-fun instantiateExFl(tp: ktype, fl: flavour, r: range): <uniquePhase, compFlags, pure> (list<typeVar>, list<evidence>, ktype, expr -> e expr)
+fun instantiateExFl(tp: ktype, fl: flavour, r: range): <uniquePhase, comp-flags, pure> (list<typeVar>, list<evidence>, ktype, expr -> e expr)
   match tp.splitPredType
     ([], [], rho) -> ([], [], rho, id)
     (vars, preds, rho) ->

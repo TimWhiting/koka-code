@@ -29,7 +29,7 @@ fun cFromCore(cTarget: cTarget, b: buildType, sourceDir: path,
               platform: platform, borrowed: borrowed, enableReuse: bool, 
               enableSpecialize: bool, enableReuseSpecialize: bool, enableBorrowInference: bool, 
               eagerPatBind: bool, stackSize: int, mbMain: maybe<(name, bool)>, 
-              core: core): <pure,compFlags,uniquePhase,newtypes,printer,documentation,niceEff<typeVar>,prettyTypeEff,precEff> (doc, doc, core)
+              core: core): <pure,comp-flags,uniquePhase,newtypes,printer,documentation,niceEff<typeVar>,prettyTypeEff,precEff> (doc, doc, core)
   with handler
     val cdefToHeader = False
     val substEnv = []
@@ -96,7 +96,7 @@ fun genModule(core: core, mbMain: maybe<(name, bool)>): asmEff core
   // parcReuseCore
   // parcReuseSpecializeCore
 
-  val headComment = "// Koka generated module:".text |+| modName.show.pretty |+| ", koka version:".text |+| compFlags.version.pretty |.| ", platform:".text |+| (targetPlatform.ptrSize * 8).pretty |.| "-bit".text
+  val headComment = "// Koka generated module:".text |+| modName.show.pretty |+| ", koka version:".text |+| comp-flags.version.pretty |.| ", platform:".text |+| (targetPlatform.ptrSize * 8).pretty |.| "-bit".text
   val initSignature = "void".text |+| ".init".newName.qualify(modName).cppName |.| emptyParams
   val doneSignature = "void".text |+| ".done".newName.qualify(modName).cppName |.| emptyParams
 

@@ -6,7 +6,7 @@ import compiler/common/name
 import compiler/common/failure
 import compiler/platform/config
 
-alias prettyKindEff = <pure, compFlags, colorSchemeEffect>
+alias prettyKindEff = <pure, comp-flags, colorSchemeEffect>
 
 fun kindColon()
   ":".text.color(colors.colorSep)

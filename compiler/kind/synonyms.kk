@@ -17,7 +17,7 @@ effect synonymsEff
   fun getSynonyms(): synonyms
   fun setSynonyms(syns: synonyms): ()
 
-fun withSynonyms(synonyms0: synonyms, f: () -> <synonymsEff,exn,compFlags|e> a): <exn,compFlags|e> a
+fun withSynonyms(synonyms0: synonyms, f: () -> <synonymsEff,exn,comp-flags|e> a): <exn,comp-flags|e> a
   var synonyms := synonyms0
   with handler
     fun getSynonyms() synonyms
@@ -57,13 +57,13 @@ fun single(name: name, s: synInfo): synonyms
   linearMap([(name, s)])
 val emptySynonyms:synonyms = linearMap([])
 
-fun extractSynonyms(c: core): <pure,compFlags> synonyms
+fun extractSynonyms(c: core): <pure,comp-flags> synonyms
   c.typeDefs.map(extractTypeDefGroup).unions
 
-fun extractTypeDefGroup(g: typeDefGroup): <pure,compFlags> synonyms
+fun extractTypeDefGroup(g: typeDefGroup): <pure,comp-flags> synonyms
   g.map(extractSynonyms).unions
 
-fun extractSynonyms(d: typeDef): <pure,compFlags> synonyms
+fun extractSynonyms(d: typeDef): <pure,comp-flags> synonyms
   match d
     Synonym(synInfo) -> single(synInfo.name, synInfo)
     _ -> emptySynonyms

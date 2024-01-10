@@ -91,7 +91,7 @@ fun fkv(k: infKind): kvs
     KICon(_) -> emptyIds
 
 // Pretty printing
-fun show(infkind: infKind): <compFlags,pure,colorSchemeEffect> string
+fun show(infkind: infKind): <comp-flags,pure,colorSchemeEffect> string
   with niceKindEnv()
   infkind.fkv.foreach(extendNice)
   infkind.ppInfKind(precInfKindTop).pprint/show
@@ -101,7 +101,7 @@ fun niceInfKinds(kinds: list<infKind>)
   kinds.map(fkv).unions.list.map(extendNice)
   kinds.map(fn(k) k.liftKApp.ppInfKind(precInfKindTop))
 
-fun ppInfKind(k: infKind, prec: int): <pure, niceEff<id>, compFlags, colorSchemeEffect> doc
+fun ppInfKind(k: infKind, prec: int): <pure, niceEff<id>, comp-flags, colorSchemeEffect> doc
   fun collectFunArgs(ik: infKind)
     match ik
       KIApp(KIApp(KICon(KCon(nm)), k1), k2) | nm == "->".newName -> Cons(k1, k2.collectFunArgs)

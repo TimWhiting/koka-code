@@ -26,7 +26,7 @@ effect infGammaEff
   fun infGammaSet(inf: infGamma): ()
   fun infGammaGet(): infGamma
 
-fun withinfGamma(ig0: infGamma, f: () -> <infGammaEff,exn,compFlags|e> a): <exn,compFlags|e> a
+fun withinfGamma(ig0: infGamma, f: () -> <infGammaEff,exn,comp-flags|e> a): <exn,comp-flags|e> a
   var ig := ig0
   with handler
     fun infGammaExtend(name: name, ni: nameInfo) ig := infGammaExtend(ig, name, ni)

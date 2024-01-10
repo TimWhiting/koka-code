@@ -36,7 +36,7 @@ fun urTopDef(d: def): ureff def
 effect ur
   val currentEff: maybe<keffect>
 
-alias ureff = <ur,compFlags,pure,corePhase>
+alias ureff = <ur,comp-flags,pure,corePhase>
 
 fun currentEffect(eff: keffect, k: () -> <ur|e> a): <ur|e> a
   with override

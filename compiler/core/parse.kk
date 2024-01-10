@@ -323,7 +323,7 @@ fun pBody()
 fun pExpr()
   choices("expr", [pFun, pForall, pMatch, pLet, pApp])
 
-fun pApp(): <ast,eenv,compFlags,synonyms> expr
+fun pApp(): <ast,eenv,comp-flags,synonyms> expr
   val expr = pAtom()
   fun parseApplies(e)
     choices("app", [
@@ -401,7 +401,7 @@ fun pDefGroups()
 fun pDefGroups0()
   maybe("def groups", {pDefGroups()}).default([])  
 
-fun pDefGroup(): <ast,eenv,compFlags,synonyms> defGroup
+fun pDefGroup(): <ast,eenv,comp-flags,synonyms> defGroup
   val (sort, inl, _, doc) = pDefSort()
   val (name, _) = choices("def group", [pFunId, {pWildcard(); (nameNil, rangeNull)}])
   val tp = pTypeAnnot()
@@ -440,7 +440,7 @@ fun pPatCon()
   val InfoCon(_, typ, repr, cons) = envLookupCon(cname)
   PatCon(TName(cname, typ), patArgs, repr, argTypes, exists0, resTp, cons, skip)
 
-fun pPatternArgs0(): <ast,eenv,compFlags,synonyms> list<(pattern, ktype)>
+fun pPatternArgs0(): <ast,eenv,comp-flags,synonyms> list<(pattern, ktype)>
   maybe("pattern args", {pPatternArgs1()}).default([])
 
 fun pPatternArgs1()
@@ -541,7 +541,7 @@ fun pKindAnnotFull()
 fun pKindAnnot()
   maybe("kind annotation", {pSpecialOp("::"); pKind()}).default(kindStar)
 
-fun pType(): <ast,eenv,compFlags,synonyms> ktype
+fun pType(): <ast,eenv,comp-flags,synonyms> ktype
   pTypeX(False).fst
 
 fun pDefType()
@@ -563,7 +563,7 @@ fun pTForall()
 fun pQualifier()
   maybe("qualifier", {pKeyword("with"); pmany1("qualifier predicates", pPredicate)}).default([])
 
-fun pPredicate(): <ast,eenv,compFlags,synonyms> pred
+fun pPredicate(): <ast,eenv,comp-flags,synonyms> pred
   try("predicate") 
     val (name, _) = pQVarId()
     val tps = maybe("predicate type parameters", {angles({pSepBy("predicates", pType, pComma)}).fst}).default([])
@@ -593,7 +593,7 @@ fun pTResult(params)
     Just(tp) -> tp
     Nothing -> TFun(params, typeTotal, tp1)
 
-fun pTAtom(): <ast,eenv,compFlags,synonyms> ktype
+fun pTAtom(): <ast,eenv,comp-flags,synonyms> ktype
   val etp = pTAtomParamsEx(False, False)
   match etp
     Left((params, _)) -> pTypeApp(extract(params, "expecting single type"))
@@ -640,7 +640,7 @@ fun pTypeApp(tp)
   val tps = maybe("type application", {angles({pSepBy("type params", pType, pComma)}).fst}).default([])
   pSynonym(tp, tps)
 
-fun pSynonym(tp, tps): <ast,eenv,compFlags,synonyms> ktype
+fun pSynonym(tp, tps): <ast,eenv,comp-flags,synonyms> ktype
   val res = maybe("Env")
     pSpecialOp("==")
     val rank = maybe("synonym rank", {pInteger().fst}).default(0)
@@ -665,13 +665,13 @@ fun pTEffect()
   pRangle()
   labels.foldr(ext, shallowEffectExtend)
 
-fun pTExtend(): <ast,eenv,compFlags,synonyms> ktype
+fun pTExtend(): <ast,eenv,comp-flags,synonyms> ktype
   maybe("effect extend", {pBar(); pTAtom()}).default(effectEmpty)
 
 fun pTLabel()
   pTypeApp(pTAtom())
 
-fun pTId(): <ast,eenv,compFlags,synonyms> ktype
+fun pTId(): <ast,eenv,comp-flags,synonyms> ktype
   val (name, _) = choices("type id", [pQVarId, pQIdOp, pWildcard])
   val kind = maybe("type kind", pKindAnnotFull).default(kindStar)
   envType(name, kind)
@@ -718,7 +718,7 @@ struct envv
   locals: linearMap<name, ktype>
   synonyms: name-map<synInfo>;
 
-fun withEnvInitial(modName: name, imports0, f: () -> <eenv,ast,compFlags,synonyms> a): <compFlags,ast> a
+fun withEnvInitial(modName: name, imports0, f: () -> <eenv,ast,comp-flags,synonyms> a): <comp-flags,ast> a
   with withSynonyms(synonyms/empty)
   var bound := linearMap([], fn(x: name, y: name) x == y, fn(x: typeVar, y: typeVar) x == y, fn(x) x.show, fn(x) x.show)
   var imports := imports0

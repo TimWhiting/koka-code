@@ -18,7 +18,7 @@ import compiler/lib/printer
 import compiler/common/color-scheme
 import std/os/path
 
-alias asmEff = <pure,asm,compFlags,uniquePhase,colorSchemeEffect,newtypesEff,printer,subst,documentation,niceEff<typeVar>,ppEnvEff,precEff,prettyTypeEff>
+alias asmEff = <pure,asm,comp-flags,uniquePhase,colorSchemeEffect,newtypesEff,printer,subst,documentation,niceEff<typeVar>,ppEnvEff,precEff,prettyTypeEff>
 
 // Put the things that need overriding in here
 effect subst
@@ -317,7 +317,7 @@ fun parameters(pars: list<doc>): doc
 fun arguments(args: list<doc>): doc
   tupled(args ++ [contextDoc])
 
-fun ppLit(l: lit): <exn,compFlags> doc
+fun ppLit(l: lit): <exn,comp-flags> doc
   match l
     LitInt(i) ->
       if i.isSmallInt then text("kk_integer_from_small") |.| parens(i.pretty)
@@ -561,7 +561,7 @@ val constdecl = "const".text
 fun tParameters(tns: list<tName>): doc
   ntParameters(tns.map(fn(tn) (tn.getName, tn.tNameType)))
 
-fun resultType(tp: ktype): <pure,compFlags> ktype
+fun resultType(tp: ktype): <pure,comp-flags> ktype
   match tp.splitFunScheme
     Just((_, _, _, _, res)) -> res
     _ -> fail("backend/c/from-core resultType: not a function type: " ++ tp.show) // TODO: Pretty type

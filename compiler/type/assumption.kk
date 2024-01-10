@@ -152,7 +152,7 @@ fun extractGammaImports(imports: list<(name,name)>, modName: name): gamma
 fun extractImport((name, qname))
   single(name, InfoImport(Private, typeVoid, name, qname, rangeNull))
 
-fun extractGamma(isValue: (dataInfo -> bool), privateAsPublic: bool, c: core): <exn, compFlags> gamma
+fun extractGamma(isValue: (dataInfo -> bool), privateAsPublic: bool, c: core): <exn, comp-flags> gamma
   fun updateVis(vis)
     match vis
       Public -> Public
@@ -190,7 +190,7 @@ fun createNameInfoX(vis, name, sort, rng, tp)
     DefVar -> InfoVal(vis, name, tp, rng, True)
     _ -> InfoVal(vis, name, tp, rng, False)
 
-fun arity(tp: ktype): <compFlags, exn> (int, int)
+fun arity(tp: ktype): <comp-flags, exn> (int, int)
   match tp.expandSyn
     TForAll(tvars, _, t) ->
       match t.expandSyn

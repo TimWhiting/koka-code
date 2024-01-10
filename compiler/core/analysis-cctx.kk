@@ -13,7 +13,7 @@ import compiler/core/core
 import compiler/platform/config
 
 // take a context and check if it is well-formed and return a well-typed context expression
-fun analyzeCCtx(rng: range, expr: expr): <compFlags, uniquePhase, pure, newtypes> (expr, list<doc>)
+fun analyzeCCtx(rng: range, expr: expr): <comp-flags, uniquePhase, pure, newtypes> (expr, list<doc>)
   with handler
     return(x) (x, [])
     final ctl emitCCtxError(e) (expr.typeOf.makeCCtxEmpty, [e])

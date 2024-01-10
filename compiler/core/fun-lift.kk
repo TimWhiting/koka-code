@@ -26,7 +26,7 @@ effect funLiftEffect
 effect currentDefEffect
   val currentDef: list<def>
 
-alias liftDefEff = <funLiftEffect, currentDefEffect, pure, uniquePhase, compFlags>
+alias liftDefEff = <funLiftEffect, currentDefEffect, pure, uniquePhase, comp-flags>
 
 fun currentDefNames()
   currentDef.map(fn(d) d.defName)

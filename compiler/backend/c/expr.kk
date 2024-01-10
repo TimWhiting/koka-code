@@ -811,7 +811,7 @@ fun genExprExternal(tname: tName, formats: list<(target, string)>, args: list<do
         ([], genHoleCall(tname.typeOf.resultType))
   val format = getFormat(tname, formats)
   val argDocs = args.map(fn(d) if d.asString.list.all(fn(c) c.is-alpha || c.is-digit || c == '_') then d else d.parens)
-  fun ppExternalF(name: name, k: list<char>): <compFlags,documentation,pure,colorSchemeEffect,ppEnvEff> doc
+  fun ppExternalF(name: name, k: list<char>): <comp-flags,documentation,pure,colorSchemeEffect,ppEnvEff> doc
     match k
       Nil -> empty
       Cons('\\', Cons('#', xs)) -> char('#') |.| ppExternalF(name, xs)

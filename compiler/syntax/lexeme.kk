@@ -14,7 +14,7 @@ pub struct lexeme ( pub range: range, pub lex: lex )
 pub type lex
   LexInt(i: int, s: string)
   LexFloat(f: float64, s: string)
-  LexChar(c: string)
+  LexChar(c: char)
   LexString(s: string)
   LexId(n: name)
   LexCons(n: name)
@@ -177,10 +177,10 @@ pub fun lex/show(l: lex): <> string
     LexIdOp(n) -> "identifier (operator) \"" ++ n.show ++ "\""
     LexWildCard(n) -> "wildcard \"" ++ n.show ++ "\""
     LexModule(n, _) -> "module \"" ++ n.show ++ "\""
-    LexKeyword(k, d) -> "keyword \"" ++ k ++ "\"" ++ (if d.is-empty then "" else " (" ++ d ++ ")")
+    LexKeyword(k, d) -> "keyword \"" ++ k.show ++ "\"" ++ (if d.is-empty then "" else " (" ++ d ++ ")")
     LexSpecial(s) -> "special \"" ++ s ++ "\""
-    LexComment(s) -> "comment \"" ++ s ++ "\""
-    LexWhite(x) -> "white" ++ x ++ ""
+    LexComment(s) -> "comment \"" ++ s.show ++ "\""
+    LexWhite(x) -> "white" ++ x.show ++ ""
     LexInsLCurly -> "start of statements ('{')"
     LexInsRCurly -> "end of statements ('}')"
     LexInsSemi -> "end of statement (';')"

@@ -2,6 +2,8 @@
 import compiler/common/name
 import compiler/common/range
 import compiler/syntax/lexeme
+import compiler/syntax/lex-help
+import std/num/float64
 val alex_tab_size:int = 8
 val alex_base : list<int> =  [ 1, 129, 385, 641, 897, 1153, -56, 151, -55, 273, -32, 545, -31, -30, 1060, 130, 156, 0, 0, 0, 1266, 1331, 1395, 1523, 1651, 1907, -27, -26, -25, -24, 802, -22, 0, 131, 0, 0, 0, 127, 0, 0, 0, 1892, 1957, 2021, 2149, 2277, 2533, 0, 0, -19, 2534, -17, 50, 52, 2582, 53, 54, 2646, 55, 337, 56, 830, 57, 58, 2710, 59, 2774, 2836, 2889, 609, 2937, 60, 3001, 3065, 3066, 61, 3130, 200, 3194, 303, 3258, 0, 184, 3411, 3412, 3324, 3477, 1124, 3478, 3374, 304, 3479, 3527, 3439, 3560, 3513, 305, 3625, 3666, 3733, 0, 0, 0, 0, 3782, 3847, 3911, 4039, 4167, 4423, 0, 0, 306, 4424, 307, 3594, 308, 3662, 309, 310, 4488, 311, 4552, 312, 4553, 313, 314, 4617, 315, 4681, 4743, 316, 4796, 705, 4940, 472, 1229, 456, 4914, 0, 753, 1230, 0, 725, 0, 0, 0, 4963, 5028, 5092, 5220, 5348, 5604, 0, 3610, 733, 731, 5699, 5734, 5769, 5799, 5882, 5966, 0, 726, 6056, 6091, 6121, 6205, 6283, 0, 3658, 4950, 4965, 4975, 6358, 5698, 5880, 6423, 6448, 6513, 6538, 5733, 6044, 6563, 6605, 0, 888, 6640, 6675, 940, 6735, 6770, 6805, 6840, 0, 0, 6870, 949, 0, 891, 6959, 0, 946, 6955, 7032, 7055, 7093, 7116, 7154, 0, 947, 0, 983, 7257, 7258, 7386, 7450, 7515, 7628, 0, 0, 0, 984, 979, 0, 7884, 7885, 8013, 8077, 8142, 8255, 0, 0, 0, 8511, 1152, 0, 8639, 969, 8703, 8767, 991, 0, 0, 0, 8507, 8530, 8911, 8934, 8972, 8995, 0, 0, 992, 8968, 1076, 1077, 1078, 1079, 1080, 1081, 0, 9149, 9150, 9278, 9342, 9407, 9520, 0, 0, 0, 1268, 9742, 1085, 0, 9735, 2467, 9799, 9863, 3031, 0, 9927, 3406, 9622, 9991, 10023, 3407, 10087, 3408, 10149, 10202, 3409, 10266, 3410, 10298, 3522, 10362, 3523, 10394, 3524, 10442, 3525, 6611, 3526, 10506, 3660, 3661 ];
 
@@ -20,84 +22,79 @@ val linecom = 2
 val linedir = 3
 val stringlit = 4
 val stringraw = 5
-val alex_action_0: action = fn(s: sslice) token(LexWhite(s))
-val alex_action_1: action = fn(_: sslice) token(LexWhite("\n"))
+val alex_action_0: action = string(fn(s: string) LexWhite(s))
+val alex_action_1: action = string(fn(_: string) LexWhite("\n"))
 val alex_action_2: action = fn(_: sslice) next(comment, more(id))
 val alex_action_3: action = fn(_: sslice) next(linecom, more(id))
 val alex_action_4: action = fn(_: sslice) next(linedir, more(id))
-val alex_action_5: action = fn(s: sslice) token(LexCons(s.newQName))
-val alex_action_6: action = fn(s: sslice) token(LexId(s.newQName))
-val alex_action_7: action = fn(s: sslice) token(LexIdOp(s.stripParens.newQName))
-val alex_action_8: action = fn(s': sslice) {
-    val s = s'.string;
-    if s.isReserved then token(LexKeyword(s, ""))
-    elif s.isMalformed then token(LexError(messageMalformed))
-    else token(LexId(s.newName)) 
-  }
-val alex_action_9: action = fn(s: sslice) token(LexCons(s.newName))
-val alex_action_10: action = fn(s: sslice) token(LexWildCard(s.newName))
-val alex_action_11: action = fn(s: sslice) token(LexSpecial(s))
-val alex_action_12: action = fn(s': sslice) {val s = s'.string; token(LexFloat(s.parseFloat)) }
-val alex_action_13: action = fn(s': sslice) {val s = s'.string; token(LexFloat(s.parseFloat)) }
-val alex_action_14: action = fn(s': sslice) {val s = s'.string; token(LexInt(s.parseInt)) }
-val alex_action_15: action = fn(s: sslice) token(LexOp(s.newName))
-val alex_action_16: action = less(1, fn(s': sslice) {val s = s'.string; if (s=="|") then token(LexKeyword(s, "")) else token(LexOp(s.newName)) } )
-val alex_action_17: action = fn(s: sslice) token(LexIdOp(s.stripParens.newName))
-val alex_action_18: action = fn(s': sslice) 
-  {
-    val s = s'.string; 
-    if s.isReserved then token(LexKeyword(s,""))
-    elif s.isPrefixOp then token(LexPrefix(s.newName))
-    else token(LexOp(s.newName)) 
-  }
+val alex_action_5: action = string(fn(s: string) LexCons(s.newQName))
+val alex_action_6: action = string(fn(s: string) LexId(s.newQName))
+val alex_action_7: action = token(fn(s: sslice) LexIdOp(s.strip-parens.newQName))
+val alex_action_8: action = string(fn(s: string) {
+    if s.is-reserved then LexKeyword(s, "")
+    elif s.is-malformed then LexError(message-malformed)
+    else LexId(s.newName)
+  })
+val alex_action_9: action = string(fn(s: string) LexCons(s.newName))
+val alex_action_10: action = string(fn(s: string) LexWildCard(s.newName))
+val alex_action_11: action = string(fn(s: string) LexSpecial(s))
+val alex_action_12: action = string(fn(s: string) LexFloat(s.parse-float64.unjust, s))
+val alex_action_13: action = string(fn(s: string) LexFloat(s.parse-float64.unjust, s))
+val alex_action_14: action = string(fn(s: string) LexInt(s.parse-int.unjust, s))
+val alex_action_15: action = string(fn(s: string) LexOp(s.newName))
+val alex_action_16: action = less(1, string(fn(s) if (s=="|") then LexKeyword(s, "") else LexOp(s.newName)))
+val alex_action_17: action = token(fn(s: sslice) LexIdOp(s.strip-parens.newName))
+val alex_action_18: action = string(fn(s: string) {    
+    if s.is-reserved then LexKeyword(s,"")
+    elif s.is-prefix-op then LexPrefix(s.newName)
+    else LexOp(s.newName)
+  })
 val alex_action_19: action = next(stringlit, more(fn(_) ""))
 val alex_action_20: action = next(stringraw, rawdelim(more, fn(_) ""))
-val alex_action_21: action = fn(s: sslice) token(LexChar(s.drop(2).head.fromCharEsc))
-val alex_action_22: action = fn(s: sslice) token(LexChar(s.drop(3).init.fromHexEsc))
-val alex_action_23: action = fn(s: sslice) token(LexChar(s.tail.head))
-val alex_action_24: action = fn(s: sslice) token(LexError("illegal character literal: " ++ s.tail.head.show))
-val alex_action_25: action = fn(s: sslice) token(LexError("tab characters: configure your editor to use spaces instead (soft tab)"))
-val alex_action_26: action = fn(s: sslice) token(LexError("illegal character: " ++ s.show ++ (if (s=="\t") then " (replace tabs with spaces)" else "")))
-val alex_action_27: action = fn(s: sslice) unsafeChar("string", s)
+val alex_action_21: action = token(fn(s:sslice) LexChar(s.sslice/drop(2).next.unjust.tuple2/fst.char/from-char-esc))
+val alex_action_22: action = token(fn(s:sslice) LexChar(s.sslice/drop(3).extend(-1).char/from-hex-esc))
+val alex_action_23: action = token(fn(s:sslice) LexChar(s.sslice/drop(1).next.unjust.tuple2/fst))
+val alex_action_24: action = token(fn(s:sslice) LexError("illegal character literal: " ++ s.sslice/drop(1).next.map(tuple2/fst).default(' ').show))
+val alex_action_25: action = token(fn(s:sslice) LexError("tab characters: configure your editor to use spaces instead (soft tab)"))
+val alex_action_26: action = string(fn(s:string) LexError("illegal character: " ++ s.show ++ (if (s=="\t") then " (replace tabs with spaces)" else "")))
+val alex_action_27: action = string(fn(s: string) unsafe-char("string", s))
 val alex_action_28: action = more(id)
-val alex_action_29: action = more(fromCharEscB)
-val alex_action_30: action = more(fromHexEscB)
-val alex_action_31: action = pop(fn(_) withmore(fn(s) token(LexString(s.init))))
-val alex_action_32: action = pop(fn(_) fn(_) token(LexError("string literal ended by a new line")))
-val alex_action_33: action = fn(s: sslice) token(LexError("illegal character in string: " ++ s.show))
-val alex_action_34: action = fn(s: sslice) token(unsafeChar("raw string", s))
+val alex_action_29: action = more(sslice/from-char-esc)
+val alex_action_30: action = more(sslice/from-hex-esc)
+val alex_action_31: action = pop(fn(_) withmore(token(fn(s) LexString(s.extend(-1).string))))
+val alex_action_32: action = pop(fn(_) token(fn(_) LexError("string literal ended by a new line")))
+val alex_action_33: action = token(fn(s: sslice) LexError("illegal character in string: " ++ s.show))
+val alex_action_34: action = string(fn(s: string) unsafe-char("raw string", s))
 val alex_action_35: action = more(id)
-val alex_action_36: action = withRawDelim(fn(s, delim) {
+val alex_action_36: action = with-raw-delim(fn(s:string, delim:string) {
                               if (s == delim) then  //  done
-                                pop(fn(_) less(delim.length, withmore(fn(s) token(LexString(s.string.reverse.drop(delim.length).reverse)))))                              
-                              elif (s.length > delim.length) then  // too many terminating hashse
-                                fn(s) token(LexError("raw string: too many '#' terminators in raw string (expecting " ++ show(delim.length - 1) ++ ")"))
+                                pop(fn(_) less(delim.count, withmore(token(fn(s') LexString(s'.extend(0 - delim.count).string)))))                              
+                              elif (s.count > delim.count) then  // too many terminating hashes
+                                token(fn(s') LexError("raw string: too many '#' terminators in raw string (expecting " ++ show(delim.count - 1) ++ ")"))
                               else // continue
                                  more(id)
                               }
                             )
-val alex_action_37: action = fn(s) token(LexError("illegal character in raw string: " ++ s.show))
+val alex_action_37: action = token(fn(s:sslice) LexError("illegal character in raw string: " ++ s.show))
 val alex_action_38: action = pop(fn(state: int) { 
     if state == comment then more(id)
-    else withmore(fn(s: sslice) token(LexComment(s.string.list.filter(fn(c) c != '\r').string))) 
+    else withmore(token(fn(s: sslice) LexComment(s.string.list.filter(fn(c) c != '\r').string))) 
 } )
 val alex_action_39: action = push(more(id))
-val alex_action_40: action = fn(s: sslice) token(unsafeChar("comment", s))
+val alex_action_40: action = string(fn(s: string) unsafe-char("comment", s))
 val alex_action_41: action = more(id)
 val alex_action_42: action = more(id)
-val alex_action_43: action = fn(s: sslice) token(LexError("illegal character in comment: " ++ s.show))
-val alex_action_44: action = fn(s: sslice) token(unsafeChar("line comment", s))
+val alex_action_43: action = token(fn(s: sslice) LexError("illegal character in comment: " ++ s.show))
+val alex_action_44: action = string(fn(s: string) unsafe-char("line comment", s))
 val alex_action_45: action = more(id)
 val alex_action_46: action = pop(fn(_) {
-      withmore(fn(s) {
-        token(LexComment(s.string.list.filter(fn(c) c !='\r').string))
-        })
+      withmore(string(fn(s:string) LexComment(s.list.filter(fn(c) c !='\r').string)))
     })
-val alex_action_47: action = fn(s: sslice) token(LexError("illegal character in line comment: " ++ s.show))
-val alex_action_48: action = fn(s: sslice) token(unsafeChar("line directive", s))
+val alex_action_47: action = string(fn(s: string) LexError("illegal character in line comment: " ++ s.show))
+val alex_action_48: action = string(fn(s: string) unsafe-char("line directive", s))
 val alex_action_49: action = more(id)
-val alex_action_50: action = pop(fn(_) withmore(fn(s: sslice) token(LexComment(s.string.list.filter(fn(c) c !='\r').string))))
-val alex_action_51: action = fn(s: sslice) token(LexError("illegal character in line directive: " ++ s.show))
+val alex_action_50: action = pop(fn(_) withmore(string(fn(s: string) LexComment(s.list.filter(fn(c) c !='\r').string))))
+val alex_action_51: action = string(fn(s: string) LexError("illegal character in line directive: " ++ s.show))
 
 // -----------------------------------------------------------------------------
 // ALEX TEMPLATE
@@ -227,63 +224,5 @@ inline fun alexRightContext(sc:int, user__, _, _, input__)
         // match when checking the right context, just
         // the first match will do.
 
-/// LINE 213 "koka.x"
-struct state
-     pos: pos
-     startPos: pos
-     states: list<int>
-     retained: list<sslice>
-     previous: char
-     current: sslice
-     previousLex: lex
-     rawEnd: string;
+/// LINE 210 "koka.x"
 
-alias action = sslice -> pure (state -> pure (state -> pure (maybe<lex>, state)));
-
-fun head(s: list<a>): exn a
-  match s
-    Cons(x, _) -> x
-    Nil -> throw("head")
-
-fun token(lex: (sslice -> pure lex)): action
-  fn(bs: sslice) fn(st0: state) fn(st1: state) (Just(lex(bs)), st1)
-
-fun next(state: int, action: action): action
-  fn(bs: sslice) fn(st0: state) fn(st1: state)
-     val (x, State(p, sp, sts, ret, prev, cur, pL, rE)) = action(bs)(st0)(st1)
-     (x, State(p, sp, Cons(state, sts), ret, prev, cur, pL, rE))
-
-fun push(action: action): action
-  fn(bs: sslice) fn(st0: state) fn(st1: state)
-     next(st1.head)(action)(bs)(st0)(st1)
-
-fun pop(action: action): action
-  fn(bs: sslice) fn(st0: state) fn(st1: state)
-    val sts = st1.states.tail
-    val sts' = if sts.is-nil then [0] else sts
-    val (x, State(p, sp, _, ret, prev, cur, pL, rE)) = action(sts'.head)(bs)(st0)(st1)
-    (x, State(p, sp, sts', ret, prev, cur, pL, rE))
-
-fun more(f: (sslice -> pure sslice)): action
-  fn(bs: sslice) fn(st0: state) fn(State(p, sp, sts, ret, prev, cur, pL, rE): state) 
-    (Nothing, State(p, sp, sts, Cons(f(bs), ret), prev, cur, pL, rE))
-
-fun less(n: int, action: action)
-  fn(bs: sslice) fn(st0: state) fn(State(_, sp, sts, ret, prev, _, pL, rE): state)
-    val bs2 = st0.current.take(n)
-    val pos2 = bs2.pos-moves8(st0.pos)
-    val st2 = State(pos2, sp, sts, ret, prev, st0.current.drop(n), pL, rE)
-    action(bs2)(st0)(st2)
-
-fun withmore(action: action)
-  fn(bs: sslice) fn(st0: state) fn(State(p, sp, sts, ret, prev, cur, pL, rE): state)
-    action(Cons(bs, ret).reverse.map(string).join("").slice)(st0)(State(p, sp, sts, [], prev, cur, pL, rE))
-
-fun withRawDelim(f: (string, string) -> pure action): action
-  fn(bs: sslice) fn(st0: state) fn(st1: state)
-    f(bs.string, st1.rawEnd)(bs)(st0)(st1)
-
-alias alexInput = state
-
-fun unsafeChar(kind: string, s: string)
-  LexError("unsafe character in " ++ kind ++ ": " ++ s.head) // TODO: Fix this

@@ -1,15 +1,15 @@
 value struct source (pub name: string, pub contents: string)
 
-val sourceNull = Source("", "")
+val source/null = Source("", "")
 
 struct pos (pub source: source, pub off: int, pub line: int, pub col: int)
 
-val posNull = Pos(sourceNull, -1, 0, 0)
+val pos/null = Pos(source/null, -1, 0, 0)
 
-fun (==)(p1: pos, p2: pos): bool
+fun pos/(==)(p1: pos, p2: pos): bool
   p1.line == p2.line && p1.col == p2.col
 
-fun (<)(p1: pos, p2: pos): bool
+fun pos/(<)(p1: pos, p2: pos): bool
   if p1.line < p2.line then
     True
   elif p1.line > p2.line then
@@ -17,7 +17,7 @@ fun (<)(p1: pos, p2: pos): bool
   else
     p1.col < p2.col
 
-fun (<=)(p1: pos, p2: pos): bool
+fun pos/(<=)(p1: pos, p2: pos): bool
   if p1.line < p2.line then
     True
   elif p1.line > p2.line then
@@ -25,7 +25,7 @@ fun (<=)(p1: pos, p2: pos): bool
   else
     p1.col <= p2.col
 
-fun (>)(p1: pos, p2: pos): bool
+fun pos/(>)(p1: pos, p2: pos): bool
   if p1.line > p2.line then
     True
   elif p1.line < p2.line then
@@ -33,7 +33,7 @@ fun (>)(p1: pos, p2: pos): bool
   else
     p1.col > p2.col
 
-fun (>=)(p1: pos, p2: pos): bool
+fun pos/(>=)(p1: pos, p2: pos): bool
   if p1.line > p2.line then
     True
   elif p1.line < p2.line then
@@ -41,100 +41,97 @@ fun (>=)(p1: pos, p2: pos): bool
   else
     p1.col >= p2.col
 
-fun compare(p1: pos, p2: pos): order
-  match p1.line.compare(p2.line)
-    Eq -> p1.col.compare(p2.col)
+fun pos/cmp(p1: pos, p2: pos): order
+  match p1.line.cmp(p2.line)
+    Eq -> p1.col.cmp(p2.col)
     o -> o
 
-fun show(p: pos): string
-  "(" ++ p.showPos(2) ++ ")"
+fun pos/show(p: pos): string
+  "(" ++ p.show-pos(?align-width=2) ++ ")"
 
-fun showPos(p: pos, alignWidth: int): string
-  p.line.showLine() ++ "," ++ p.col.show.pad-left(alignWidth)
+fun show-pos(p: pos, ?align-width: int): string
+  p.line.show-line() ++ "," ++ p.col.show.pad-left(align-width)
 
-fun showFullPos(p: pos, alignWidth: int): string
-  "[" ++ p.off.show ++ "] " ++ p.showPos(alignWidth)
+fun show-full-pos(p: pos, ?align-width: int): string
+  "[" ++ p.off.show ++ "] " ++ p.show-pos()
 
 // about 67 million lines
-val bigLine: int = 2.pow(26)
+val big-line: int = 2.pow(26)
 
-fun showLine(line: int)
-  if line > bigLine then
-    "(" ++ (line - bigLine).show ++ ")"
+fun show-line(line: int)
+  if line > big-line then
+    "(" ++ (line - big-line).show ++ ")"
   else if line <= 0 then
     "1"
   else
     line.show
 
-fun posMoves8(p: pos, cs: list<char>): pos
-  cs.foldl(p, posMove8)
+fun chars/pos-moves-8(p: pos, cs: list<char>): pos
+  cs.foldl(p, pos-move8)
 
-fun posMoves8(cs: sslice, p: pos): pos
-  cs.string.list.foldl(p, posMove8)
+fun sslice/pos-moves8(cs: sslice, p: pos): pos
+  cs.string.list.foldl(p, pos-move8)
 
-fun posMove8(Pos(s, o, l, c), ch: char): pos
+fun pos-move8(Pos(s, o, l, c), ch: char): pos
   val o1 = if o < 0 then o else o+1
   match ch
-    '\t' -> Pos(s, o1, l, ((c + tabSize - 1) / tabSize)*tabSize +1)
+    '\t' -> Pos(s, o1, l, ((c + tab-size - 1) / tab-size)*tab-size +1)
     '\n' -> Pos(s, o1, l + 1, 1)
     _    -> Pos(s, o1, l, c + 1)
 
-val tabSize = 2 // Always 2 in koka
+val tab-size = 2 // Always 2 in koka
 
 // source range
 value struct range (pub start: pos, pub end: pos)
 
-fun rangeLength(Range(p1, p2)): int
-  p2.off - p1.off
-
-fun (==)(r1: range, r2: range): bool
+fun range/(==)(r1: range, r2: range): bool
   r1.start == r2.start && r1.end == r2.end
 
 fun showRange(r: range, endToo: bool)
-  if r.start.line > bigLine then 
+  if r.start.line > big-line then 
     "" 
   else 
-    var range := r.start.showPos(0)
+    var range := r.start.show-pos(0)
     if endToo then 
-      range := "(" ++ r.start.showPos(0) ++ "-" ++ r.end.showPos(0) ++ ")"     
+      range := "(" ++ r.start.show-pos(0) ++ "-" ++ r.end.show-pos(0) ++ ")"     
     r.start.source.name ++ range
 
-fun compare(r1: range, r2: range): order
-  match r1.start.compare(r2.start)
-    Eq -> r1.end.compare(r2.end)
+fun range/cmp(r1: range, r2: range): order
+  match r1.start.cmp(r2.start)
+    Eq -> r1.end.cmp(r2.end)
     o -> o
 
-fun length(r: range): int
+fun range/length(r: range): int
   r.end.off - r.start.off
 
 // Does r2 start after r1
-fun after(r1: range, r2: range): bool
+fun range/is-after(r1: range, r2: range): bool
   r1.end <= r2.start
 
-val rangeNull = makeRange(posNull, posNull)
+val range/null = makeRange(pos/null, pos/null)
 
-fun showFullRange(r: range): string
+fun show-full-range(r: range): string
   r.showRange(True)
 
 fun makeRange(p1: pos, p2: pos): range
-  Range(minPos(p1, p2), maxPos(p1, p2))
+  Range(min(p1, p2), max(p1, p2))
 
 fun source(r: range): source
   r.start.source
 
 fun combine(r1: range, r2: range): range
-  Range(minPos(r1.start, r2.start), maxPos(r1.end, r2.end))
+  Range(min(r1.start, r2.start), max(r1.end, r2.end))
 
-fun combine(rs: list<range>): range
-  rs.foldl(rangeNull, combine)
+fun range-list/combine(rs: list<range>): range
+  rs.foldl(range/null, combine)
 
-fun before(r: range)
+fun range/before(r: range)
   Range(r.start, r.start)
 
-fun after(r: range)
+fun range/after(r: range)
   Range(r.end, r.end)
 
-fun minPos(p1: pos, p2: pos): pos
+fun pos/min(p1: pos, p2: pos): pos
   if p1.line <= 0 then // for combining nullRanges sensibly
     p2
   elif p2.line <= 0 then
@@ -144,7 +141,7 @@ fun minPos(p1: pos, p2: pos): pos
   else
     p2
 
-fun maxPos(p1: pos, p2: pos): pos
+fun pos/max(p1: pos, p2: pos): pos
   if (p1 < p2) then
     p2
   else
@@ -154,18 +151,18 @@ fun extend(r: range, off: int): range
   val e = r.end
   Range(r.start, e(col = e.col + off))
 
-fun range(m: maybe<range>): range
+fun default/range(m: maybe<range>): range
   match m
     Just(r) -> r
-    Nothing    -> rangeNull
+    Nothing -> null
 
 fun sourceFromRange(Range(start, end)): string
   if start.off >= 0 then
      " ".replicate(start.col - 1).join ++ start.source.contents.slice.subslice(start.off, end.off).string
   else
-    val l1 = if start.line >= bigLine then 1 else start.line
-    val l2 = if end.line >= bigLine then 
-        if start.line >= bigLine then 
+    val l1 = if start.line >= big-line then 1 else start.line
+    val l2 = if end.line >= big-line then 
+        if start.line >= big-line then 
           end.line - start.line + 1 
         else 1
       else end.line

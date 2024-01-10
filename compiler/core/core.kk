@@ -151,9 +151,9 @@ fun show(e: external): div string
   match e
     External(name, typeScheme, params, format, visibility, fipT, rng, doc) -> 
       "External(" ++ name.show ++ "," ++ typeScheme.show ++ "," ++ params.show-list(show) ++ "," ++ 
-      format.show-list(fn(f) f.show-tuple(show, show)) ++ "," ++ visibility.show ++ "," ++ fipT.show ++ "," ++ rng.showFullRange ++ "," ++ doc.show ++ ")"
+      format.show-list(fn(f) f.show-tuple(show, show)) ++ "," ++ visibility.show ++ "," ++ fipT.show ++ "," ++ rng.show-full-range ++ "," ++ doc.show ++ ")"
     ExternalImport(imports, rng) -> 
-      "ExternalImport(" ++ imports.show-list(fn((t, ls)) t.show ++ ":" ++ ls.show-list(fn((s1, s2)) s1.show ++ ":" ++ s2.show)) ++ "," ++ rng.showFullRange ++ ")"
+      "ExternalImport(" ++ imports.show-list(fn((t, ls)) t.show ++ ":" ++ ls.show-list(fn((s1, s2)) s1.show ++ ":" ++ s2.show)) ++ "," ++ rng.show-full-range ++ ")"
 
 fun vis(e: external)
   match e
@@ -441,7 +441,7 @@ struct def
 
 fun show(d: def): div string
   "Def(" ++ d.defName.show ++ "," ++ d.ktype.show ++ "," ++ d.defExpr.show ++ "," ++ d.vis.show ++ "," ++
-  d.sort.show ++ "," ++ d.kinline.show ++ "," ++ d.nameRange.showFullRange ++ "," ++ d.doc.show ++ ")"
+  d.sort.show ++ "," ++ d.kinline.show ++ "," ++ d.nameRange.show-full-range ++ "," ++ d.doc.show ++ ")"
 
 struct inlineDef
   defName: name

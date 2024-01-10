@@ -21,13 +21,13 @@ fun isSameNamespace(n1: name, n2: name): bool
     (Cons(c, _), Cons(d, _)) -> c.is-upper && d.is-upper
     _ -> True
 
-fun lowerCompare(Name(m1, _, n1, _), Name(m2, _, n2, _)): order
-  match compare(m1.to-lower, m2.to-lower)
-    Eq -> compare(n1.to-lower, n2.to-lower)
+fun lower/cmp(Name(m1, _, n1, _), Name(m2, _, n2, _)): order
+  match cmp(m1.to-lower, m2.to-lower)
+    Eq -> cmp(n1.to-lower, n2.to-lower)
     lg -> lg
 
-pub fun (==)(n1: name, n2: name): bool
-  n1.hashId == n2.hashId && n1.hashModule == n2.hashModule && n1.lowerCompare(n2) == Eq
+pub fun name/(==)(n1: name, n2: name): bool
+  n1.hashId == n2.hashId && n1.hashModule == n2.hashModule && n1.lower/cmp(n2) == Eq
 
 val nameEq = fn(n1: name, n2: name) n1 == n2
 
@@ -43,21 +43,21 @@ inline fun (==)(l1: list<name>, l2: list<name>): bool
 pub fun (!=)(n1: name, n2: name): bool
   !(n1 == n2)
 
-pub fun compare(n1: name, n2: name): order
-  match n1.hashModule.compare(n2.hashModule)
+pub fun name/cmp(n1: name, n2: name): order
+  match n1.hashModule.cmp(n2.hashModule)
     Eq -> 
-      match n1.hashId.compare(n2.hashId)
-        Eq -> n1.lowerCompare(n2)
+      match n1.hashId.cmp(n2.hashId)
+        Eq -> n1.lower/cmp(n2)
         x -> x
     x -> x
 
 fun labelNameCompare(n1: name, n2: name): order
-  match n1.hashId.compare(n2.hashId)
+  match n1.hashId.cmp(n2.hashId)
     Eq -> 
-      match n1.nameId.to-lower.compare(n2.nameId.to-lower)
+      match n1.nameId.to-lower.cmp(n2.nameId.to-lower)
         Eq -> 
-          match n1.hashModule.compare(n2.hashModule)
-            Eq -> n1.nameModule.to-lower.compare(n2.nameModule.to-lower)
+          match n1.hashModule.cmp(n2.hashModule)
+            Eq -> n1.nameModule.to-lower.cmp(n2.nameModule.to-lower)
             x -> x
         x -> x
     x -> x
@@ -379,7 +379,7 @@ fun canonicalSplit(n: name): (name, string)
 // camel-case to dash-case
 fun camelToDash(s: string): string
   match s.splitCamel
-    Cons(x, xs) -> x ++ xs.map(fn(y) -> "-" ++ y.to-lower).join
+    Cons(x, xs) -> x ++ xs.map(fn(y:string) "-" ++ y.to-lower).join
     _ -> ""
 
 fun splitCamel(s: string): list<string>

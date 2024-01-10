@@ -29,11 +29,11 @@ fun (==)(ni1: nameInfo, ni2: nameInfo)
 
 fun show(ni: nameInfo): div string
   match ni
-    InfoVal(vis, cname, typ, range, isVar) -> "InfoVal(" ++ show(vis) ++ ", " ++ show(cname) ++ ", " ++ show(typ) ++ ", " ++ showFullRange(range) ++ ", " ++ show(isVar) ++ ")"
-    InfoFun(vis, cname, typ, arity, fipt, range) -> "InfoFun(" ++ show(vis) ++ ", " ++ show(cname) ++ ", " ++ show(typ) ++ ", " ++ show-tuple(arity, show, show) ++ ", " ++ show(fipt) ++ ", " ++ showFullRange(range) ++ ")"
-    InfoCon(vis, typ, repr, conInfo, range) -> "InfoCon(" ++ show(vis) ++ ", " ++ show(typ) ++ ", " ++ show(repr) ++ ", " ++ show(conInfo) ++ ", " ++ showFullRange(range) ++ ")"
-    assumption/InfoExternal(vis, cname, typ, format, fipt, range) -> "InfoExternal(" ++ show(vis) ++ ", " ++ show(cname) ++ ", " ++ show(typ) ++ ", " ++ show-list(format, fn(s) s.show-tuple(show, fn(x) x)) ++ ", " ++ show(fipt) ++ ", " ++ showFullRange(range) ++ ")"
-    InfoImport(vis, typ, nameAlias, fullName, range) -> "InfoImport(" ++ show(vis) ++ ", " ++ show(typ) ++ ", " ++ show(nameAlias) ++ ", " ++ show(fullName) ++ ", " ++ showFullRange(range) ++ ")"
+    InfoVal(vis, cname, typ, range, isVar) -> "InfoVal(" ++ show(vis) ++ ", " ++ show(cname) ++ ", " ++ show(typ) ++ ", " ++ show-full-range(range) ++ ", " ++ show(isVar) ++ ")"
+    InfoFun(vis, cname, typ, arity, fipt, range) -> "InfoFun(" ++ show(vis) ++ ", " ++ show(cname) ++ ", " ++ show(typ) ++ ", " ++ show-tuple(arity, show, show) ++ ", " ++ show(fipt) ++ ", " ++ show-full-range(range) ++ ")"
+    InfoCon(vis, typ, repr, conInfo, range) -> "InfoCon(" ++ show(vis) ++ ", " ++ show(typ) ++ ", " ++ show(repr) ++ ", " ++ show(conInfo) ++ ", " ++ show-full-range(range) ++ ")"
+    assumption/InfoExternal(vis, cname, typ, format, fipt, range) -> "InfoExternal(" ++ show(vis) ++ ", " ++ show(cname) ++ ", " ++ show(typ) ++ ", " ++ show-list(format, fn(s) s.show-tuple(show, fn(x) x)) ++ ", " ++ show(fipt) ++ ", " ++ show-full-range(range) ++ ")"
+    InfoImport(vis, typ, nameAlias, fullName, range) -> "InfoImport(" ++ show(vis) ++ ", " ++ show(typ) ++ ", " ++ show(nameAlias) ++ ", " ++ show(fullName) ++ ", " ++ show-full-range(range) ++ ")"
 
 fun canonicalName(info: nameInfo, name: name)
   match info

@@ -48,9 +48,9 @@ type external
 fun show(e: external): div string
   match e
     External(name, t, params, nameRange, range, inlineCall, vis, fipAnnot, doc) -> 
-      "External " ++ name.show ++ " " ++ t.show ++ " " ++ params.show-list(fn(p) p.show) ++ " " ++ nameRange.showFullRange ++ " " ++ range.showFullRange ++ " " ++ 
+      "External " ++ name.show ++ " " ++ t.show ++ " " ++ params.show-list(fn(p) p.show) ++ " " ++ nameRange.show-full-range ++ " " ++ range.show-full-range ++ " " ++ 
       inlineCall.show-list(fn(c) c.fst.show ++ " " ++ c.snd.show) ++ " " ++ vis.show ++ " " ++ fipAnnot.show ++ " " ++ doc.show
-    ExternalImport(eImport, range) -> "ExternalImport " ++ eImport.show-list(fn(e') e'.fst.show ++ " " ++ e'.snd.show-list(fn(e1) e1.fst ++ " " ++ e1.snd)) ++ " " ++ range.showFullRange
+    ExternalImport(eImport, range) -> "ExternalImport " ++ eImport.show-list(fn(e') e'.fst.show ++ " " ++ e'.snd.show-list(fn(e1) e1.fst ++ " " ++ e1.snd)) ++ " " ++ range.show-full-range
 
 value type externalCall
   ExternalInline(content: string)
@@ -70,7 +70,7 @@ struct fixDef
   vis: visibility
 
 fun show(f: fixDef): string
-  f.name.show ++ " " ++ f.fixity.show ++ " " ++ f.range.showFullRange ++ " " ++ f.vis.show
+  f.name.show ++ " " ++ f.fixity.show ++ " " ++ f.range.show-full-range ++ " " ++ f.vis.show
 
 alias imports = list<kimport>;
 
@@ -81,7 +81,7 @@ struct kimport
   vis: visibility
 
 fun show(i: kimport): string
-  i.name.show ++ " " ++ i.fullName.show ++ " " ++ i.range.showFullRange ++ " " ++ i.vis.show
+  i.name.show ++ " " ++ i.fullName.show ++ " " ++ i.range.show-full-range ++ " " ++ i.vis.show
 
 alias typeDefGroups<t,k> = list<typeDefGroup<t,k>>;
 
@@ -100,12 +100,12 @@ type typeDef<t,u,k>
 
 fun show(td: typeDef<t,u,k>, showT: (t) -> div string, showU: (u) -> div string, showK: (k) -> div string): div string
   match td
-    Synonym(binder, params, synonym, range, vis, doc) -> "Synonym " ++ binder.show(showK) ++ " " ++ params.show-list(fn(b) b.show(showK)) ++ " " ++ synonym.showT ++ " " ++ range.showFullRange ++ " " ++ vis.show ++ " " ++ doc.show
+    Synonym(binder, params, synonym, range, vis, doc) -> "Synonym " ++ binder.show(showK) ++ " " ++ params.show-list(fn(b) b.show(showK)) ++ " " ++ synonym.showT ++ " " ++ range.show-full-range ++ " " ++ vis.show ++ " " ++ doc.show
     DataType(binder, params, constrs, range, vis, sort, ddef, isExtend, doc) -> 
       "DataType " ++ binder.show(showK) ++ " " ++ 
       params.show-list(fn(b) b.show(fn(k) k.showK)) ++ " " ++ 
       constrs.show-list(fn(c) c.show(showT, showU, showK)) ++ " " ++ 
-      range.showFullRange ++ " " ++ vis.show ++ " " ++ sort.show ++ " " ++ ddef.show ++ " " ++ isExtend.show ++ " " ++ doc.show
+      range.show-full-range ++ " " ++ vis.show ++ " " ++ sort.show ++ " " ++ ddef.show ++ " " ++ isExtend.show ++ " " ++ doc.show
 
 struct typeBinder<k>
   name: name
@@ -114,7 +114,7 @@ struct typeBinder<k>
   range: range;
 
 fun show(t: typeBinder<k>, showK: (k) -> e string): e string
-  t.name.show ++ " " ++ t.kind.showK ++ " " ++ t.nameRange.showFullRange ++ " " ++ t.range.showFullRange
+  t.name.show ++ " " ++ t.kind.showK ++ " " ++ t.nameRange.show-full-range ++ " " ++ t.range.show-full-range
 
 struct userCon<t, u, k>
   name: name
@@ -127,7 +127,7 @@ struct userCon<t, u, k>
   doc: string  
 
 fun show(u: userCon<t,u,k>, showT: (t) -> div string, showU: (u) -> div string, showK: (k) -> div string): div string
-  u.name.show ++ " " ++ u.existentials.show-list(fn(e) e.show(showK)) ++ " " ++ u.params.show-list(fn(p) p.fst.show ++ "," ++ p.snd.show(fn(t) t.showT, fn(m) m.show(fn(e1) e1.show(showU)))) ++ " " ++ u.result.show(showT) ++ " " ++ u.nameRange.showFullRange ++ " " ++ u.range.showFullRange ++ " " ++ u.vis.show ++ " " ++ u.doc.show
+  u.name.show ++ " " ++ u.existentials.show-list(fn(e) e.show(showK)) ++ " " ++ u.params.show-list(fn(p) p.fst.show ++ "," ++ p.snd.show(fn(t) t.showT, fn(m) m.show(fn(e1) e1.show(showU)))) ++ " " ++ u.result.show(showT) ++ " " ++ u.nameRange.show-full-range ++ " " ++ u.range.show-full-range ++ " " ++ u.vis.show ++ " " ++ u.doc.show
 
 alias defGroups<t> = list<defGroup<t>>;
   
@@ -152,7 +152,7 @@ struct valueBinder<t, e>
   range: range; // full range
 
 fun show(v: valueBinder<t,e>, showT: (t) -> e1 string, showE: (e) -> e1 string): e1 string
-  v.name.show ++ " " ++ v.binderType.showT ++ " " ++ v.expr.showE ++ " " ++ v.nameRange.showFullRange ++ " " ++ v.range.showFullRange
+  v.name.show ++ " " ++ v.binderType.showT ++ " " ++ v.expr.showE ++ " " ++ v.nameRange.show-full-range ++ " " ++ v.range.show-full-range
 
 struct def<t>
   binder: valueBinder<(), expr<t>>
@@ -163,7 +163,7 @@ struct def<t>
   doc: string;
 
 fun show(d: def<t>, showT: (t) -> e string): e string
-  d.binder.show(fn(x) "", fn(e1) "") ++ " " ++ d.range.showFullRange ++ " " ++ d.visibilty.show ++ " " ++ d.sort.show ++ " " ++ d.defInline.show ++ " " ++ d.doc
+  d.binder.show(fn(x) "", fn(e1) "") ++ " " ++ d.range.show-full-range ++ " " ++ d.visibilty.show ++ " " ++ d.sort.show ++ " " ++ d.defInline.show ++ " " ++ d.doc
 
 fun defIsVal(d: def<t>): bool
   !d.sort.isFun
@@ -185,21 +185,21 @@ type expr<t>
 
 fun show(expr: expr<t>, showT: (t) -> div string): div string
   match expr
-    Lam(binder, e, range) -> "Lam " ++ binder.show-list(fn(b) b.show(fn(s) s.show(showT), fn(e') e'.show(fn(s) s.show(showT)))) ++ " " ++ e.show(showT) ++ " " ++ range.showFullRange
-    Let(d, e, range) -> "Let " ++ d.show(showT) ++ " " ++ e.show(showT) ++ " " ++ range.showFullRange
-    Bind(d, e, range) -> "Bind " ++ d.show(showT) ++ " " ++ e.show(showT) ++ " " ++ range.showFullRange
-    App(e, args, range) -> "App " ++ e.show(showT) ++ " " ++ args.show-list(fn(a) "" ++ ":" ++ a.snd.show(showT)) ++ " " ++ range.showFullRange
-    Var(name, isOp, range) -> "Var " ++ name.show ++ " " ++ isOp.show ++ " " ++ range.showFullRange
+    Lam(binder, e, range) -> "Lam " ++ binder.show-list(fn(b) b.show(fn(s) s.show(showT), fn(e') e'.show(fn(s) s.show(showT)))) ++ " " ++ e.show(showT) ++ " " ++ range.show-full-range
+    Let(d, e, range) -> "Let " ++ d.show(showT) ++ " " ++ e.show(showT) ++ " " ++ range.show-full-range
+    Bind(d, e, range) -> "Bind " ++ d.show(showT) ++ " " ++ e.show(showT) ++ " " ++ range.show-full-range
+    App(e, args, range) -> "App " ++ e.show(showT) ++ " " ++ args.show-list(fn(a) "" ++ ":" ++ a.snd.show(showT)) ++ " " ++ range.show-full-range
+    Var(name, isOp, range) -> "Var " ++ name.show ++ " " ++ isOp.show ++ " " ++ range.show-full-range
     Literal(l) -> "Literal " ++ l.show
-    Ann(e, t, range) -> "Ann " ++ e.show(showT) ++ " " ++ t.showT ++ " " ++ range.showFullRange
-    Case(e, cases, range) -> "Case " ++ e.show(showT) ++ " " ++ cases.show-list(fn(c) c.show(showT)) ++ " " ++ range.showFullRange
-    Parens(e, name, range) -> "Parens " ++ e.show(showT) ++ " " ++ name.show ++ " " ++ range.showFullRange
-    Inject(t, e, behind, range) -> "Inject " ++ t.showT ++ " " ++ e.show(showT) ++ " " ++ behind.show ++ " " ++ range.showFullRange
+    Ann(e, t, range) -> "Ann " ++ e.show(showT) ++ " " ++ t.showT ++ " " ++ range.show-full-range
+    Case(e, cases, range) -> "Case " ++ e.show(showT) ++ " " ++ cases.show-list(fn(c) c.show(showT)) ++ " " ++ range.show-full-range
+    Parens(e, name, range) -> "Parens " ++ e.show(showT) ++ " " ++ name.show ++ " " ++ range.show-full-range
+    Inject(t, e, behind, range) -> "Inject " ++ t.showT ++ " " ++ e.show(showT) ++ " " ++ behind.show ++ " " ++ range.show-full-range
     Handler(sort, scope, hOverride, allowMask, hEffect, localPars, initially, hReturn, finally, branches, declRange, range) -> 
       "Handler " ++ sort.show ++ " " ++ scope.show ++ " " ++ hOverride.show ++ " " ++ 
       allowMask.show(show) ++ " " ++ hEffect.show(showT) ++ " " ++ localPars.show-list(fn(p) p.show(fn(f) f.show(showT), fn(s) "")) ++ " " ++ 
       initially.show(fn(e') e'.show(showT)) ++ " " ++ hReturn.show(fn(e) e.show(showT)) ++ " " ++ finally.show(fn(e) e.show(showT)) ++ " " ++
-      branches.show-list(fn(b) b.show(showT)) ++ " " ++ declRange.showFullRange ++ " " ++ range.showFullRange
+      branches.show-list(fn(b) b.show(showT)) ++ " " ++ declRange.show-full-range ++ " " ++ range.show-full-range
 
 type handlerOverride
   HandlerOverride
@@ -229,7 +229,7 @@ struct handlerBranch<t>
 
 fun show(h: handlerBranch<t>, showT: (t) -> div string): div string
   h.branchName.show ++ " " ++ h.branchPars.show-list(fn(p) p.show(fn(m) m.show(showT), fn(m) "")) ++ " " ++ h.branchExpr.show(showT) ++ " " ++
-  h.branchSort.show ++ " " ++ h.branchNameRange.showFullRange ++ " " ++ h.branchPatRange.showFullRange
+  h.branchSort.show ++ " " ++ h.branchNameRange.show-full-range ++ " " ++ h.branchPatRange.show-full-range
   
 struct branch<t>
   branchPattern: pattern<t>
@@ -255,11 +255,11 @@ type pattern<t>
 
 fun show(p: pattern<t>, showT: (t) -> div string): div string
   match p
-    PatWild(range) -> "PatWild " ++ range.showFullRange
+    PatWild(range) -> "PatWild " ++ range.show-full-range
     PatVar(ref) -> "PatVar " ++ ref.show(fn(m) m.show(showT), fn(p') p'.show(showT))
-    PatAnn(p, t, range) -> "PatAnn " ++ p.show(showT) ++ " " ++ t.showT ++ " " ++ range.showFullRange
-    PatCon(name, args, nameRange, range) -> "PatCon " ++ name.show ++ " " ++ args.show-list(fn(a) ":" ++ a.snd.show(showT)) ++ " " ++ nameRange.showFullRange ++ " " ++ range.showFullRange
-    PatParens(p, range) -> "PatParens " ++ p.show(showT) ++ " " ++ range.showFullRange
+    PatAnn(p, t, range) -> "PatAnn " ++ p.show(showT) ++ " " ++ t.showT ++ " " ++ range.show-full-range
+    PatCon(name, args, nameRange, range) -> "PatCon " ++ name.show ++ " " ++ args.show-list(fn(a) ":" ++ a.snd.show(showT)) ++ " " ++ nameRange.show-full-range ++ " " ++ range.show-full-range
+    PatParens(p, range) -> "PatParens " ++ p.show(showT) ++ " " ++ range.show-full-range
     PatLit(value) -> "PatLit " ++ value.show
 
 type lit
@@ -270,10 +270,10 @@ type lit
 
 fun show(l: lit): string
   match l
-    LitInt(v, r) -> v.show ++ " " ++ r.showFullRange
-    LitFloat(v, r) -> v.show ++ " " ++ r.showFullRange
-    LitChar(v, r) -> v ++ " " ++ r.showFullRange
-    LitString(v, r) -> v ++ " " ++ r.showFullRange
+    LitInt(v, r) -> v.show ++ " " ++ r.show-full-range
+    LitFloat(v, r) -> v.show ++ " " ++ r.show-full-range
+    LitChar(v, r) -> v ++ " " ++ r.show-full-range
+    LitString(v, r) -> v ++ " " ++ r.show-full-range
 
 // Types and kinds
 alias kUserTypes<k> = list<kUserType<k>>
@@ -304,13 +304,13 @@ alias userType = kUserType<userKind>
 
 fun show(u: userType): div string
   match u
-    TpQuan(q, b, kind, range) -> "TpQuan " ++ q.show ++ " " ++ b.show(show) ++ " " ++ kind.show ++ " " ++ range.showFullRange
+    TpQuan(q, b, kind, range) -> "TpQuan " ++ q.show ++ " " ++ b.show(show) ++ " " ++ kind.show ++ " " ++ range.show-full-range
     TpQual(l, kind) -> "TpQual " ++ l.show-list(fn(t) t.show) ++ " " ++ kind.show
-    TpFun(a, b, c, range) -> "TpFun " ++ a.show-list(fn(t) t.fst.show ++ ":" ++ t.snd.show) ++ " " ++ b.show ++ " " ++ c.show ++ " " ++ range.showFullRange
-    TpApp(a, b, range) -> "TpApp " ++ a.show ++ " " ++ b.show-list(fn(t) t.show) ++ " " ++ range.showFullRange
-    TpVar(name, range) -> "TpVar " ++ name.show ++ " " ++ range.showFullRange
-    TpCon(name, range) -> "TpCon " ++ name.show ++ " " ++ range.showFullRange
-    TpParens(t, range) -> "TpParens " ++ t.show ++ " " ++ range.showFullRange
+    TpFun(a, b, c, range) -> "TpFun " ++ a.show-list(fn(t) t.fst.show ++ ":" ++ t.snd.show) ++ " " ++ b.show ++ " " ++ c.show ++ " " ++ range.show-full-range
+    TpApp(a, b, range) -> "TpApp " ++ a.show ++ " " ++ b.show-list(fn(t) t.show) ++ " " ++ range.show-full-range
+    TpVar(name, range) -> "TpVar " ++ name.show ++ " " ++ range.show-full-range
+    TpCon(name, range) -> "TpCon " ++ name.show ++ " " ++ range.show-full-range
+    TpParens(t, range) -> "TpParens " ++ t.show ++ " " ++ range.show-full-range
     TpAnn(t, kind) -> "TpAnn " ++ t.show ++ " " ++ kind.show
 
 type userKind
@@ -321,9 +321,9 @@ type userKind
 
 fun show(u: userKind): string
   match u
-    KindCon(name, range) -> "KindCon " ++ name.show ++ " " ++ range.showFullRange
+    KindCon(name, range) -> "KindCon " ++ name.show ++ " " ++ range.show-full-range
     KindArrow(from, to) -> "KindArrow " ++ from.show ++ " " ++ to.show
-    KindParens(kind, range) -> "KindParens " ++ kind.show ++ " " ++ range.showFullRange
+    KindParens(kind, range) -> "KindParens " ++ kind.show ++ " " ++ range.show-full-range
     KindNone -> "KindNone"
 
 

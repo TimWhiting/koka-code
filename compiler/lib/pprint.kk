@@ -126,7 +126,7 @@ val backslash = Char('\\')
 val equals = Char('=')
 
 // string is like "text" but replaces '\n' by "line"
-fun pretty(s: string): doc
+fun string/pretty(s: string): doc
   if s == "" then empty else
     match s.starts-with("\n")
       Just(x) -> line |.| pretty(x.string.unsafe-decreasing)
@@ -134,13 +134,13 @@ fun pretty(s: string): doc
         val (xs, ys) = span(s.list, fn(c) c != '\n')
         text(xs.string) |.| pretty(ys.string.unsafe-decreasing)
 
-fun pretty(b: bool): doc
+fun bool/pretty(b: bool): doc
   b.show.text
 
-fun pretty(i: int): doc
+fun int/pretty(i: int): doc
   i.show.text
 
-fun pretty(d: float64): doc
+fun float64/pretty(d: float64): doc
   d.show.text
 
 // Semi primitive: fill and fillBreak

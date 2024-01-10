@@ -28,16 +28,16 @@ val platform64c = Platform(8, 8, 4, 8) // Compressed
 val platformJS = Platform(8, 4, 8, 0)
 val platformCS = Platform(8, 4, 8, 0)
 
-fun (==)(p1: platform, p2: platform): bool
+fun platform/(==)(p1: platform, p2: platform): bool
   p1.ptrSize == p2.ptrSize && p1.sizeSize == p2.sizeSize && p1.fieldSize == p2.fieldSize && p1.headerSize == p2.headerSize
 
 fun hasCompressedFields(p: platform): bool
   p.ptrSize != p.fieldSize
 
-fun show(p: platform): string
+fun platform/show(p: platform): string
   "Platform(ptrSize: {" ++ p.ptrSize.show ++ "}, sizeSize: {" ++ p.sizeSize.show ++ "}, fieldSize: {" ++ p.fieldSize.show ++ "}, headerSize: {" ++ p.headerSize.show ++ "})"
 
-fun (==)(c1: cTarget, c2: cTarget): bool
+fun ctarget/(==)(c1: cTarget, c2: cTarget): bool
   match (c1, c2)
     (CDefault, CDefault) -> True
     (LibC, LibC) -> True
@@ -46,14 +46,14 @@ fun (==)(c1: cTarget, c2: cTarget): bool
     (WasmWeb, WasmWeb) -> True
     _ -> False
 
-fun (==)(j1: jsTarget, j2: jsTarget): bool
+fun jstarget/(==)(j1: jsTarget, j2: jsTarget): bool
   match (j1, j2)
     (JsDefault, JsDefault) -> True
     (JsNode, JsNode) -> True
     (JsWeb, JsWeb) -> True
     _ -> False
 
-pub fun (==)(t1: target, t2: target): bool
+pub fun target/(==)(t1: target, t2: target): bool
   match (t1, t2)
     (CS, CS) -> True
     (JS(j1), JS(j2)) -> j1 == j2
@@ -61,20 +61,20 @@ pub fun (==)(t1: target, t2: target): bool
     (DefaultTarget, DefaultTarget) -> True
     _ -> False
 
-fun show(t: target): string
+fun target/show(t: target): string
   match t
     CS -> "CS"
     JS(j) -> "JS(" ++ j.show ++ ")"
     C(c) -> "C(" ++ c.show ++ ")"
     DefaultTarget -> "Default"
 
-fun show(t: jsTarget): string
+fun jstarget/show(t: jsTarget): string
   match t
     JsDefault -> "JsDefault"
     JsNode -> "JsNode"
     JsWeb -> "JsWeb"
 
-fun show(t: cTarget): string
+fun ctarget/show(t: cTarget): string
   match t
     CDefault -> "CDefault"
     LibC -> "LibC"
@@ -82,13 +82,13 @@ fun show(t: cTarget): string
     WasmJs -> "WasmJs"
     WasmWeb -> "WasmWeb"
 
-fun alignedSum(start: int, xs: list<int>): int
-  xs.foldl(start, alignedAdd)
+fun aligned/sum(start: int, xs: list<int>): int
+  xs.foldl(start, aligned/add)
 
-fun alignedAdd(x: int, y: int): int
-  alignUp(x, y) + y
+fun aligned/add(x: int, y: int): int
+  align-up(x, y) + y
 
-fun alignUp(x: int, y: int): int
+fun align-up(x: int, y: int): int
   if y <= 0 then x
   else ((x + y - 1) / y) * y
 
@@ -98,13 +98,12 @@ type buildType
   RelWithDebInfo
   Release
 
-fun show(b: buildType): string
+fun build-type/show(b: buildType): string
   match b
     DebugFull -> "DebugFull"
     Debug -> "Debug"
     RelWithDebInfo -> "RelWithDebInfo"
     Release -> "Release"
-
 
 // The flavour of a type variable. Types in a "Type.Assumption" (Gamma) and inferred types in "Core.Core"
 // are always of the 'Bound' flavour. 'Meta' and 'Skolem' type variables only ever occur during type inference.
@@ -116,7 +115,7 @@ type flavour
   Skolem
   Meta // used for pretty printing
 
-fun (==)(f1: flavour, f2: flavour): bool
+fun flavour/(==)(f1: flavour, f2: flavour): bool
   match (f1, f2)
     (Meta, Meta) -> True
     (Skolem, Skolem) -> True
@@ -127,13 +126,13 @@ type visibility
   Public
   Private
 
-fun (==)(v1: visibility, v2: visibility): bool
+fun visibility/(==)(v1: visibility, v2: visibility): bool
   match (v1, v2)
     (Public, Public) -> True
     (Private, Private) -> True
     _ -> False
 
-fun show(v: visibility): string
+fun visibility/show(v: visibility): string
   match v
     Public -> "Public"
     Private -> "Private"
@@ -142,17 +141,17 @@ type handlerSort
   HandlerNormal
   HandlerInstance
 
-pub fun show(h: handlerSort): string
+pub fun handler-sort/show(h: handlerSort): string
   match h
     HandlerNormal -> "HandlerNormal"
     HandlerInstance -> "HandlerInstance"
 
-pub fun isHandlerInstance(h: handlerSort): bool
+pub fun is-handler-instance(h: handlerSort): bool
   match h
     HandlerInstance -> True
     HandlerNormal -> False
 
-pub fun isHandlerNormal(h: handlerSort): bool
+pub fun is-handler-normal(h: handlerSort): bool
   match h
     HandlerInstance -> False
     HandlerNormal -> True
@@ -165,7 +164,7 @@ type operationSort
   OpControl
   OpControlErr
 
-fun show(o: operationSort): string
+fun op-sort/show(o: operationSort): string
   match o
     OpVal -> "val"
     OpFun -> "fun"
@@ -179,7 +178,7 @@ type dataKind
   CoInductive
   Retractive
 
-fun show(k: dataKind): string
+fun datakind/show(k: dataKind): string
   match k
     Inductive -> "Inductive"
     CoInductive -> "CoInductive"
@@ -192,7 +191,7 @@ value type dataDef
   DataDefRec
   DataDefOpen
 
-fun show(d: dataDef): string
+fun datadef/show(d: dataDef): string
   match d
     DataDefValue(r) -> "DataDefValue(" ++ r.show ++ ")"
     DataDefNormal -> "DataDefNormal"
@@ -200,69 +199,63 @@ fun show(d: dataDef): string
     DataDefRec -> "DataDefRec"
     DataDefOpen -> "DataDefOpen"
 
-fun isRec(d: dataDef): bool
-  match d
-    DataDefRec -> True
-    _ -> False
+fun datadef/is-rec(d: dataDef): bool
+  d.is-dataDefRec
   
-fun isOpen(d: dataDef): bool
-  match d
-    DataDefOpen -> True
-    _ -> False
-  
-fun isValue(d: dataDef): bool
-  match d
-    DataDefValue -> True
-    _ -> False
+fun datadef/is-open(d: dataDef): bool
+  d.is-dataDefOpen
+
+fun datadef/is-value(d: dataDef): bool
+  d.is-dataDefValue
 
 type valueRepr
   ValueRepr(pub rawSize: int, pub scanCount: int, pub alignment: int);
 
-fun show(v: valueRepr): string
+fun valuerepr/show(v: valueRepr): string
   "ValueRepr(rawSize: {" ++ v.rawSize.show ++ "}, scanCount: {" ++ v.scanCount.show ++ "}, alignment: {" ++ v.alignment.show ++ "})"
 
-fun sizeScan(p: platform, v: valueRepr): (int, int)
+fun scan/size(p: platform, v: valueRepr): (int, int)
   (p.size(v), v.scanCount)
 
-fun size(p: platform, v: valueRepr): int
+fun full/size(p: platform, v: valueRepr): int
   v.rawSize + (v.scanCount * p.fieldSize)
 
-fun isMixed(v: valueRepr): bool
+fun is-mixed(v: valueRepr): bool
   v.rawSize > 0 && v.scanCount > 0
 
-fun isRaw(v: valueRepr): bool
+fun is-raw(v: valueRepr): bool
   v.rawSize > 0 && v.scanCount == 0
 
-pub val valueReprZero = ValueRepr(0,0,0)
+pub val valuerepr/zero = ValueRepr(0,0,0)
 fun valueReprRaw(m: int)
   ValueRepr(m,0,m)
 fun valueReprScan(n: int)
   ValueRepr(0,n,0)
 
 type defSort
-  DefFun(param: list<paramInfo>, fipKind: fipT=noFip)
+  DefFun(param: list<paramInfo>, fipKind: fipT=NoFip(False))
   DefVal
   DefVar
 
-fun defFunEx(pinfos: list<paramInfo>, fipKind: fipT)
+fun def-fun-ex(pinfos: list<paramInfo>, fipKind: fipT)
   if pinfos.all(fn(p) p.is-own) then DefFun([], fipKind) else DefFun(pinfos, fipKind)
 
-fun defFun(pinfos: list<paramInfo>)
-  defFunEx(pinfos, noFip)
+fun def-fun(pinfos: list<paramInfo>)
+  def-fun-ex(pinfos, no-fip)
 
-fun show(s: defSort): string
+fun defsort/show(s: defSort): string
   match s
     DefFun(p, f) -> "DefFun(" ++ p.show-list(show) ++ ", " ++ f.show ++ ")"
     DefVal -> "DefVal"
     DefVar -> "DefVar"
 
-fun showFull(s: defSort): string
+fun show-full(s: defSort): string
   match s
     DefFun(_, f) -> f.show ++ " fun"
     DefVal -> "val"
     DefVar -> "var"
 
-pub fun isFun(s: defSort): bool
+pub fun defsort/is-fun(s: defSort): bool
   match s
     DefFun(_) -> True
     _ -> False
@@ -271,13 +264,13 @@ type paramInfo
   Borrow
   Own
 
-fun (==)(p1: paramInfo, p2: paramInfo): bool
+fun param/(==)(p1: paramInfo, p2: paramInfo): bool
   match (p1, p2)
     (Borrow, Borrow) -> True
     (Own, Own) -> True
     _ -> False
 
-fun show(p: paramInfo): string
+fun param/show(p: paramInfo): string
   match p
     Borrow -> "Borrow"
     Own -> "Own"
@@ -287,7 +280,7 @@ type defInline
   InlineAlways
   InlineAuto
 
-fun show(i: defInline): string
+fun definline/show(i: defInline): string
   match i
     InlineNever -> "InlineNever"
     InlineAlways -> "InlineAlways"
@@ -298,14 +291,14 @@ type fixity
   FixPrefix
   FixPostfix
 
-fun (==)(f1: fixity, f2: fixity): bool
+fun fixity/(==)(f1: fixity, f2: fixity): bool
   match (f1, f2)
     (FixInfix(p1, a1), FixInfix(p2, a2)) -> p1 == p2 && a1 == a2
     (FixPrefix, FixPrefix) -> True
     (FixPostfix, FixPostfix) -> True
     _ -> False
 
-fun show(f: fixity): string
+fun fixity/show(f: fixity): string
   match f
     FixInfix(p, a) -> "FixInfix(" ++ p.show ++ ", " ++ a.show ++ ")"
     FixPrefix -> "FixPrefix"
@@ -316,14 +309,14 @@ type assoc
   AssocRight
   AssocLeft
 
-fun (==)(a1: assoc, a2: assoc): bool
+fun assoc/(==)(a1: assoc, a2: assoc): bool
   match (a1, a2)
     (AssocNone, AssocNone) -> True
     (AssocRight, AssocRight) -> True
     (AssocLeft, AssocLeft) -> True
     _ -> False
 
-fun show(a: assoc): string
+fun assoc/show(a: assoc): string
   match a
     AssocNone -> "AssocNone"
     AssocRight -> "AssocRight"
@@ -334,7 +327,7 @@ type fipT
   Fbip(alloc: fipAlloc, tail: bool)
   NoFip(tail: bool)
 
-fun show(f: fipT): string
+fun fipt/show(f: fipT): string
   match f
     Fip(a) -> "Fip(" ++ a.show ++ ")"
     Fbip(a, t) -> "Fbip(" ++ a.show ++ ", " ++ t.show ++ ")"
@@ -345,16 +338,16 @@ value type fipAlloc
   AllocFinitely
   AllocUnlimited
 
-fun show(a: fipAlloc): string
+fun fipalloc/show(a: fipAlloc): string
   match a
     AllocAtMost(0) -> "AllocAtMost(0)"
     AllocAtMost(n) -> "AllocAtMost(" ++ n.show ++ ")"
     AllocFinitely -> "AllocFinitely"
     AllocUnlimited -> "AllocUnlimited"
 
-val noFip = NoFip(False)
+pub val no-fip = NoFip(False)
 
-fun isTail(f: fipT): bool
+fun fipt/is-tail(f: fipT): bool
   match f
     Fip(_) -> True
     Fbip(_, t) -> t
@@ -366,16 +359,16 @@ fun alloc(f: fipT): fipAlloc
     Fbip(a) -> a
     NoFip() -> AllocUnlimited
 
-fun showFip(f: fipT)
-  fun showTail(b: bool): string
+fun show-fip(f: fipT)
+  fun show-tail(b: bool): string
     if b then "tail" else " "
-  fun showN(n: fipAlloc): string
+  fun show-n(n: fipAlloc): string
     match n
       AllocAtMost(0) -> ""
       AllocAtMost(n) -> "(" ++ n.show ++ ")"
       AllocFinitely -> "(n)"
       AllocUnlimited -> "" 
   match f
-    Fip(n) -> "fip" ++ showN(n)
-    Fbip(n, t) -> t.showTail ++ "fbip" ++ showN(n)
-    NoFip(t) -> t.showTail
+    Fip(n) -> "fip" ++ show-n(n)
+    Fbip(n, t) -> t.show-tail ++ "fbip" ++ show-n(n)
+    NoFip(t) -> t.show-tail

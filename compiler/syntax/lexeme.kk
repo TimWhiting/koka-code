@@ -78,10 +78,10 @@ fun is-lbracket(l: lex): bool
     LexSpecial("[") -> True
     _ -> False
 
-pub fun (==)(l1: lexeme, l2: lexeme): bool
+pub fun lexeme/(==)(l1: lexeme, l2: lexeme): bool
   l1.range == l2.range && l1.lex == l2.lex
 
-pub fun (==)(l1: lex, l2: lex): bool
+pub fun lex/(==)(l1: lex, l2: lex): bool
   match (l1, l2)
     (LexInt(i1, s1), LexInt(i2, s2)) -> i1 == i2 && s1 == s2
     (LexFloat(f1, s1), LexFloat(f2, s2)) -> f1 == f2 && s1 == s2
@@ -105,24 +105,24 @@ pub fun (==)(l1: lex, l2: lex): bool
     (LexError(s1), LexError(s2)) -> s1 == s2
     _ -> False
 
-pub fun isError(l: lex)
+pub fun lex/is-error(l: lex)
   match l
     LexError(_) -> True
     _ -> False
 
-pub fun lexemeIsWhite(l: lexeme): <> bool
-  l.lex.lexIsWhite
+pub fun lexeme/is-white(l: lexeme): <> bool
+  l.lex.is-white
 
-pub fun lexemeIsWhitespace(l: lexeme): <> bool
-  l.lex.lexIsWhitespace
+pub fun lexeme/is-whitespace(l: lexeme): <> bool
+  l.lex.is-whitespace
 
-pub fun lexIsWhite(l: lex): <> bool
+pub fun lex/is-white(l: lex): <> bool
   match l
     LexWhite(_) -> True
     LexComment(_) -> True
     _ -> False
 
-pub fun lexIsWhitespace(l: lex): <> bool
+pub fun lex/is-whitespace(l: lex): <> bool
   match l
     LexWhite(_) -> True
     _ -> False
@@ -133,13 +133,13 @@ pub fun is-semicolon(l: lexeme): bool
     LexSpecial(";") -> True
     _ -> False
 
-pub fun sameLexeme(l1: lexeme, l2: lexeme): <> bool
+pub fun same-lexeme(l1: lexeme, l2: lexeme): <> bool
   match (l1.lex, l2.lex)
     (LexKeyword(n1, _), LexKeyword(n2, _)) -> n1 == n2 
     (LexSpecial(n1), LexSpecial(n2)) -> n1 == n2
-    (_, _) -> l1.lex.fromEnum == l2.lex.fromEnum
+    (_, _) -> l1.lex.from-enum == l2.lex.from-enum
 
-pub fun fromEnum(l: lex): <> int
+pub fun from-enum(l: lex): <> int
   match l
     LexInt(_, __) -> 0
     LexFloat(_, __) -> 1
@@ -162,10 +162,10 @@ pub fun fromEnum(l: lex): <> int
     LexCons(_) -> 17
     LexTypeId(_, _) -> 18
 
-pub fun show(l: lexeme): <> string
-  l.range.showFullRange ++ ": " ++ l.lex.show
+pub fun lexeme/show(l: lexeme): <> string
+  l.range.show-full-range ++ ": " ++ l.lex.show
 
-pub fun show(l: lex): <> string
+pub fun lex/show(l: lex): <> string
   match l
     LexInt(_, s) -> "int " ++ s.show
     LexFloat(_, s) -> "float " ++ s.show

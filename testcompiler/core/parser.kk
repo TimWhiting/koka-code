@@ -10,6 +10,6 @@ fun main()
   // val f = ".koka/v2.4.3/gcc-debug/compiler_common_failure.kki"
   with handler
     final ctl astError(msg: string, rng: range)
-      println("error parsing ast at " ++ rng.showFullRange ++ "\n" ++ msg)
+      println("error parsing ast at " ++ rng.show-full-range ++ "\n" ++ msg)
   val res = parseCore(f.path)
   res.fst.show.println

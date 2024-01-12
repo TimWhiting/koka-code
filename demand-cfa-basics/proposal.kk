@@ -65,7 +65,7 @@ fun nonlinear/main()
         resume(())
   [0, 1, 2, 3].iterate
 
-fun main()
+fun linear/main()
   with handler
     ctl yield(a)
       if a == 2 then 
@@ -77,26 +77,26 @@ fun main()
   [0, 1, 2, 3].iterate
 
 // fold over the integers between [`start`,`end`] (inclusive).
-fun fold-int( start : int, end : int, init : a, f : (int,a) -> e a ) : e a
-  if start >= end then return init else
-    val x = f(start,init)
-    return fold-int(unsafe-decreasing(start + 1), end, x, f)
+// fun x/fold( start : int, end : int, init : a, f : (int,a) -> e a ) : e a
+//   if start >= end then init else
+//     val x = f(start,init)
+//     x/fold(unsafe-decreasing(start + 1), end, x, f)
 
 // Computes the number of pythagorean triples such that x < n/3, y < n/2, and z < n/2
 fun pyth(n : int): int
-  return fold-int(1, n/3, 0) fn(x, xcount) 
+  fold(1, n/3, 0) fn(x, xcount) 
     // 1 < x < 30/3
     val xx = x*x // 1^2 < xx < (30/3)^2        
-    return fold-int(x.inc, n/2, xcount) fn(y, ycount)  
+    fold(x.inc, n/2, xcount) fn(y, ycount)  
       // x+1 < y < 30/2  
       val yy = y*y // 1^2+1 < yy < (30/2)^2
-      return fold-while-int(y.inc, n/2, ycount) fn(z, zcount)
+      fold-while(y.inc, n/2, ycount) fn(z, zcount)
         // y + 1 < z < 30/2
         val zz = z*z // (1^2+1)^2+1 < zz < (30/2)^2
         // xx+yy < 2*(30/2)^2
-        if (xx+yy == zz) then return Just(zcount + 1)  
-        elif (xx+yy >= zz) && (x+y+z <= n) then return Just(zcount)
-        else return Nothing
+        if (xx+yy == zz) then Just(zcount + 1)  
+        elif (xx+yy >= zz) && (x+y+z <= n) then Just(zcount)
+        else Nothing
 
 fun int/main()
   pyth(30).println

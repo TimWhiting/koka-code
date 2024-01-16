@@ -8,16 +8,16 @@ fun test1()
   // Same as
   println(process("World!"))
 
-fun createAddN(n: int)
-  fn(x)
-    x + n
+// fun createAddN(n: int)
+//   fn(x)
+//     x + n
   // Returns a function that adds n to it's argument
 
-fun test2()
-  val add5 = createAddN(5)
-  add5(10).println
-  // Same as
-  println(createAddN(5)(10))
+// fun test2()
+//   val add5 = createAddN(5)
+//   add5(10).println
+//   // Same as
+//   println(createAddN(5)(10))
 
 fun sum(xs: list<int>, f: (int) -> int)
   match xs
@@ -76,27 +76,33 @@ fun linear/main()
         resume(())
   [0, 1, 2, 3].iterate
 
-// fold over the integers between [`start`,`end`] (inclusive).
-// fun x/fold( start : int, end : int, init : a, f : (int,a) -> e a ) : e a
-//   if start >= end then init else
-//     val x = f(start,init)
-//     x/fold(unsafe-decreasing(start + 1), end, x, f)
 
-// Computes the number of pythagorean triples such that x < n/3, y < n/2, and z < n/2
-fun pyth(n : int): int
-  fold(1, n/3, 0) fn(x, xcount) 
-    // 1 < x < 30/3
-    val xx = x*x // 1^2 < xx < (30/3)^2        
-    fold(x.inc, n/2, xcount) fn(y, ycount)  
-      // x+1 < y < 30/2  
-      val yy = y*y // 1^2+1 < yy < (30/2)^2
-      fold-while(y.inc, n/2, ycount) fn(z, zcount)
-        // y + 1 < z < 30/2
-        val zz = z*z // (1^2+1)^2+1 < zz < (30/2)^2
-        // xx+yy < 2*(30/2)^2
-        if (xx+yy == zz) then Just(zcount + 1)  
-        elif (xx+yy >= zz) && (x+y+z <= n) then Just(zcount)
-        else Nothing
+// Returns a function that adds n to its argument
+fun createAddN(n: int): (int -> int)
+  fn(x)
+    x + n
 
-fun int/main()
-  pyth(30).println
+// Returns a function that adds n to n transformed by f
+fun combineAdd(n: int, f: (int) -> int): int
+  val result = f(n) + n
+  result
+
+fun test4()
+  val add5 = createAddN(5)
+  combineAdd(10, add5).println
+
+
+// Exceptional control flow
+effect throw-a<a>
+  ctl throwa(a: a): b
+
+fun do-throw(do: bool): <throw-a<int>> int
+  throwa(10)
+  20
+
+fun test6()
+  val result = handle(fn() do-throw(True))
+    final ctl throwa(b:int)
+      b + 1
+    return(x) x + 2
+  result.println

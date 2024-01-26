@@ -181,26 +181,27 @@ type expr<t>
   Inject(t: t, e: expr<t>, behind: bool, range: range)
   Handler(sort: handlerSort, scope: handlerScope, hOverride: handlerOverride, allowMask: maybe<bool>, hEffect: maybe<t>, localPars: list<valueBinder<maybe<t>, ()>>, initially: maybe<expr<t>>, hReturn: maybe<expr<t>>, finally: maybe<expr<t>>, branches: list<handlerBranch<t>>, declRange: range, range: range)
 
-fun expr/show(expr: expr<t>): string
-  ""
+// fun expr/show(expr: expr<t>): string
+//   ""
 
-// fun expr/show(expr: expr<t>, ?show: (t) -> <div|e1> string): <div|e1> string
-//   match expr
-//     Lam(binder, e, range) -> "Lam " ++ binder.list/show ++ " " ++ e.show ++ " " ++ range.show-full-range
-//     Let(d, e, range) -> "Let " ++ d.show ++ " " ++ e.show ++ " " ++ range.show-full-range
-//     Bind(d, e, range) -> "Bind " ++ d.show ++ " " ++ e.show ++ " " ++ range.show-full-range
-//     App(e, args, range) -> "App " ++ e.show ++ " " ++ args.list/show(?show=fn((mn, e')) mn.show(?show=fn((n,_)) n.name/name/show) ++ "=" ++ expr/show(e')) ++ " " ++ range.show-full-range
-//     Var(name, isOp, range) -> "Var " ++ name.name/name/show ++ " " ++ isOp.show ++ " " ++ range.show-full-range
-//     Literal(l) -> "Literal " ++ l.show
-//     Ann(e, t, range) -> "Ann " ++ e.show ++ " " ++ t.show ++ " " ++ range.show-full-range
-//     Case(e, cases, range) -> "Case " ++ e.show ++ " " ++ cases.list/show ++ " " ++ range.show-full-range
-//     Parens(e, name, range) -> "Parens " ++ e.show ++ " " ++ name.name/name/show ++ " " ++ range.show-full-range
-//     Inject(t, e, behind, range) -> "Inject " ++ t.show ++ " " ++ e.show ++ " " ++ behind.show ++ " " ++ range.show-full-range
-//     Handler(sort, scope, hOverride, allowMask, hEffect, localPars, initially, hReturn, finally, branches, declRange, range) -> 
-//       "Handler " ++ sort.show ++ " " ++ scope.show ++ " " ++ hOverride.show ++ " " ++ 
-//       allowMask.show ++ " " ++ hEffect.show ++ " " ++ localPars.list/show ++ " " ++ 
-//       initially.show ++ " " ++ hReturn.show ++ " " ++ finally.show ++ " " ++
-//       branches.list/show ++ " " ++ declRange.show-full-range ++ " " ++ range.show-full-range
+fun expr/show(expr: expr<t>, ?show: (t) -> <div|e1> string): <div|e1> string
+  match expr
+    // Lam(binder, e, rng) -> "Lam " ++ binder.list/show ++ " " ++ e.show ++ " " ++ rng.show-full-range
+    // Let(d, e, rng) -> "Let " ++ d.dg/show ++  " " ++ e.expr/show ++ " " ++ rng.show-full-range 
+    // Bind(d, e, rng) -> "Bind " ++ d.show ++ " " ++ e.show ++ " " ++ rng.show-full-range
+    // App(e, args, rng) -> "App " ++ e.show ++ " " ++ args.list/show(?show=fn((mn, e')) mn.show(?show=fn((n,_)) n.name/name/show) ++ "=" ++ expr/show(e')) ++ " " ++ rng.show-full-range
+    Var(n, isOp, rng) -> "Var " ++ n.name/name/show ++ " " ++ isOp.show ++ " " ++ rng.show-full-range
+    Literal(l) -> "Literal " ++ l.show
+    Ann(e, t, rng) -> "Ann " ++ e.show ++ " " ++ t.show ++ " " ++ rng.show-full-range
+    // Case(e, cases, rng) -> "Case " ++ e.show ++ " " ++ cases.list/show ++ " " ++ rng.show-full-range
+    Parens(e, n, rng) -> "Parens " ++ e.show ++ " " ++ n.name/name/show ++ " " ++ rng.show-full-range
+    // Inject(t, e, behind, rng) -> "Inject " ++ t.show ++ " " ++ e.show ++ " " ++ behind.show ++ " " ++ rng.show-full-range
+    _ -> ""
+    // Handler(sort, scope, hOverride, allowMask, hEffect, localPars, initially, hReturn, fin, branches, declRange, rng) -> 
+      // "Handler " ++ sort.show ++ " " ++ scope.show ++ " " ++ hOverride.show ++ " " ++ 
+      // allowMask.show ++ " " ++ hEffect.show ++ " " ++ localPars.list/show ++ " " ++ 
+      // initially.show ++ " " ++ hReturn.show ++ " " ++ fin.show ++ " " ++
+      // branches.list/show ++ " " ++ declRange.show-full-range ++ " " ++ rng.show-full-range
 
 type handlerOverride
   HandlerOverride

@@ -12,9 +12,9 @@ pub infixr 5 (|->)
 alias tvs = linearSet<typeVar>
 alias sub = linearMap<typeVar, ktype>
 
-val emptyTvs = linearSet([])
+val emptyTvs = []
 
-val emptySub = linearMap([])
+val emptySub = []
 
 fun fuv(tvs: tvs): linearSet<typeVar>
   tvs.filter(fn(tv) tv.flavour.is-meta)
@@ -25,7 +25,7 @@ fun fbv(tvs: tvs): linearSet<typeVar>
 
 fun subNew(l: list<(typeVar, ktype)>): exn sub
   if l.all(fn((tv, t)) tv.kind == t.kind) then
-    linearMap(l)
+    l
   else
     throw("type/typevar: subNew kind mismatch")
 
@@ -33,13 +33,13 @@ fun subDom(s: sub): tvs
   tvsNew(s.list.map(fst))
 
 fun subRange(s: sub): list<ktype>
-  s.list.map(snd)
+  s.map(snd)
 
 fun subList(s: sub): list<(typeVar, ktype)>
-  s.list
+  s
 
 fun subCommon(s1: sub, s2: sub): list<(typeVar, (tau, tau))>
-  s1.list.map(fn(s) s2.maybeGet(s.fst).map(fn(t) (s.fst, (s.snd, t)))).concat-maybe
+  s1.map(fn(s) s2.maybe-get(s.fst).map(fn(t) (s.fst, (s.snd, t)))).concat-maybe
 
 fun subSingle(tvar: typeVar, tau: tau)
   // Top assertion is invalid; it can happen (and happens) in the CoreF typechecker when
@@ -55,10 +55,10 @@ fun subSingle(tvar: typeVar, tau: tau)
   linearMap([(tvar, tau)])
 
 fun subLookup(s: sub, tv: typeVar): maybe<tau>
-  s.maybeGet(tv)
+  s.maybe-get(tv)
 
 fun subRemove(s: sub, tvars: list<typeVar>): sub
-  s.removeAll(tvars)
+  s.remove-all(tvars)
 
 fun subFind(s: sub, tv: typeVar): exn tau
   s.get(tv)
@@ -67,20 +67,20 @@ fun subCompose(s1: sub, s2: sub): pure sub
   s1.union(s1 |-> s2)
 
 fun single(tv: typeVar) 
-  linearSet([tv])
+  [tv]
 
 fun tvsNew(tv: list<typeVar>) 
-  linearSet(tv)
+  tv
 
-fun free-type-vars(ps: list<a>, ?free-type-vars: (a) -> pure tvs): pure tvs
-  ps.map(f).unions
+fun list/free-type-vars(ps: list<a>, ?free-type-vars: (a) -> pure tvs): pure tvs
+  ps.map(free-type-vars).unions
 
-fun free-type-vars(pred: pred): pure tvs
+fun pred/free-type-vars(pred: pred): pure tvs
   match pred
     PredSub(sub, super) -> sub.free-type-vars + super.free-type-vars
     PredIFace(_, args) -> args.map(free-type-vars).unions
 
-fun free-type-vars(tp: ktype): pure tvs
+fun ktype/free-type-vars(tp: ktype): pure tvs
   match tp
     TForAll(vars, preds, t) -> 
       val tv1 :tvs = t.free-type-vars + preds.free-type-vars
@@ -90,7 +90,7 @@ fun free-type-vars(tp: ktype): pure tvs
       val tv2: tvs = tv1 + res.free-type-vars
       tv2 + eff.free-type-vars
     TCon -> emptyTvs
-    TVar(tv) -> single(tv)
+    TVar(tv) -> [tv]
     TApp(t, args) -> t.free-type-vars + args.map(fn(a) a.free-type-vars).unions
     TSyn(_, xs, t) -> t.free-type-vars + xs.map(free-type-vars).unions
 
@@ -108,21 +108,21 @@ fun free-type-vars(e0: expr): pure tvs
     Let(defGroups, e) -> defGroups.map(free-type-vars).unions + e.free-type-vars
     Case(es, bs) -> es.free-type-vars + bs.map(free-type-vars).unions
 
-fun free-type-vars(dg: defGroup): pure tvs
+fun dg/free-type-vars(dg: defGroup): pure tvs
   match dg
     DefRec(defs) -> defs.map(free-type-vars).unions
     DefNonRec(e) -> free-type-vars(e)
 
-fun free-type-vars(d: def): pure tvs
+fun def/free-type-vars(d: def): pure tvs
   d.ktype.free-type-vars + d.defExpr.free-type-vars
 
-fun free-type-vars(bs: branch): pure tvs
+fun branch/free-type-vars(bs: branch): pure tvs
   match bs
     Branch(p, e) -> 
       val tv1: tvs = e.free-type-vars - p.boundTypeVars
       tv1 + p.free-type-vars
 
-fun free-type-vars(p: pattern): pure tvs
+fun pat/free-type-vars(p: pattern): pure tvs
   match p
     PatVar(tn, pat) -> tn.free-type-vars + pat.free-type-vars
     PatCon(tn, args, _, targs, exists0, tres) ->
@@ -133,17 +133,17 @@ fun free-type-vars(p: pattern): pure tvs
     PatWild -> emptyTvs
     PatLit(_) -> emptyTvs
 
-fun free-type-vars(gd: guard): pure tvs
+fun guard/free-type-vars(gd: guard): pure tvs
   match gd
     Guard(e, e2) -> e.free-type-vars + e2.free-type-vars
 
-fun free-type-vars(TName(_, tp): tName): pure tvs
+fun tn/free-type-vars(TName(_, tp): tName): pure tvs
   tp.free-type-vars
 
-fun boundTypeVars(l: list<a>, ?boundTypeVars: (a) -> pure tvs): pure tvs
-  l.map(f).unions
+fun list/boundTypeVars(l: list<a>, ?boundTypeVars: (a) -> pure tvs): pure tvs
+  l.map(boundTypeVars).unions
 
-fun boundTypeVars(p: pattern): pure tvs
+fun pat/boundTypeVars(p: pattern): pure tvs
   match p
     PatVar(tn, pat) -> tn.boundTypeVars + pat.boundTypeVars
     PatCon(tn, args, _, targs, exists0, tres) ->
@@ -154,48 +154,48 @@ fun boundTypeVars(p: pattern): pure tvs
     PatWild -> emptyTvs
     PatLit(_) -> emptyTvs
 
-fun boundTypeVars(tp: ktype): pure tvs
+fun ktype/boundTypeVars(tp: ktype): pure tvs
   match tp
     TForAll(vars, preds, t) -> 
       val tv1: tvs = preds.free-type-vars + t.boundTypeVars
       tv1 + vars
     TFun(args, eff, res) -> 
-      val tv1: tvs = args.map(snd).boundTypeVars + res.boundTypeVars 
+      val tv1: tvs = args.map(tuple2/snd).boundTypeVars + res.boundTypeVars 
       tv1 + eff.boundTypeVars
     TSyn(_, _, t) -> t.boundTypeVars
     TApp(t, arg) -> t.boundTypeVars + arg.boundTypeVars
     _ -> emptyTvs
 
-fun boundTypeVars(TName(_, tp): tName): pure tvs
+fun tn/boundTypeVars(TName(_, tp): tName): pure tvs
   tp.boundTypeVars
 
-fun (|->)(s1: sub, s2: sub): pure sub
+fun sub/(|->)(s1: sub, s2: sub): pure sub
   s2.map(fn(k, v) (k, s1 |-> v))
 
-fun (|->)(s: sub, l: list<a>, ?(|->): (sub, a) -> e a): e list<a>
-  l.map(fn(a) f(s, a))
+fun sublist/(|->)(s: sub, l: list<a>, ?(|->): (sub, a) -> e a): e list<a>
+  l.map(fn(a) s |-> a)
 
-fun (|->)(s: sub, tp: ktype): pure tau
+fun ktype/(|->)(s: sub, tp: ktype): pure tau
   match tp
     TForAll(vars, preds, t) ->
       val sub' = s.subRemove(vars)
-      TForAll(vars, preds.map(fn(p:pred) (|->)(sub', p)), sub' |-> t)
+      TForAll(vars, preds.map(fn(p:pred) sub' |-> p), sub' |-> t)
     TFun(args, eff, res) -> TFun(args.map(fn(a) (a.fst, s |-> a.snd)), s |-> eff, s |-> res)
     TCon -> tp
     TVar(tv) -> s.subFind(tv)
     TApp(t, args) -> TApp(s |-> t, args.map(fn(t') s |-> t'))
     TSyn(syn, xs, t) -> TSyn(syn, xs, s |-> t)
 
-fun (|->)(s: sub, pred: pred): pure pred
+fun pred/(|->)(s: sub, pred: pred): pure pred
   match pred
     PredSub(sub, super) -> PredSub(s |-> sub, s |-> super)
     PredIFace(iface, args) -> PredIFace(iface, args.map(fn(t) s |-> t))
 
-fun (|->)(s: sub, tn: tName): pure tName
+fun tn/(|->)(s: sub, tn: tName): pure tName
   match tn
     TName(n, tp) -> TName(n, s |-> tp)
 
-fun (|->)(s: sub, p: pattern): pure pattern
+fun pat/(|->)(s: sub, p: pattern): pure pattern
   match p
     PatVar(tn, pat) -> PatVar(s |-> tn, s |-> pat)
     PatCon(tn, args, repr, targs, exists0, tres,  conInfo, skip) ->
@@ -204,7 +204,7 @@ fun (|->)(s: sub, p: pattern): pure pattern
     PatWild -> PatWild
     PatLit(l) -> PatLit(l)
 
-fun (|->)(s: sub, e: expr): pure expr
+fun expr/(|->)(s: sub, e: expr): pure expr
   match e
     Lam(tn, eff, e) -> Lam(s |-> tn, s |-> eff, s |-> e)
     Var(tn, x) -> Var(s |-> tn, x)
@@ -218,19 +218,19 @@ fun (|->)(s: sub, e: expr): pure expr
     Let(defGroups, e) -> Let(defGroups.map(fn(dg) s |-> dg), s |-> e)
     Case(es, bs) -> Case(s |-> es, bs.map(fn(b) s |-> b))
 
-fun (|->)(s: sub, dg: defGroup): pure defGroup
+fun dg/(|->)(s: sub, dg: defGroup): pure defGroup
   match dg
     DefRec(defs) -> DefRec(defs.map(fn(d) s |-> d))
     DefNonRec(e) -> DefNonRec(s |-> e)
 
-fun (|->)(s: sub, Def(name, scheme, expr, vis, isVal, inl, nameRng, doc): def): pure def
+fun def/(|->)(s: sub, Def(name, scheme, expr, vis, isVal, inl, nameRng, doc): def): pure def
   Def(name, s |-> scheme, s |-> expr, vis, isVal, inl, nameRng, doc)
 
-fun (|->)(s: sub, Branch(p, e): branch): pure branch
-  val sub' = s.subRemove(p.boundTypeVars.list)
+fun branch/(|->)(s: sub, Branch(p, e): branch): pure branch
+  val sub' = s.subRemove(p.boundTypeVars)
   Branch(s |-> p, sub' |-> e)
 
-fun (|->)(s: sub, g: guard): pure guard
+fun guard/(|->)(s: sub, g: guard): pure guard
   match g
     Guard(e, e2) -> Guard(s |-> e, s |-> e2)
 
@@ -240,5 +240,5 @@ fun freshTypeVar(k: kind, fl: flavour)
     Meta -> "_v"
     Skolem -> "$v"
     Bound -> "v"
-  val id = uniqueId(idbase)
+  val id = unique-id(idbase)
   TypeVar(id, k, fl)

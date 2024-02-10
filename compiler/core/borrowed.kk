@@ -13,11 +13,8 @@ alias borrowed = name-map<list<paramInfo>>
 
 alias borrowDef = (name, list<paramInfo>)
 
-val listEq = fn(l1: list<paramInfo>, l2: list<paramInfo>) (==)(l1, l2, fn(p1, p2) p1 == p2)
-val listShow = fn(l: list<paramInfo>) show-list(l, fn(p) show(p))
-
 // The initial borrowed
-val borrowedEmpty = linearMap([])
+val borrowedEmpty = []
 
 fun borrowedNew(xs: list<borrowDef>): borrowed
   borrowedEmpty.extends(xs)

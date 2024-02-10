@@ -20,32 +20,32 @@ fun withNewtypes(newtps0: newtypes, f: () -> <newtypesEff,exn,comp-flags|e> a): 
   var newtps := newtps0
   with handler
     fun newtypesExtend(name: name, k: dataInfo) newtps := newtps.set(name, k)
-    fun newtypesLookupAny(name: name) newtps.maybeGet(name)
+    fun newtypesLookupAny(name: name) newtps.maybe-get(name)
     fun newtypesLookupPublic(name: name) newtps.newtypesLookupPublic(name)
     fun newtypesFind(name: name) newtps.newtypesFind(name)
-    fun newtypesList() newtps.list
+    fun newtypesList() newtps
   f()
 
-fun newtypesNew(lst: list<dataInfo>): newtypes
-  linearMap(lst.map(fn(di) (di.name, di)))
-fun newtypesExtend(newtps: newtypes, name: name, k: dataInfo)
+fun nt/newtypesNew(lst: list<dataInfo>): newtypes
+  lst.map(fn(di) (di.name, di))
+fun nt/newtypesExtend(newtps: newtypes, name: name, k: dataInfo)
   newtps.set(name, k)
-fun newtypesLookupAny(newtps: newtypes, name: name)
-  newtps.maybeGet(name)
-fun newtypesLookupPublic(newtps: newtypes, name: name)
-  match newtps.maybeGet(name)
+fun nt/newtypesLookupAny(newtps: newtypes, name: name)
+  newtps.maybe-get(name)
+fun nt/newtypesLookupPublic(newtps: newtypes, name: name)
+  match newtps.maybe-get(name)
     Just(di) | di.vis.is-public -> Just(di)
     _ -> Nothing
-fun newtypesFind(newtps: newtypes, name: name)
-  match newtps.maybeGet(name)
+fun nt/newtypesFind(newtps: newtypes, name: name)
+  match newtps.maybe-get(name)
     Just(di) -> di
     _ -> fail("newTypes lookup failed")
 fun newtypesCompose(ntps1: newtypes, ntps2: newtypes)
   unions([ntps2, ntps1])
 
 fun single(name: name, d: dataInfo): newtypes
-  linearMap([(name, d)])
-val emptyNewtypes:newtypes = linearMap([])
+  [(name, d)]
+val emptyNewtypes:newtypes = []
 
 fun extractNewtypes(c: core): <pure,comp-flags> newtypes
   c.typeDefs.map(extractTypeDefGroup).unions

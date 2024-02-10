@@ -3,6 +3,7 @@ import std/text/regex
 import std/text/unicode
 import compiler/common/name
 import compiler/common/range
+import std/num/float64
 
 val typeVarRegex = "^[a-z][0-9]*$".regex();
 

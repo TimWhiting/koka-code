@@ -74,7 +74,7 @@ fun insertSome((i, (name, eitherTp)): (int, (name, either<userType, range>)))
   match eitherTp
     Left(t) -> ([], (name, t))
     Right(r) ->
-      val tn = i.newImplicitTypeVarName
+      val tn = i.new-implicit-type-var-name
       ([tn], (name, TpVar(tn, r)))
 
 fun isSomeVar(n: name)

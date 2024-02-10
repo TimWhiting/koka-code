@@ -152,7 +152,7 @@ fun makeDef(fvs: list<tName>, tvs: list<typeVar>, pinfos: list<paramInfo>, origN
 
 fun uniqueNameCurrentDef()
   val current = currentDef.last.unjust
-  val i = newUnique()
+  val i = new-unique()
   val udef-name = toHiddenUniqueName(i,"lift",current.def-name)
   (udef-name, current.kinline)
 

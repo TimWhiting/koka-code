@@ -5,6 +5,7 @@ import compiler/kind/kind
 import compiler/common/name
 import compiler/common/failure
 import compiler/platform/config
+import std/core/undiv
 
 alias prettyKindEff = <pure, comp-flags, colorSchemeEffect>
 
@@ -39,14 +40,14 @@ fun commaParens(xs, f)
 
 fun collectFunArgs(k: kind)
   match k
-    KApp(KApp(KCon(name), k1), k2) | name == "->".newName ->
-      Cons(k1, k2.unsafe-decreasing.collectFunArgs)
+    KApp(KApp(KCon(name), k1), k2) | name == "->".new-name ->
+      Cons(k1, k2.pretend-decreasing.collectFunArgs)
     _ -> [k]
 
 fun ppKind(k: kind, prec: prec)
   val nm = match k
     KCon(n) -> name/pretty(n)
-    KApp(KApp(KCon(name), k1), k2) | name == "->".newName ->
+    KApp(KApp(KCon(name), k1), k2) | name == "->".new-name ->
       val x = match k2.collectFunArgs
         [res] -> 
           k1.ppKind(precArrow) |+| 

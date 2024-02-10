@@ -72,7 +72,7 @@ fun single(tv: typeVar)
 fun tvsNew(tv: list<typeVar>) 
   linearSet(tv)
 
-fun free-type-vars(ps: list<a>, ?f: (a) -> pure tvs = free-type-vars): pure tvs
+fun free-type-vars(ps: list<a>, ?free-type-vars: (a) -> pure tvs): pure tvs
   ps.map(f).unions
 
 fun free-type-vars(pred: pred): pure tvs
@@ -140,7 +140,7 @@ fun free-type-vars(gd: guard): pure tvs
 fun free-type-vars(TName(_, tp): tName): pure tvs
   tp.free-type-vars
 
-fun boundTypeVars(l: list<a>, ?f: (a) -> pure tvs = boundTypeVars): pure tvs
+fun boundTypeVars(l: list<a>, ?boundTypeVars: (a) -> pure tvs): pure tvs
   l.map(f).unions
 
 fun boundTypeVars(p: pattern): pure tvs
@@ -172,7 +172,7 @@ fun boundTypeVars(TName(_, tp): tName): pure tvs
 fun (|->)(s1: sub, s2: sub): pure sub
   s2.map(fn(k, v) (k, s1 |-> v))
 
-fun (|->)(s: sub, l: list<a>, ?f: (sub, a) -> e a = (|->)): e list<a>
+fun (|->)(s: sub, l: list<a>, ?(|->): (sub, a) -> e a): e list<a>
   l.map(fn(a) f(s, a))
 
 fun (|->)(s: sub, tp: ktype): pure tau

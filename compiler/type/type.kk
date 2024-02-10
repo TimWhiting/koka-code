@@ -6,6 +6,8 @@ import compiler/common/range
 import compiler/common/failure
 import compiler/kind/kind
 import newstd/data/sort
+import std/core/unsafe
+import std/core/undiv
 
 pub type ktype
   TForAll(vars: list<typeVar>, pred: list<pred>, r: ktype) // rho
@@ -18,7 +20,7 @@ pub type ktype
 fun ktype/show(tp: ktype): div string
   match tp
     TForAll(vars, preds, t) -> "forall " ++ vars.show-list(show) ++ " . " ++ preds.show-list(show) ++ " => " ++ t.show
-    TFun(args, eff, t) -> "(" ++ args.show-list(fn((name, tp1)) name.name/name/show ++ tp1.unsafe-decreasing.show) ++ " -> " ++ eff.show ++ " " ++ t.show ++ ")"
+    TFun(args, eff, t) -> "(" ++ args.show-list(fn((name, tp1)) name.name/name/show ++ tp1.pretend-decreasing.show) ++ " -> " ++ eff.show ++ " " ++ t.show ++ ")"
     TCon(c) -> c.name.name/name/show
     TVar(v) -> v.tid.id/show
     TApp(t, args) -> t.show ++ " " ++ args.show
@@ -57,7 +59,7 @@ fun tv/(==)(t1: typeVar, t2: typeVar): bool
   t1.tid == t2.tid
 
 fun tv/cmp(t1: typeVar, t2: typeVar)
-   core/cmp(t1.tid, t2.tid)
+  cmp(t1.tid, t2.tid)
 
 // Type constants have a name and a kind
 value struct typeCon
@@ -91,14 +93,14 @@ pub alias synonymRank = int
 pub fun maxSynonymRank(t: ktype): synonymRank
   fun maxSynonymRanks(tps: list<ktype>): int
     tps.foldr(0) fn(t1, r) 
-      max(r, maxSynonymRank(t1.unsafe-decreasing))
+      max(r, maxSynonymRank(t1.pretend-decreasing))
   match t
-    TForAll(_, _, r) -> maxSynonymRank(r.unsafe-decreasing)
-    TFun(args, eff, ty) -> maxSynonymRanks(Cons(ty, Cons(eff, args.map(fn (f) -> f.snd))).unsafe-decreasing)
+    TForAll(_, _, r) -> maxSynonymRank(r.pretend-decreasing)
+    TFun(args, eff, ty) -> maxSynonymRanks(Cons(ty, Cons(eff, args.map(fn (f) -> f.snd))).pretend-decreasing)
     TCon(_) -> 0
     TVar(_) -> 0
-    TApp(ty, tps) -> maxSynonymRanks(Cons(ty, tps).unsafe-decreasing)
-    TSyn(syn, args, ty) -> max(syn.rank, maxSynonymRanks(Cons(ty, args).unsafe-decreasing))
+    TApp(ty, tps) -> maxSynonymRanks(Cons(ty, tps).pretend-decreasing)
+    TSyn(syn, args, ty) -> max(syn.rank, maxSynonymRanks(Cons(ty, args).pretend-decreasing))
 
 // Information about types
 pub struct dataInfo
@@ -201,7 +203,7 @@ fun mustSplit(tp)
 fun splitPredType(tp: ktype): (list<typeVar>, list<pred>, rho)
   match tp
     TForAll(vars, preds, t) -> (vars, preds, t)
-    _ -> if tp.mustSplit then tp.unsafe-decreasing.splitPredType else ([], [], tp)
+    _ -> if tp.mustSplit then tp.pretend-decreasing.splitPredType else ([], [], tp)
 
 fun shallowSplitVars(tp: ktype)
   match tp
@@ -253,7 +255,7 @@ fun applyType(tp1: ktype, tp2: ktype): ktype
     TSyn(_, _, tp) | tp.mustSplit -> applyType(tp, tp2)
     _ -> TApp(tp1, [tp2])
 
-fun typeArities(tp: ktype): (int, int)
+fun type-arities(tp: ktype): (int, int)
   match tp.splitFunScheme
     Just((tvars, _, pars, _, _)) -> (tvars.length, pars.length)
     Nothing -> (0, 0)
@@ -285,10 +287,10 @@ fun isRho(tp: ktype): bool
 fun isTau(tp: ktype): bool
   match tp
     TForAll -> False
-    TFun(xs, e, r) -> xs.all(fn(x) x.snd.unsafe-decreasing.isTau) && e.isTau && r.isTau
+    TFun(xs, e, r) -> xs.all(fn(x) x.snd.pretend-decreasing.isTau) && e.isTau && r.isTau
     TCon -> True
     TVar -> True
-    TApp(a, b) -> a.isTau && b.all(fn(x) x.unsafe-decreasing.isTau)
+    TApp(a, b) -> a.isTau && b.all(fn(x) x.pretend-decreasing.isTau)
     TSyn(_, _, t) -> t.isTau
 
 fun splitFunType(tp: ktype): maybe<(list<(name, ktype)>, ktype, ktype)>
@@ -340,10 +342,9 @@ fun isValueOperation(tp: ktype): bool
     _ -> False
 
 
-fun orderEffect(tp: tau): exn tau
+fun orderEffect(tp: tau): <exn,div> tau
   val (ls, tl) = extractOrderedEffect(tp)
-  unsafe-no-div
-    ls.foldr(tl, effectExtend)
+  ls.foldr(tl, effectExtend)
 
 fun extractOrderedEffect(tp: tau): exn (list<tau>, tau)
   val (labs, tl) = extractEffectExtend(tp)
@@ -364,7 +365,7 @@ fun label-name-full(tp: tau): pure name
 fun label-name-ex(tp: tau): exn (name, int, list<tau>)
   match tp.expandSyn
     TCon(tc) -> (tc.name, 0, [])
-    TApp(TCon(TypeCon(name)), [htp]) | name == nameTpHandled || name == nameTpHandled1 -> htp.unsafe-decreasing.label-name-ex
+    TApp(TCon(TypeCon(name)), [htp]) | name == nameTpHandled || name == nameTpHandled1 -> htp.pretend-decreasing.label-name-ex
     TApp(TCon(tc), targs as Cons(TVar(TypeVar(id, kind, Skolem)), _)) | kind == kindScope -> (tc.name, id, targs)
     TApp(TCon(tc), targs) -> if (tc.name == nameEffectExtend) then throw("non-expanded type sysnonym used as label") else (tc.name, 0, targs)
     _ -> throw("type/type labelNameEx: label is not a constant")
@@ -437,13 +438,13 @@ fun extractEffectExtend(t: tau): (list<tau>, tau)
   fun extractLabel(l: tau): list<tau>
     match l.expandSyn
       TApp(TCon(tc), [_, _]) | tc.name == nameEffectExtend ->
-        val (ls, _) = l.unsafe-decreasing.extractEffectExtend
+        val (ls, _) = l.pretend-decreasing.extractEffectExtend
         // TODO: Assertion
         ls
       _ -> [l]
   match t.expandSyn
     TApp(TCon(tc), [l, e]) | tc.name == nameEffectExtend ->
-      val (ls, tl) = e.unsafe-decreasing.extractEffectExtend
+      val (ls, tl) = e.pretend-decreasing.extractEffectExtend
       (l.extractLabel ++ ls, tl)
     _ -> ([], t)
 
@@ -550,7 +551,7 @@ fun unOptional(tp: ktype): ktype
 fun pruneSyn(rho: rho): rho
   match rho
     TSyn(_, _, t) -> t.pruneSyn
-    TApp(t1, ts) -> TApp(t1.pruneSyn, ts.map(fn(x) x.unsafe-decreasing.pruneSyn))
+    TApp(t1, ts) -> TApp(t1.pruneSyn, ts.map(fn(x) x.pretend-decreasing.pruneSyn))
     _ -> rho
 
 fun tv/to-type(v: typeVar)

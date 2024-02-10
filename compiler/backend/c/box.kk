@@ -101,16 +101,16 @@ fun boxPattern(fromTp: ktype, p: pattern)
           match p
             PatVar(tname, PatWild) ->
               // ok, no nested match
-              val i = newUnique()
-              val uname = newHiddenName("fun-unbox-x" ++ i.show)
+              val i = new-unique()
+              val uname = new-hidden-name("fun-unbox-x" ++ i.show)
               val coerce = bcoerce(fromTp, toTp, Var(TName(uname, fromTp), InfoNone))
               val def = makeTDef(TName(tname.getName, toTp), coerce)
               (PatVar(TName(uname, fromTp), PatWild), [def])
             _ ->
               fail("backend/c/from-core boxPattern: nested match on a function?")
         else // regular box / unbox
-          val i = newUnique()
-          val uname = newHiddenName("box-x" ++ i.show)
+          val i = new-unique()
+          val uname = new-hidden-name("box-x" ++ i.show)
           val (bpat, defs) = boxPatternX(toTp, p)
           (PatVar(TName(uname, typeBoxStar), patBox(toTp, typeBoxStar, bpat)), defs)
       _ ->
@@ -216,7 +216,7 @@ fun boxedFunType(tp: ktype)
     _ -> fail("backend/c/box boxedFunType: " ++ tp.pretty.show)
 
 fun boxedTypeVar()
-  TVar(TypeVar(newUnique(), kindStar, Bound))
+  TVar(TypeVar(new-unique(), kindStar, Bound))
 
 fun typeBox(k: kind)
   TCon(TypeCon(nameTpBox, k))

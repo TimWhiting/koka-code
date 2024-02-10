@@ -129,7 +129,7 @@ fun uniquefyPattern(pat: pattern, patTp: ktype)
   match pat
     PatVar(tname, p) -> PatVar(tname.uniquefyTName, p.uniquefyPatternX(patTp))
     _ ->
-      val name = "pat".newHiddenName.uniquefyName
+      val name = "pat".new-hidden-name.uniquefyName
       val p = pat.uniquefyPatternX(patTp)
       PatVar(TName(name, patTp), p)
 
@@ -154,7 +154,7 @@ fun uniquefyName(n)
     val full = makeFullUnique()
     if full || locals.member(n) then
       val renaming = getRenaming()
-      val name1 = if full then n.uniqueNameFrom else findUniqueName(0, n, locals)
+      val name1 = if full then n.uniqueNameFrom else find-unique-name(0, n, locals)
       setLocals(locals.add(name1))
       setRenaming(renaming.add(n, name1))
       name1
@@ -162,7 +162,7 @@ fun uniquefyName(n)
       setLocals(locals.add(n))
       n
 
-fun findUniqueName(i: int, n: name, locals: nameSet): div name
-  val name1 = toUniqueName(i, n)
-  if locals.member(name1) then findUniqueName(i+1, n, locals)
+fun find-unique-name(i: int, n: name, locals: nameSet): div name
+  val name1 = to-unique-name(i, n)
+  if locals.member(name1) then find-unique-name(i+1, n, locals)
   else name1

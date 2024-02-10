@@ -64,8 +64,8 @@ fun freeVars(Def(_, _, e): def): pure linearSet<tName>
   e.freeVars
 
 // Term substitutions
-fun (|->)(sub: list<(tName, expr)>, l: list<a>, ?s: (list<(tName, expr)>, a) -> pure a = (|->)): pure list<a>
-  l.map(fn(x) s(sub, x))
+fun (|->)(sub: list<(tName, expr)>, l: list<a>, ?(|->): (list<(tName, expr)>, a) -> pure a): pure list<a>
+  l.map(fn(x) (|->)(sub, x))
 
 fun (|->)(sub: list<(tName, expr)>, dg: defGroup): pure defGroup
   match dg

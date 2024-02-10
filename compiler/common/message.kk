@@ -45,7 +45,7 @@ fun doc-from-range(r: range)
       val post = ls.reverse.take(n2).reverse
       val prepost = (pre ++ post).remove-indent
       prepost.take(n2) ++ ["..."] ++ prepost.drop(n2)
-  val x = r.sourceFromRange.lines.limit-lines(3).map(fn(l) l.limit-line-len(80))
+  val x = r.source-from-range.lines.limit-lines(3).map(fn(l) l.limit-line-len(80))
   match x
-    Nil -> empty
+    Nil -> pprint/empty
     src -> src.map(text).vcat.align.color(colors.colorSource)

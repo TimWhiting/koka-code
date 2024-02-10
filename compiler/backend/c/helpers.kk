@@ -94,13 +94,13 @@ fun localUnique(f)
   x
 
 fun newVarName(s: string): asmEff name
-  newName("." ++ s ++ newUnique().show)
+  newName("." ++ s ++ new-unique().show)
 
 fun newVarNames(i: int): asmEff list<name>
   Cons(newVarName("x"), newVarNames(i - 1))
 
 fun newDefVarName(s: string)
-  postpend("-" ++ s ++ newUnique().show, cdef-name)
+  postpend("-" ++ s ++ new-unique().show, cdef-name)
 
 fun newCanonicalVarName(s: string)
   postpend("-" ++ s, modName)

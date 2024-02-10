@@ -12,7 +12,7 @@ val nice/empty = []
 effect niceEff<k>
   fun extend-nice(tv: k): ()
   fun get-nice(tv: k): string 
-  fun get-niceDoc(tv: k): doc 
+  fun get-nice-doc(tv: k): doc 
 
 fun niceEnv(f)
   var nice := nice/empty
@@ -44,9 +44,9 @@ fun niceEnv(f)
       nice := nice.extend(tv.tid, x)
       ()
     fun get-nice(tv: typeVar)
-      nice.nice-show(tv.tid)
-    fun get-niceDoc(tv: typeVar)
-      nice.nice-pretty(tv.tid)
+      nice.nice/show(tv.tid)
+    fun get-nice-doc(tv: typeVar)
+      nice.nice/pretty(tv.tid)
   f()
 
 // Add fresh identifier substitutions give an (infinite) list of nice names.
@@ -54,14 +54,14 @@ fun extend(n: nice, id: int, name: string): nice
   n.set(id, name)
 
 // Show the nice version of an identifier
-fun nice-show(n: nice, id: id): string
+fun nice/show(n: nice, id: id): string
   match n.maybe-get(id)
     Just(name) -> name
     Nothing -> id.id/show
 
 // Pretty print an identifier nicely.
-fun nice-pretty(n: nice, id: id): doc
-  n.nice-show(id).text
+fun nice/pretty(n: nice, id: id): doc
+  n.nice/show(id).text
 
 /// Tests for identifiers
 // fun main()

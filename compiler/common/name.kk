@@ -1,5 +1,6 @@
 import compiler/lib/pprint
 import compiler/common/range
+import std/core/undiv
 
 struct name
   pub nameModule: string
@@ -34,7 +35,7 @@ val nameEq = fn(n1: name, n2: name) n1 == n2
 fun namelist/(==)(l1: list<name>, l2: list<name>): bool
   match (l1, l2)
     (Nil, Nil) -> True
-    (Cons(a, ra), Cons(b, rb)) -> a == b && ra.unsafe-decreasing == rb
+    (Cons(a, ra), Cons(b, rb)) -> a == b && ra.pretend-decreasing == rb
     _ -> False
 
 pub fun (!=)(n1: name, n2: name): bool
@@ -130,7 +131,7 @@ fun qualifier(Name(m, hm, _, _)): name
 
 // Module paths
 fun split-module-name(n: name): list<name>
-  if n.is-qualified then unsafe-decreasing(n.qualifier).split-module-name
+  if n.is-qualified then pretend-decreasing(n.qualifier).split-module-name
   else n.name/name/show.split("/").map(fn(s) -> s.new-name)
 
 fun unsplit-module-name(l: list<name>): name
@@ -142,8 +143,8 @@ fun merge(l1: list<name>, l2: list<name>): list<name>
       if m == n && ms.zipwith(ns, fn(i, j) -> i == j).all(fn(i) -> i) then
         Cons(m, ms) ++ ns.drop(ms.length)
       else
-        Cons(m, merge(unsafe-decreasing(ms), Cons(n, ns)))
-    (Cons(m, ms), ns) -> Cons(m, merge(unsafe-decreasing(ms), ns))
+        Cons(m, merge(pretend-decreasing(ms), Cons(n, ns)))
+    (Cons(m, ms), ns) -> Cons(m, merge(pretend-decreasing(ms), ns))
     (_, ns) -> ns
 
 fun merge-common-path(n1: name, n2: name): name
@@ -385,17 +386,17 @@ fun split-camel(s: string): list<string>
   if s == "" then Nil
   else
     match s.list
-      Cons('-', cs) -> unsafe-decreasing(cs.string).split-camel
+      Cons('-', cs) -> pretend-decreasing(cs.string).split-camel
       Cons(c, cs) -> 
         val (pre, post) = cs.span(is-break)
         if post.is-empty then
           val (pre2, post2) = post.span(fn(i) -> i.is-upper)
           if pre2.is-empty || post.is-empty && post2.head.default(' ').is-break then
-            Cons(Cons(c, pre2).string, unsafe-decreasing(post2.string).split-camel)
+            Cons(Cons(c, pre2).string, pretend-decreasing(post2.string).split-camel)
           else
-            Cons(Cons(c, pre2.init).string, unsafe-decreasing(Cons(pre2.last(' '), post2).string).split-camel)
+            Cons(Cons(c, pre2.init).string, pretend-decreasing(Cons(pre2.last.default(' '), post2).string).split-camel)
         else
-          Cons(Cons(c, pre).string, unsafe-decreasing(post.string).split-camel)
+          Cons(Cons(c, pre).string, pretend-decreasing(post.string).split-camel)
       Nil -> Nil
 
 // name to file path
@@ -406,12 +407,12 @@ fun path-to-module-name(p: string): name
   fun decode(s: string): string // TODO: Performance
     val sl = s.list
     match sl
-      _ | s.starts-with("_dash_").bool -> "-" ++ decode(unsafe-decreasing(sl.drop(6).string))
-      Cons('_', Cons('_', t)) -> "_" ++ decode(unsafe-decreasing(t.string))
-      Cons('_', t) -> "/" ++ decode(unsafe-decreasing(t.string))
-      Cons('@', t) -> decode(unsafe-decreasing(t.string))
-      Cons('\\', t) -> "/" ++ decode(unsafe-decreasing(t.string))
-      Cons(c, t) -> c.string ++ decode(unsafe-decreasing(t.string))
+      _ | s.starts-with("_dash_").bool -> "-" ++ decode(pretend-decreasing(sl.drop(6).string))
+      Cons('_', Cons('_', t)) -> "_" ++ decode(pretend-decreasing(t.string))
+      Cons('_', t) -> "/" ++ decode(pretend-decreasing(t.string))
+      Cons('@', t) -> decode(pretend-decreasing(t.string))
+      Cons('\\', t) -> "/" ++ decode(pretend-decreasing(t.string))
+      Cons(c, t) -> c.string ++ decode(pretend-decreasing(t.string))
       Nil -> ""
   p.decode.list.drop-while(fn(c) -> c == '_' || c == '@' || c == '/').string.new-name
 

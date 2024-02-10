@@ -55,14 +55,14 @@ fun filePrinter(filePath: string, action)
   handle action
     fun write(s) f := f ++ s
     fun write-ln(s) f := f ++ s ++ "\n"
-    fun flush() try-default(()) fn() write-text-file(filePath.path, f)
+    fun flush() try{write-text-file(filePath.path, f)}.default(())
 
 fun newFilePrinter(filePath: string, action)
   var f := ""
   handle action
     fun write(s) f := f ++ s
     fun write-ln(s) f := f ++ s ++ "\n"
-    fun flush() try-default(()) fn() write-text-file(filePath.path, f)
+    fun flush() try{write-text-file(filePath.path, f)}.default(())
 
 effect val colorSettings: printColorSettings
 

@@ -8,6 +8,7 @@ import compiler/common/failure
 import compiler/platform/config
 import newstd/data/linearset
 import newstd/core
+import std/core/undiv
 
 pub struct program<t, k>
   source: source
@@ -338,7 +339,7 @@ fun uk/show(u: userKind): string
 fun kut/range(tp: kUserType<k>, rK: (k) -> range): range
   match tp
     TpQuan(range=range) -> range
-    TpQual(preds, tp) -> Range(preds.head.default(tp).unsafe-decreasing.range(rK).start, tp.range(rK).end)
+    TpQual(preds, tp) -> Range(preds.head.default(tp).pretend-decreasing.range(rK).start, tp.range(rK).end)
     TpFun(range=range) -> range
     TpApp(range=range) -> range
     TpVar(range=range) -> range

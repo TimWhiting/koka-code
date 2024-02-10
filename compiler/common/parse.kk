@@ -606,7 +606,7 @@ fun pDocKeyword(s: string, alternates: list<string>): <ast> (range, string)
 
 fun uniqueRangeHiddenName(pre: string, rng: range): name
   val pos = rng.start
-  newHiddenName(pre ++ "_" ++ pos.line.show ++ "_" ++ pos.col.show)
+  new-hidden-name(pre ++ "_" ++ pos.line.show ++ "_" ++ pos.col.show)
 
 fun uniqueRangeName(rng: range, pre: string): name
   val pos = rng.start

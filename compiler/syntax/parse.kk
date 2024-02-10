@@ -116,7 +116,7 @@ fun genFunParArgs(pars: list<(name, userType)>)
   pars.map-indexed(fn(i, p) p.genParArg(i)).unzip 
 
 fun genParArg((name:name, _:userType), idx: int)
-  val fullName = if name == nameNil then newHiddenName("arg" ++ idx.show) else name
+  val fullName = if name == nameNil then new-hidden-name("arg" ++ idx.show) else name
   val rng = rangeNull
   (ValueBinder(fullName, Nothing, Nothing, rng, rng), (Nothing, Var(fullName, False, rng)))
 
@@ -490,8 +490,8 @@ fun makeEffectDecl(decl: effectDecl): div list<topDef>
   val kindStar = KindCon(nameKindStar, krng)
   val kidnEffect = KindCon(nameKindEffect, krng)
   val hndTpName = TypeBinder(hndName, KindNone, krng, krng)
-  val hndEffTp = TypeBinder("e".newHiddenName, KindCon(nameKindEffect, krng), krng, krng)
-  val hndResTp = TypeBinder("r".newHiddenName, kindStar, krng, krng)
+  val hndEffTp = TypeBinder("e".new-hidden-name, KindCon(nameKindEffect, krng), krng, krng)
+  val hndResTp = TypeBinder("r".new-hidden-name, kindStar, krng, krng)
   val hndTp = TpApp(hndTpName.tpCon, (tparsNonScoped ++ [hndEffTp, hndResTp]).map(tpVar), grng)
 
   val (effTpDecl, wrapAction) = 
@@ -529,7 +529,7 @@ fun makeEffectDecl(decl: effectDecl): div list<topDef>
   // Handle function
   val hndCon = UserCon(hndName.toConstructorName, [], opFields.map(fn(f) (Public, f)), Nothing, krng, grng, vis, "")
   val hndTpDecl = DataType(hndTpName, tparsNonScoped ++ [hndEffTp, hndResTp], [hndCon], grng, vis, sort, DataDefNormal, False, "// handler for the " ++ docEffect)
-  val handleRetTp = TypeBinder("b".newHiddenName, kindStar, krng, krng)
+  val handleRetTp = TypeBinder("b".new-hidden-name, kindStar, krng, krng)
   val handleName = id.toHandleName
   val handleEff = 
     if isInstance then 
@@ -666,7 +666,7 @@ fun operationDecl(opCount, vis, forallsScoped:list<userTypeBinder>, forallsNonSc
     val hasExists = exists1.is-cons
     val perform = Var(namePerform(pars.length), False, krng)
     val zeroIdx = App(Var(nameSSizeT, False, krng), [(Nothing, Literal(LitInt(0, krng)))], krng)
-    val resourceName = "hname".newHiddenName
+    val resourceName = "hname".new-hidden-name
     val resourceBinder = ValueBinder(resourceName, effTp, Nothing, krng, grng)
     val params0 = pars.map(fn(par) par(binderType=if par.expr.is-just then par.binderType.makeOptional else par.binderType))
     val params = if isInstance then Cons(resourceBinder, params0) else params0
@@ -1049,7 +1049,7 @@ fun pHandlerClauses(rng: range, mbEff: maybe<userType>, scoped: handlerScope, ov
       val retExpr = match ret
         Nothing -> fn(x) x
         Just(f) -> fn(actionExpr) App(f, [(Nothing, App(actionExpr, [], fullrange))], fullrange)
-      val handlerExpr = Lam([ValueBinder("action".newHiddenName, Nothing, Nothing, rng, rng)], retExpr(Var("action".newHiddenName, False, rng)), fullrange)
+      val handlerExpr = Lam([ValueBinder("action".new-hidden-name, Nothing, Nothing, rng, rng)], retExpr(Var("action".new-hidden-name, False, rng)), fullrange)
       binders(handlerExpr)
     _ -> binders(Handler(hsort, scoped, over, Nothing, mbEff, [], reinit, ret, finally, ops, rng, fullrange))
   applyMaybe(fullrange, reinit, finally, hand)
@@ -1058,14 +1058,14 @@ fun applyMaybe(rng: range, reinit: maybe<userExpr>, finally: maybe<userExpr>, f:
   match (reinit, finally)
     (Nothing, Nothing) -> f
     _ -> 
-      val applyH = App(f, [(Nothing, Var("act".newHiddenName, False, rng))], rng)
+      val applyH = App(f, [(Nothing, Var("act".new-hidden-name, False, rng))], rng)
       val bodyF = match finally
         Just(fin) -> App(Var(nameFinally, False, rng), [(Nothing, fin),(Nothing, Lam([], applyH, rng))], rng)
         Nothing -> applyH
       val bodyI = match reinit
         Just(ini) -> App(Var(nameInitially, False, rng), [(Nothing, ini), (Nothing, Lam([], bodyF, rng))], rng)
         Nothing -> bodyF
-      Lam([ValueBinder("act".newHiddenName, Nothing, Nothing, rng, rng)], bodyI, rng)
+      Lam([ValueBinder("act".new-hidden-name, Nothing, Nothing, rng, rng)], bodyI, rng)
 
 value type clause
   ClauseRet(expr: userExpr)
@@ -1207,7 +1207,7 @@ fun pHandlerPar()
   ValueBinder(name, tp, (), rng, rng.combine(tp.map(range).default(rng)))
 
 fun pHandlerReturnDefault(r: range) // Default return clause: return(x) -> x
-  val xname = "x".newHiddenName
+  val xname = "x".new-hidden-name
   val xbind = ValueBinder(xname, Nothing, Nothing, r, r)
   Lam([xbind], Var(xname, False, r), r)
 
@@ -1397,7 +1397,7 @@ fun pInjectExpr()
   val (rng, mkInj) = injectType()
   choicesnb("", [
     {mkInj(parens({choices("", [pExpr, pFunBlock])}).fst)},
-    {val name = newHiddenName("mask-action"); Lam([ValueBinder(name, Nothing, Nothing, rng, rng)], mkInj(Var(name, False, rng)), rng)}
+    {val name = new-hidden-name("mask-action"); Lam([ValueBinder(name, Nothing, Nothing, rng, rng)], mkInj(Var(name, False, rng)), rng)}
   ])
 
 fun injectType()

@@ -173,8 +173,8 @@ fun ppConTag(ci: conInfo, crepr: conRepr, drepr: dataRepr)
 fun genConstructorCreate(ci: conInfo, crepr: conRepr, allFields: list<(name, ktype)>, scanCount: int, maxScanCount: int, info: dataInfo, drepr: dataRepr)
   if drepr.is-dataOpen then
     emitToH("extern kk_string_t".text |+| ci.conTagName |.| semi)
-  val at = "at".newHiddenName
-  val cpath = "cpath".newHiddenName
+  val at = "at".new-hidden-name
+  val cpath = "cpath".new-hidden-name
   val hasCPath = crepr.hasCtxPath && allFields.is-cons
   val nameDoc = ci.name.cppName
   val ctag = ppConTag(ci, crepr, drepr)

@@ -1,6 +1,8 @@
 import compiler/lib/printer
 import std/os/path
+import std/core/undiv
 import std/os/file
+import std/num/float64
 
 pub infixr 5 (/), (||), (|-|), (|--|) 
 pub infixr 6 (|.|), (|+|)
@@ -129,10 +131,10 @@ val equals = Char('=')
 fun string/pretty(s: string): doc
   if s == "" then empty else
     match s.starts-with("\n")
-      Just(x) -> line |.| pretty(x.string.unsafe-decreasing)
+      Just(x) -> line |.| pretty(x.string.pretend-decreasing)
       _ -> 
         val (xs, ys) = span(s.list, fn(c) c != '\n')
-        text(xs.string) |.| pretty(ys.string.unsafe-decreasing)
+        text(xs.string) |.| pretty(ys.string.pretend-decreasing)
 
 fun bool/pretty(b: bool): doc
   b.show.text
@@ -386,16 +388,16 @@ fun renderCompact(xdoc: doc): simpleDoc
       Cons(d, ds) ->
         match d
           Empty -> scan(k, ds)
-          Char(c) -> SChar(0, c, scan(k + 1, ds.unsafe-decreasing))
-          Text(s) -> SText(0, s, scan(k + s.count, ds.unsafe-decreasing))
-          Line() -> SLine(0, scan(0, ds.unsafe-decreasing))
-          Cat(x, y) -> scan(k, Cons(x, Cons(y, ds)).unsafe-decreasing)
-          Nest(_, x) -> scan(k, Cons(x, ds).unsafe-decreasing)
-          Union(_, y) -> scan(k, Cons(y, ds).unsafe-decreasing)
-          Column(f) -> scan(k, Cons(f(k), ds).unsafe-decreasing)
-          Nesting(f) -> scan(k, Cons(f(0), ds).unsafe-decreasing)
-          Colored(f, c, x) -> SColorOpen(f, c, scan(k, Cons(x, Cons(ColoredEnd, ds)).unsafe-decreasing))
-          ColoredEnd -> SColorClose(scan(k, ds.unsafe-decreasing))
+          Char(c) -> SChar(0, c, scan(k + 1, ds.pretend-decreasing))
+          Text(s) -> SText(0, s, scan(k + s.count, ds.pretend-decreasing))
+          Line() -> SLine(0, scan(0, ds.pretend-decreasing))
+          Cat(x, y) -> scan(k, Cons(x, Cons(y, ds)).pretend-decreasing)
+          Nest(_, x) -> scan(k, Cons(x, ds).pretend-decreasing)
+          Union(_, y) -> scan(k, Cons(y, ds).pretend-decreasing)
+          Column(f) -> scan(k, Cons(f(k), ds).pretend-decreasing)
+          Nesting(f) -> scan(k, Cons(f(0), ds).pretend-decreasing)
+          Colored(f, c, x) -> SColorOpen(f, c, scan(k, Cons(x, Cons(ColoredEnd, ds)).pretend-decreasing))
+          ColoredEnd -> SColorClose(scan(k, ds.pretend-decreasing))
   scan(0, [xdoc])
 
 fun asString(d: doc)

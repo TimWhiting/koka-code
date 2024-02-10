@@ -1,5 +1,6 @@
 import compiler/common/name
 import compiler/common/name-prim
+import std/core/undiv
 
 type kind
   KCon(constant: kindCon) // Kind constants: "*","->","!","H","P"
@@ -8,7 +9,7 @@ type kind
 fun kind/(==)(a: kind, b: kind): bool
   match (a, b)
     (KCon(c1), KCon(c2)) -> c1 == c2
-    (KApp(a1, b1), KApp(a2, b2)) -> unsafe-decreasing(a1) == a2 && unsafe-decreasing(b1) == b2
+    (KApp(a1, b1), KApp(a2, b2)) -> pretend-decreasing(a1) == a2 && pretend-decreasing(b1) == b2
     _ -> False
 
 fun kind/(!=)(a: kind, b: kind): bool
@@ -55,7 +56,7 @@ pub fun extract-kind-fun(k: kind): (list<kind>, kind)
   match k
     KApp(KApp(k0, k1), k2) ->
       if k0 == kindArrow then
-        val (args, res) = unsafe-decreasing(k2).extract-kind-fun()
+        val (args, res) = pretend-decreasing(k2).extract-kind-fun()
         (Cons(k1, args), res)
       else
         ([], k)

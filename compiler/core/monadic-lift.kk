@@ -182,6 +182,6 @@ fun liftGuard(Guard(guard, body): guard)
 
 fun uniqueNameCurrentDef()
   val d = currentDef.last.unjust
-  val i = newUnique()
+  val i = new-unique()
   val udef-name = toHiddenUniqueName(i, "mlift", d.def-name)
   (udef-name, d.kinline)

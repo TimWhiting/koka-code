@@ -1,4 +1,5 @@
 import compiler/lib/printer
+import std/core/undiv
 // Global color scheme used for pretty printing
 
 
@@ -8,7 +9,7 @@ import compiler/lib/printer
 effect colorSchemeEffect
   val colors: colorScheme;
 
-fun "@default-colorSchemeEff"(f)
+fun @default-colorSchemeEff(f)
   handle(f)
     val colors = ColorScheme()
 
@@ -66,8 +67,8 @@ fun read-color-flags(scheme: colorScheme, s: string)
   fun split(xs: list<char>): list<string>
     val (pre, ys) = xs.span(fn(c) c != ',' && c != ';')
     match ys
-      Cons(',', post) -> Cons(pre.string, post.unsafe-decreasing.split)
-      Cons(';', post) -> Cons(pre.string, post.unsafe-decreasing.split)
+      Cons(',', post) -> Cons(pre.string, post.pretend-decreasing.split)
+      Cons(';', post) -> Cons(pre.string, post.pretend-decreasing.split)
       Nil -> Cons(pre.string, Nil)
       _ -> [pre.string, ""] // impossible case
 

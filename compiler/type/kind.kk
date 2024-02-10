@@ -2,6 +2,7 @@ import compiler/type/type
 import compiler/kind/kind
 import compiler/common/name
 import compiler/common/name-prim
+import std/core/undiv
 
 fun effectIsAffine(eff: keffect)
   val (labs, tl) = eff.extractOrderedEffect
@@ -76,7 +77,7 @@ fun kind(tp: ktype): exn kind
 fun kindApply(tps: list<ktype>, k: kind): exn kind
   match (tps, k)
     ([], _) -> k
-    (Cons(_, rest), KApp(KApp, k2)) -> kindApply(rest.unsafe-decreasing, k2)
+    (Cons(_, rest), KApp(KApp, k2)) -> kindApply(rest.pretend-decreasing, k2)
     _ -> throw("type/kind kindApply: illegal kind in application")
 
   

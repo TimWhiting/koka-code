@@ -1,3 +1,5 @@
+import std/core/unsafe
+
 pub fun updateOrPush(v: vector<a>, pred: (a) -> e bool, update: (maybe<a>) -> a): e vector<a>
   val updated = v.foreach-while-indexed(fn (i,e) if pred(e) then Just(unsafe-assign(v,i.ssize_t,update(Just(e)))) else Nothing).is-just
   if !updated then

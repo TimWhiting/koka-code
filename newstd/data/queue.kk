@@ -20,21 +20,21 @@ fun bq/check(f: list<a>, r: list<a>): bQ<a>
 
 val batched/queue = Queue(
   BQ([], []),
-  fn(BQ(f,_)) f.is-empty,
-  fn(BQ(f,r), x) bq/check(f, Cons(x,r)),
-  fn(bq)
+  fn(BQ(f,_)) f.is-empty, // O(1)
+  fn(BQ(f,r), x) bq/check(f, Cons(x,r)), // O(1) amortized with tail
+  fn(bq) // O(1)
     match bq
       BQ([], _) -> err-empty()
       BQ(Cons(x,_), _) -> x
   ,
-  fn(bq)
+  fn(bq) // O(1) amortized with snoc
     match bq
       BQ([], _) -> err-empty()
       BQ(Cons(_,f), r) -> bq/check(f,r)
 )
 
 
-// Bankers Queue
+// Bankers Queue (-- not really we would need to have some lazy lists)
 value struct baQ<a>
   lenf: int
   f: list<a>

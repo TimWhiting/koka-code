@@ -1,4 +1,4 @@
-import compiler/platform/config
+pub import compiler/platform/config
 
 pub alias compilerEff = <comp-flags, exn>
 

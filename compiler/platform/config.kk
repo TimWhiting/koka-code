@@ -34,3 +34,6 @@ fun os-config(): <exn,ndet> fileConfig
     "macos" -> FileConfig(".dylib", ".o", ".a", "lib", "", "/", ":")
 
 val source-ext = ".kk"
+
+fun is-path-sep(c: char): bool
+  c == '/' || c == '\\'

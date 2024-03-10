@@ -1,8 +1,9 @@
 import compiler/lib/pprint
+import compiler/common/color-scheme
 import compiler/common/range
+import compiler/common/failure
 import std/core/undiv
 import newstd/core
-
 
 // | Names defined by the user.
 // Uses a hash to speed up comparisions. The hash is constructed
@@ -31,7 +32,9 @@ struct name
 alias names = list<name>
 
 fun join(m: string, n: string): string
-  m ++ "/" ++ n
+  if m == "" then n
+  elif n == "" then m
+  else m ++ "/" ++ n
 
 fun name/local(n: name): string
   join(n.nameLocalQual, n.nameStem)
@@ -46,88 +49,143 @@ fun name-case-equal-prefix-of(n1: name, n2: name): bool
 
 fun name-case-overlap(n1: name, n2: name): bool
   !n1.name-case-equal(n2) && n1.is-same-namespace(n2)
-    
-fun is-same-namespace(n1: name, n2: name): bool
-  match (n1.nameStem.list, n2.nameStem.list)
-    (Cons(c, _), Cons(d, _)) -> c.is-upper && d.is-upper
-    _ -> True
 
-fun lower/cmp(Name(m1, _, n1, _), Name(m2, _, n2, _)): order
+fun name-case-overlap-prefix-of(n1: name, n2: name): bool
+  !n1.name-case-equal-prefix-of(n2) && n1.is-same-namespace(n2)
+
+// Checks whether both names are in the same namespace, ie. constructors or not
+fun is-same-namespace(n1: name, n2: name): bool
+  n1.is-constructor-name == n2.is-constructor-name
+
+fun lower/cmp(Name(m1, _, l1, _, n1, _), Name(m2, _, l2, _, n2, _)): order
   match cmp(m1.to-lower, m2.to-lower)
-    Eq -> cmp(n1.to-lower, n2.to-lower)
-    lg -> lg
+    Eq -> match cmp(l1.to-lower, l2.to-lower)
+      Eq -> cmp(n1.to-lower, n2.to-lower)
+      x -> x
+    x -> x
+
+fun string/cmp-lower(s1: string, s2: string): order
+  slice/cmp-lower(s1.slice,s2.slice)
+
+fun slice/cmp-lower(s1: sslice, s2: sslice): order
+  match (s1.next, s2.next)
+    (Just((c1, r1)), Just((c2, r2))) -> 
+      match c1.to-lower.cmp(c2.to-lower)
+        Eq -> slice/cmp-lower(r1.pretend-decreasing, r2)
+        x -> x
+    (Just, _) -> Gt
+    (_, Just) -> Lt
+    (_, _) -> Eq
 
 pub fun name/(==)(n1: name, n2: name): bool
-  n1.hashStem == n2.hashStem && n1.hashModule == n2.hashModule && n1.lower/cmp(n2) == Eq
+  val eq = n1.hashStem == n2.hashStem && n1.hashModule == n2.hashModule && n1.hashLocalQual == n2.hashLocalQual
+  assert("common/name/(==): wrong hashes: " ++ n1.show-fully-explicit ++ 
+         " " ++ n2.show-fully-explicit, 
+         eq || n1.show-fully-explicit != n2.show-fully-explicit)
+  eq && n1.lower/cmp(n2) == Eq
 
 val nameEq = fn(n1: name, n2: name) n1 == n2
-
-fun namelist/(==)(l1: list<name>, l2: list<name>): bool
-  match (l1, l2)
-    (Nil, Nil) -> True
-    (Cons(a, ra), Cons(b, rb)) -> a == b && ra.pretend-decreasing == rb
-    _ -> False
 
 pub fun (!=)(n1: name, n2: name): bool
   !(n1 == n2)
 
 pub fun name/cmp(n1: name, n2: name): order
   match n1.hashModule.cmp(n2.hashModule)
-    Eq -> 
-      match n1.hashStem.cmp(n2.hashStem)
+    Eq -> match n1.hashLocalQual.cmp(n2.hashLocalQual)
+      Eq -> match n1.hashStem.cmp(n2.hashStem)
         Eq -> n1.lower/cmp(n2)
         x -> x
+      x -> x
     x -> x
 
+// Effects compare by name first, then by module name for efficiency at runtime
 fun label-name/cmp(n1: name, n2: name): order
   match n1.hashStem.int/cmp(n2.hashStem)
-    Eq -> 
-      match n1.nameStem.to-lower.string/cmp(n2.nameStem.to-lower)
-        Eq -> 
-          match n1.hashModule.int/cmp(n2.hashModule)
-            Eq -> n1.nameModule.to-lower.string/cmp(n2.nameModule.to-lower)
+    Eq -> match n1.nameStem.cmp-lower(n2.nameStem)
+      Eq -> match n1.hashLocalQual.int/cmp(n2.hashLocalQual)
+        Eq -> match n1.nameLocalQual.cmp-lower(n2.nameLocalQual)
+          Eq -> match n1.hashModule.int/cmp(n2.hashModule)
+            Eq -> n1.nameModule.cmp-lower(n2.nameModule)
             x -> x
+          x -> x
         x -> x
+      x -> x
     x -> x
 
-val canonical-sep = '@'
+fun is-id-char(c: char): bool
+  c.is-alpha || c.is-digit || c == '_' || c == '-' || c == '@'
 
-fun name/show(Name(m, _, n, _)): string
-  val pre = if m == "" then "" else m ++ "/"
-  val (mid, _) = match n.list.reverse.span(is-digit)
-    (Cons(p, ps), Cons(c, rest)) | (c == canonical-sep) -> (rest.reverse, Cons(c, Cons(p, ps).reverse))
-    _ -> (n.list, "".list)
-  val rest = match mid
-    Cons(c, _) | !(c.is-alpha || c == '_' || c == '(' || c == '@') -> "(" ++ n ++ ")"
-    _ -> n
-  pre ++ rest
+fun is-id-start-char(c: char): bool
+  c.is-alpha || c == '_' || c == '@'
 
-fun show-plain(n: name): string // TODO: better name show
-  if n.nameModule.is-empty then n.nameStem else n.nameModule ++ "/" ++ n.nameStem
+fun is-id-end-char(c: char): bool
+  c.is-id-char || c == '\''
+
+fun is-symbol-id(s: string): bool
+  s != "" && 
+    // The default cases shouldn't happen because of the check above
+    (s.head-char.map(fn(c) !c.is-id-start-char).default(False) ||
+     s.last(1).next.map(fn((c,_)) !c.is-id-end-char).default(False))
+
+fun wrap-id(s: string): string
+  if is-symbol-id(s) then "(" ++ s ++ ")" else s
+
+fun name/show(Name(m, _, l, _, n, _), explicitLocal: bool): string
+  val ln = l.join(n.wrap-id)
+  if m == "" then ln 
+  elif ln == "" then m
+  else m ++ (if explicitLocal && l != "" then "/#" else "/") ++ ln
+
+fun show-fully-explicit(Name(m, _, l, _, n, _)): string
+  val ln = l.join(n.wrap-id)
+  if m == "" then "#" ++ ln
+  elif ln == "" then m
+  else m ++ "/#" ++ ln
+
+fun show-explicit(n: name): string
+  n.show(True)
+
+fun show-plain(n: name): string 
+  join(n.nameModule, join(n.nameLocalQual, n.nameStem))
+
+fun show(n: name): string
+  n.show-explicit()
 
 fun pretty(n: name): doc
-  n.name/name/show.text
+  n.show.text
+
+fun pretty-name-ex(Name(m, _, l, _, n, _), lsep: string, cs: colorScheme): doc // explicit /# if needed
+  val ln = join(l, n.wrap-id)
+  if m == "" then ln.text
+  else (
+   (m.text |.| (if ln.is-empty then pprint/empty elif l.is-empty then "/".text else lsep.text))
+           |.| ln.text
+  ).color(cs.colorModule)
+
+fun pretty-name(nm: name, cs: colorScheme): <comp-flags,exn> doc // not explicit /#
+  if nm.is-implicit-param-name then "?".text |.| nm.from-implicit-param-name.requalify-locally.pretty-name-ex("/", cs)
+  else nm.pretty-name-ex("/", cs)
+
+fun pretty-core-name(nm: name, cs: colorScheme): doc // explicit /# if needed
+  nm.pretty-name-ex("/#", cs)
 
 fun tupled/show(Name(m, _, n, _)): string
   "(" ++ m.show ++ "," ++ n.show ++ ")"
 
 fun tupled/read(s: string): exn name
-  val Cons(t1, Cons(t2, _)) = s.split(",") // TODO: Strip parens
-  new-qualified(t1, t2)
+  val s' = s.slice.drop(1).extend(-1).string // Drop ()
+  val Cons(m, Cons(l, Cons(n, Nil))) = s'.split(",")
+  new-locally-qualified(m, l, n)
 
-fun qualified/read(s: string): exn name
-  val sl = s.list
-  if (sl.take(1).head.default(' ') == '(') then tupled/read(s)
-  else
-    val (n, m) = sl.reverse.span(fn(c) -> c != '/')
-    new-qualified(m.drop(1).reverse.string, n.reverse.string)
-
-// show quotes around the name
-fun namequotes/show(n: name): string
-  n.name/name/show.string/show
+fun qualified/read(s: string): <div,comp-flags,exn> name
+  if s.starts-with("(").bool then tupled/read(s)
+  else s.read-qualified-name
 
 fun new-name(s: string): name
   new-qualified("", s)
+
+fun new-module-name(s: string): name
+  new-qualified(s, "")
 
 fun new-qualified(mod: string, name: string): name
   new-locally-qualified(mod, "", name)
@@ -145,6 +203,80 @@ fun hash(s: string)
   val sn = (s ++ "____").list.take(4).string.to-lower.list.map(fn (c) { c.int })
   sn.foldl(0, fn(c, h) { h * 256 + c})
 
+fun name-map-stem(Name(m, hm, l, hl, n, _), f: (string) -> e string): e name
+  val n' = f(n)
+  Name(m, hm, l, hl, n', n'.hash)
+
+fun read-qualified-name(s0: string): <div,comp-flags,exn> name
+  if s0.starts-with("?").bool then s0.slice.drop(1).string.read-qualified-name.requalify-locally.to-implicit-param-name
+  else
+    fun split-qual-id-rev(rs: list<char>): (string, string)
+      val (rid, rqual) = rs.span(fn(c) c != '/')
+      match rqual
+        Cons('/', rs1) -> (rs1.reverse.string, rid.reverse.string) // qualifier
+        _ -> ("", rid.reverse.string)
+    fun split-id-name-rev(rs: list<char>): <comp-flags,exn> (string, string, string)
+      val (rid, rest) = rs.span(fn(c) c != '#')
+      match rest
+        Cons('#', Cons('/', rs2)) -> // local qualifier
+          val (lqual,id) = rid.split-qual-id-rev
+          (rs2.reverse.string, lqual, id)
+        Nil ->
+          val (qual, id) = rid.split-qual-id-rev
+          (qual, "", id)
+        _ -> fail("Name split-id-name-rev: illegal locally qualified name: " ++ rs.reverse.string)
+    fun split-name(s: string): <comp-flags,exn> (string, string, string)
+      if s.ends-with(")").bool then // operator
+        val (rop, rest) = s.list.reverse.span(fn(c) c != '(')
+        match rest
+          Cons('(', rs2) ->
+            val (qual, lqual, id) = rs2.split-id-name-rev
+            (qual, lqual, id ++ rop.reverse.string)
+          _ -> fail("Name split-name: unmatched parenthesis in name: " ++ s)
+      else s.list.split-id-name-rev
+    val (q, lq, id) = s0.split-name
+    new-locally-qualified(q,lq,id)
+
+fun is-module-name(n: name): bool
+  n.nameStem == ""
+
+fun is-qualified(n: name): bool
+  n.nameModule != ""
+
+fun is-locally-qualified(n): bool
+  n.nameLocalQual != ""
+
+fun is-symbol-name(n: name): bool
+  n.nameStem.is-symbol-id
+
+fun is-constructor-name(n: name): bool
+  match n.nameStem.slice.next
+    Just((c, _)) | c.is-upper -> True
+    Just(('@', r)) -> 
+      match r.next
+        Just((c, _)) | c.is-upper -> True
+        _ -> False
+    _ -> False
+
+fun is-wildcard(n: name): bool
+  match n.nameStem.slice.next
+    Just(('_', _)) -> True
+    Just(('@', r)) -> r.next.map(fn((c, _)) c == '_').default(False)
+    _ -> False
+
+fun is-hidden-name(n: name): bool
+  n.nameStem.starts-with("@").bool
+
+fun missing-qualifier(current-mod: name, n: name, qname: name): string
+  val missing0 = qname.show-plain.list.reverse.drop(n.show-plain.count).reverse.string
+  val standard = [current-mod.show, "std/core/types", "std/core/hnd", "std/core"]
+  val missing = 
+        match standard.filter(fn(std) (std ++ "/").is-prefix-of(missing0))
+          Cons(std, _) -> missing0.list.drop(std.count).string
+          _ -> missing0
+  if missing.starts-with(implicit-namespace ++ "/").bool then "?" ++ missing.list.drop(implicit-namespace.count + 1).string
+  else missing
+
 val name/nil = "".new-name
 
 fun is-nil(Name(_, _, n, _)): bool
@@ -155,167 +287,174 @@ fun qualify(a: name, b: name): name
     (Name(m, hm, _, 0, _, 0), Name(_, 0, l, hl, n, hn)) -> Name(m, hm, l, hl, n, hn)
     (Name(m1, _, _, 0, _, 0), name as Name(m2)) | m1 == m2 -> name
     _ ->
-      trace("Cannot use qualify on qualified names " ++ a.name/name/show ++ ", " ++ b.name/name/show)
+      trace("Cannot use qualify on qualified names " ++ a.show ++ ", " ++ b.show)
       new-name("")
 
 fun unqualify(Name(_, _,l, hl, n, hn)): name
   Name("", 0, l, hl, n, hn)
 
-fun is-qualified(Name(m)): bool
-  m != ""
-
 fun qualifier(Name(m, hm)): name
   Name(m, hm, "", 0, "", 0)
 
+fun name-as-module-name(n: name): name
+  new-module-name(join(n.nameModule, join(n.nameLocalQual, n.nameStem)))
+
+fun qualify-locally(nl: name, n: name): <comp-flags,exn> name
+  match nl
+    Name(l, _, _, 0, _, 0) ->
+      new-locally-qualified(n.nameModule, join(l, n.nameLocalQual), n.nameStem)
+    _ -> fail("common/name/qualify-locally: illegal qualification: " ++ nl.show-explicit ++ ", " ++ n.show-explicit)
+
+// Move the module qualifier to the local qualifier
+fun requalify-locally(n: name): name
+  if n.nameModule == "" then n else new-locally-qualified("", join(n.nameModule, n.nameLocalQual), n.nameStem)
+
+// Only keep the stem
+fun unqualify-full(n: name): name
+  Name("", 0, "", 0, n.nameStem, n.hashStem)
+
+// Full qualifier: module + local qualifier
+fun full-qualifier(n: name): string
+  n.unqualify-locally.nameModule
+
+// Add the local qualifier to the module qualifier
+fun unqualify-locally(n: name): name
+  if n.nameLocalQual == "" then n else new-qualified(join(n.nameModule, n.nameLocalQual), n.nameStem)
+
+fun unqualify-as-module-name(n: name): name
+  new-module-name(join(n.nameModule, n.nameLocalQual))
+
 // Module paths
-fun split-module-name(n: name): list<name>
-  if n.is-qualified then pretend-decreasing(n.qualifier).split-module-name
-  else n.name/name/show.split("/").map(fn(s) -> s.new-name)
+fun split-module-name(n: name): list<string>
+  n.nameModule.split("/")
 
-fun unsplit-module-name(l: list<name>): name
-  l.map(fn(n) n.name/name/show).join("/").new-name
-
-fun merge(l1: list<name>, l2: list<name>): list<name>
-  match (l1, l2)
-    (Cons(m, ms), Cons(n, ns)) -> 
-      if m == n && ms.zipwith(ns, fn(i, j) -> i == j).all(fn(i) -> i) then
-        Cons(m, ms) ++ ns.drop(ms.length)
-      else
-        Cons(m, merge(pretend-decreasing(ms), Cons(n, ns)))
-    (Cons(m, ms), ns) -> Cons(m, merge(pretend-decreasing(ms), ns))
-    (_, ns) -> ns
+fun unsplit-module-name(l: list<string>): name
+  l.join("/").new-module-name
 
 fun merge-common-path(n1: name, n2: name): name
+  fun merge(l1: list<string>, l2: list<string>): list<string>
+    match (l1, l2)
+      (Cons(m, ms), Cons(n, ns)) -> 
+        if m == n && ms.zipwith(ns, fn(i, j) -> i == j).all(fn(i) -> i) then
+          Cons(m, ms) ++ ns.drop(ms.length)
+        else
+          Cons(m, merge(pretend-decreasing(ms), Cons(n, ns)))
+      (Cons(m, ms), ns) -> Cons(m, merge(pretend-decreasing(ms), ns))
+      (_, ns) -> ns
   val ns = n2.split-module-name
   val ms = n1.split-module-name
   val new = ms.merge(ns).unsplit-module-name
   new
 
-fun is-wildcard(Name(_, _, n, _)): bool
-  match n.list
-    Cons('_', _) -> True
-    Cons('@', Cons('_', _)) -> True
-    _ -> False
+fun split-local-qual-name(n: name): list<string>
+  n.nameLocalQual.split("/")
 
-fun is-constructor-name(Name(_, _, n, _)): bool
-  match n.list
-    Cons('@', Cons(c, _)) -> c.is-upper || c == '('
-    Cons(c, _) -> c.is-upper || c == '('
-    _ -> False
+fun to-constructor-name(n: name): name
+  n.name-map-stem fn(stem)
+    match stem.list
+      Cons('@', Cons(c, cs)) -> Cons('@', Cons(c.to-upper, cs)).string // keep hidden names hidden
+      Cons(c, cs) -> Cons(c.to-upper, cs).string
+      _ -> stem
 
-fun is-early-bind-name(n: name): bool
-  n.is-handle-name || n.is-creator-name
-
-// TODO: Move to std library
-fun to-upper(c: char): char
-  c.string.to-upper.head-char.default(c)
-fun to-lower(c: char): char
-  c.string.to-lower.head-char.default(c)
-
-fun to-constructor-name(Name(m, _, n, _)): name
-  val nl = n.list
-  val new = match nl
-    Cons('@', Cons(c, cs)) -> Cons('@', Cons(c.to-upper, cs)) // keep hidden names hidden
-    Cons(c, cs) -> Cons(c.to-upper, cs)
-    _ -> nl
-  m.new-qualified(new.string)
-
-fun to-lowers(l: list<char>): list<char>
+fun to-var-name(n: name): name 
+  fun to-lowers(l: list<char>): list<char>
     match l
       Cons(c, cs) | c.is-upper -> Cons(c.to-lower, to-lowers(cs))
       _ -> l
+  n.name-map-stem fn(stem)
+    match stem.list
+      Cons('@', cs) -> Cons('@', cs.to-lowers).string // keep hidden names hidden
+      cs -> cs.to-lowers.string
 
-fun to-var-name(Name(m, _, n, _)): name 
-  val new = match n.list
-    Cons('@', cs) -> Cons('@', cs.to-lowers) // keep hidden names hidden
-    cs -> cs.to-lowers
-  m.new-qualified(new.string)
+fun to-handler-con-name(n: name): name
+  make-hidden-name("Hnd", n)
 
 fun name/starts-with(n: name, s: string): bool
   n.nameStem.starts-with(s).bool
 
-// Various special names
-fun new-hidden-name(s: string): name
-  new-name("." ++ s)
+fun prepend(s: string, n: name): name
+  val sl = s.list
+  val new = match n.nameStem.list
+    Cons('@', t) -> match sl
+      Cons('@', _) -> sl ++ t // Keep hidden names hidden
+      _ -> Cons('@', sl ++ t)
+    t -> sl ++ t
+  new-qualified(n.nameModule, new.string)
 
-fun is-hidden(n: name): bool
-  match n.nameStem.list
-    Cons('@', _) -> True
-    _ -> False
+fun postpend(n: name, post: string): name
+  if n.is-symbol-name then // we must always end in symbols for operators so postpend inserts before the symbols
+    n.name-map-stem fn(stem)
+      val (rsyms, rid) = stem.list.reverse.span(fn(c) !c.is-id-char)
+      val start = if rid.is-empty || rid.string == "@" then "@x" else rid.reverse.string // ensure it becomes a valid lowerid
+      start ++ post ++ rsyms.reverse.string
+  else n.name-map-stem fn(stem)
+    val (xs, ys) = stem.list.reverse.span(fn(c) c == '?' || c == '\'')
+    ys.reverse.string ++ post ++ xs.reverse.string
+
+// Hidden names
+fun make-hidden(n: name): name
+  prepend("@", n)
 
 fun make-hidden-name(s: string, n: name): name
-  val xname = match n.nameStem.list
-    Cons('@', cs) -> new-qualified(n.nameModule, cs.string)
-    _ -> n
-  prepend("." ++ s ++ "-", xname)
+  prepend("." ++ s ++ "-", n)
+
+fun unmake-hidden(n: name, pre: string): <comp-flags,exn> name
+  n.name-map-stem fn(stem)
+    if stem.starts-with("@" ++ pre ++ "-").bool then
+      stem.slice.drop(2 + pre.count).string
+    else fail("common/name/unmake-hidden: expecting hidden name prefixed with @" ++ pre ++ "-, but found: " ++ n.show)
+
+fun new-hidden-name-ex(base: string, s: string): name
+  make-hidden-name(base, s.new-name)
+
+fun new-hidden-name(base: string): name
+  make-hidden(base.new-name)
+
+fun to-unique-name(i: int, n: name): name
+  n.postpend("@" ++ i.show)
+
+fun to-hidden-unique-name(i: int, pre: string, n: name): name
+  make-hidden-name(pre, to-unique-name(i, n))
 
 fun make-fresh-hidden-name(s: string, n: name, r: range)
   val idFromPos = fn(p) -> "-l" ++ p.line.show ++ "-c" ++ p.col.show
-  make-hidden-name(s, postpend(r.start.idFromPos, n))
+  make-hidden-name(s, n.postpend(r.start.idFromPos))
 
 fun hidden/starts-with(n: name, pre: string): bool
-  n.nameStem.starts-with("." ++ pre ++ "-").bool
+  n.nameStem.starts-with("@" ++ pre).bool ||
+    n.nameStem.starts-with("@" ++ pre ++ "-").bool
 
-fun to-unique-name(i: int, n: name): name
-  fun insert(l: list<char>): list<char>
-    match l
-      Cons(c, cs) | c == '\'' || c == '?' -> Cons(c, cs.insert)
-      _ -> (i.show ++ l.string).list.reverse
-  n.nameModule.new-qualified(n.nameStem.list.reverse.insert.reverse.string)
+// Various special names
 
-fun to-hidden-unique-name(i: int, s: string, n: name): name
-  if s == "" then
-    prepend(".", to-unique-name(i, n))
-  else
-    val c = n.nameStem.head-char.default(' ')
-    val xname = if c.is-alpha || c == '@' then n else n.nameModule.new-qualified("op")
-    make-hidden-name(s ++ i.show, xname)
+fun new-padding-name(i: int): name
+  new-hidden-name-ex("padding", i.show)
 
-fun new-padding-name(i: int)
-  new-hidden-name("padding" ++ i.show)
+fun is-padding-name(n: name): bool
+  n.hidden/starts-with("padding")
 
-fun is-padding-name(n: name)
-  n.nameStem.starts-with("@padding").is-just
+fun new-cctx-name(s: string): name
+  new-hidden-name-ex("cctx", s)
 
-fun is-cctx-name(n: name)
-  n.nameStem.starts-with("@cctx").is-just
+fun is-cctx-name(n: name): bool
+  n.hidden/starts-with("cctx")
 
 fun new-field-name(i: int): name
-  new-hidden-name("field" ++ i.show)
+  new-hidden-name-ex("field", i.show)
 
 fun is-field-name(n: name): bool
-  n.is-hidden && n.name/name/starts-with("field")
+  n.hidden/starts-with("field")
 
 fun new-implicit-typevar-name(i: int): name
-  new-hidden-name("t" ++ i.show)
+  new-hidden-name-ex("tv", i.show)
 
 fun is-implicit-typevar-name(n: name): bool
-  n.is-hidden && n.name/name/starts-with("t")
+  n.hidden/starts-with("tv")
 
 fun new-hidden-external-name(n: name): name
   make-hidden-name("extern", n)
 
 fun is-hidden-external-name(n: name): bool
   n.hidden/starts-with("extern")
-
-fun to-implicit-param-name(n: name): name
-  prepend("?", n)
-
-fun is-implicit-param-name(n: name): bool
-  n.nameStem.starts-with("?").bool
-
-fun plain-implicit-param-name(n: name): name
-  if n.is-implicit-param-name then n.nameModule.new-qualified(n.nameStem.slice.drop(1).string)
-  else n
-
-fun named-implicit-param-name(pname: name, ename: name): name
-  (pname.plain-implicit-param-name.nameStem ++ "," ++ ename.nameStem).new-name.to-implicit-param-name()
-
-fun split-implicit-param-name(n: name): (name, name)
-  val (pre, post) = n.plain-implicit-param-name.nameStem.list.span(fn(c) c != ',')
-  match post
-    Cons(_, ename) | !pre.is-nil -> (pre.string.new-name, ename.string.new-name)
-    _ -> (n, n.plain-implicit-param-name)
 
 // Create a constructor creator name from the constructor name.
 // Used if special creation functions are used for the constructor.
@@ -326,16 +465,19 @@ fun new-creator-name(n: name): name
 fun is-creator-name(n: name): bool
   n.hidden/starts-with("create")
 
+fun is-early-bind-name(n: name): bool
+  n.is-handle-name || n.is-creator-name
+
 // Create a handler type name from an effect type name.
 fun to-handler-name(n: name): name
   make-hidden-name("hnd", n)
 
 fun is-handler-name(n: name): bool
-  n.nameStem.starts-with("@hnd-").bool
+  n.hidden/starts-with("hnd")
 
 // Create an effect type name from an operations type name.
-fun from-handler-name(n: name): name
-  n.nameModule.new-qualified(n.nameStem.list.drop(5).string)
+fun from-handler-name(n: name): <comp-flags,exn> name
+  n.unmake-hidden("hnd")
 
 // Create a handle function name from an effect type name.
 fun to-handle-name(n: name): name
@@ -350,18 +492,22 @@ fun to-operations-name(n: name): name
 
 // Is this an operations name?
 fun is-operations-name(n: name): bool
-  n.nameStem.starts-with("@ops-").bool
+  n.hidden/starts-with("ops")
+
+// Create an effect type name from an operations type name.
+fun from-operations-name(n: name): <comp-flags,exn> name
+  n.unmake-hidden("ops")
 
 fun to-op-selector-name(n: name): name
   make-hidden-name("select", n)
 
 // Is this an operations name?
 fun is-op-selector-name(n: name): bool
-  n.nameStem.starts-with("@select-").bool
+  n.hidden/starts-with("select")
 
 //  Create an effect type name from an operations type name.
-fun from-op-selector-name(n: name): name
-  n.nameModule.new-qualified(n.nameStem.list.drop(8).string)
+fun from-op-selector-name(n: name): <comp-flags,exn> name
+  n.unmake-hidden("select")
 
 // Create an effect tag name from an effect type name.
 fun to-effect-tag-name(n: name): name
@@ -380,7 +526,7 @@ fun to-open-tag-name(n: name): name
   make-hidden-name("tag", n)
 
 fun is-open-tag-name(n: name): bool
-  n.nameStem.starts-with("@tag-").bool
+  n.hidden/starts-with("tag")
 
 // Create a name for a value operation
 fun to-value-operation-name(n: name): name
@@ -388,86 +534,67 @@ fun to-value-operation-name(n: name): name
 
 // Is this an name of a value operation?
 fun is-value-operation-name(n: name): bool
-  n.nameStem.starts-with("@val-").bool
+  n.hidden/starts-with("val")
 
 // Create an operation name from a value operation name
-fun from-value-operations-name(n: name): name
-  n.nameModule.new-qualified(n.nameStem.list.drop(5).string)
+fun from-value-operations-name(n: name): <comp-flags,exn> name
+  n.unmake-hidden("val")
 
-fun prepend(s: string, n: name): name
-  val sl = s.list
-  val new = match n.nameStem.list
-    Cons('@', t) -> match sl
-      Cons('@', _) -> sl ++ t // Keep hidden names hidden
-      _ -> Cons('@', sl ++ t)
-    t -> sl ++ t
-  new-qualified(n.nameModule, new.string)
+// Create an operation name from either a value operation name or regular operations name
+fun to-basic-operations-name(n: name): <comp-flags,exn> name
+  if n.is-value-operation-name then n.from-value-operations-name else n
 
-fun postpend(s: string, cname: name): name
-  val (name, post) = cname.canonical-split
-  new-qualified(name.nameModule, name.nameStem ++ s ++ post)
+// Implicits
 
-fun canonical-name(n: int, name: name): name
-  if n == 0 then name else postpend(canonical-sep.string ++ n.show, name)
+val implicit-namespace = "@implicit"
+val implicit-namespace-name = implicit-namespace.new-module-name
 
-fun non-canonical-name(n: name): name
-  n.canonical-split.fst
+fun is-implicit-param-name(n: name): bool
+  match n.split-local-qual-name
+    Cons(m, _) -> m == implicit-namespace
+    _ -> False
 
-fun canonical-split(n: name): (name, string)
-  match n.nameStem.list.reverse.span(is-digit)
-    (Cons(p, ps), Cons(c, rest)) | c == canonical-sep -> (new-qualified(n.nameModule, rest.reverse.string), Cons(c, Cons(p, ps).reverse).string)
-    _ -> (n, "")
+fun to-implicit-param-name(n: name): <comp-flags,exn> name
+  qualify-locally(implicit-namespace-name, n)
 
-// camel-case to dash-case
-fun camel-to-dash(s: string): string
-  match s.split-camel
-    Cons(x, xs) -> x ++ xs.map(fn(y:string) "-" ++ y.to-lower).join
-    _ -> ""
+fun from-implicit-param-name(n: name): <comp-flags,exn> name
+  match n.split-local-qual-name
+    Cons(m, ms) | m == implicit-namespace -> qualify-locally(ms.unsplit-module-name, n.unqualify-full)
+    _ -> n
 
-fun split-camel(s: string): list<string>
-  fun is-break(c: char): bool
-    c.is-alpha || c == '-'
-  if s == "" then Nil
-  else
-    match s.list
-      Cons('-', cs) -> pretend-decreasing(cs.string).split-camel
-      Cons(c, cs) -> 
-        val (pre, post) = cs.span(is-break)
-        if post.is-empty then
-          val (pre2, post2) = post.span(fn(i) -> i.is-upper)
-          if pre2.is-empty || post.is-empty && post2.head.default(' ').is-break then
-            Cons(Cons(c, pre2).string, pretend-decreasing(post2.string).split-camel)
-          else
-            Cons(Cons(c, pre2.init).string, pretend-decreasing(Cons(pre2.last.default(' '), post2).string).split-camel)
-        else
-          Cons(Cons(c, pre).string, pretend-decreasing(post.string).split-camel)
-      Nil -> Nil
+fun split-implicit-param-name(n: name): (name, name)
+  (n, n.unqualify-full)
 
 // name to file path
 fun module-name-to-path(n: name): string
-  n.name/name/show.ascii-encode(True)
+  n.show.ascii-encode(True)
 
 fun path-to-module-name(p: string): name
-  fun decode(s: string): string // TODO: Performance
-    val sl = s.list
+  fun decode(sl: list<char>): list<char> // TODO: Performance / do proper decoding
+    val s = sl.string
     match sl
-      _ | s.starts-with("_dash_").bool -> "-" ++ decode(pretend-decreasing(sl.drop(6).string))
-      Cons('_', Cons('_', t)) -> "_" ++ decode(pretend-decreasing(t.string))
-      Cons('_', t) -> "/" ++ decode(pretend-decreasing(t.string))
-      Cons('@', t) -> decode(pretend-decreasing(t.string))
-      Cons('\\', t) -> "/" ++ decode(pretend-decreasing(t.string))
-      Cons(c, t) -> c.string ++ decode(pretend-decreasing(t.string))
-      Nil -> ""
-  p.decode.list.drop-while(fn(c) -> c == '_' || c == '@' || c == '/').string.new-name
+      _ | s.starts-with("_dash_").bool -> Cons('-', decode(pretend-decreasing(sl.drop(6))))
+      Cons('_', Cons('_', t)) -> Cons('_', decode(pretend-decreasing(t)))
+      Cons('_', t) -> Cons('/', decode(pretend-decreasing(t)))
+      Cons('@', t) -> Cons('@', decode(pretend-decreasing(t)))
+      Cons('\\', t) -> Cons('/', decode(pretend-decreasing(t)))
+      Cons(c, t) -> Cons(c, decode(pretend-decreasing(t)))
+      Nil -> Nil
+  p.list.map(fn(c) if c.is-path-sep then '/' else c).decode.drop-while(fn(c) -> c == '_' || c == '.' || c == '/').string.new-module-name
 
+// Ascii encode a name
+// - on module names '/' becomes '_'
+// - on normal names '-' becomes '_'
 fun ascii-encode(n: string, is-module: bool): string
   fun encode-char(pre: char, c: char, post: char): string
     match c
+      _ | c.is-alpha-num -> c.string
       '/' | is-module -> "_"
       '-' | !is-module && post.is-alpha-num -> "_"
       '@' | post.is-digit || post == ' ' || pre == ' ' -> "_"
+
       '_' -> "__"
-      '@' -> "_dot_"
+      '.' -> "_dot_"
       '-' -> "_dash_"
       '/' -> "_fs_"
 
@@ -500,27 +627,24 @@ fun ascii-encode(n: string, is-module: bool): string
       '}'  -> "_rc_"
       '|'  -> "_bar_"
       _ -> "_x" ++ c.int.show-hex(pre="", width=2) ++ "_"
-
   fun encode-chars2(s: list<char>): list<string>
     match s
-      Cons(pre, Cons(c, Cons(post, rest))) -> Cons(encode-char(pre, c, post), encode-chars2(rest))
+      Cons(pre, Cons(c, Cons(post, rest))) -> Cons(encode-char(pre, c, post), encode-chars2(Cons(c, Cons(post, rest)).pretend-decreasing))
       Cons(pre, Cons(c, Nil)) -> Cons(encode-char(pre, c, ' '), Nil)
       Cons(pre, Nil) -> Cons(pre.string, Nil)
       Nil -> Nil
-  
   fun encode-chars(s: string): string
     encode-chars2((" " ++ s).list).join
-
   if n.head-char.default(' ').is-alpha-num then
     return n.encode-chars
   match n
     ""      -> "_null_"
-    ".<>"   -> "_total_"
-    ".<|>"  -> "_extend_"
-    ".()"   -> "_unit_"
-    ".(,)"  -> "_tuple2_"
-    ".(,,)" -> "_tuple3_"
-    ".(,,,)"-> "_tuple4_"
+    "@<>"   -> "_total_"
+    "@<|>"  -> "_extend_"
+    "@()"   -> "_unit_"
+    "@(,)"  -> "_tuple2_"
+    "@(,,)" -> "_tuple3_"
+    "@(,,,)"-> "_tuple4_"
     "()"    -> "_Unit_"
     "(,)"   -> "_Tuple2_"
     "(,,)"  -> "_Tuple3_"

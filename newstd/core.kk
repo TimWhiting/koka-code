@@ -12,3 +12,9 @@ fun and(l: list<bool>): bool
 
 fun is-prefix-of(s1: string, s2: string): bool
   s2.starts-with(s1).bool
+
+fun to-upper(c: char): char
+  c.string.to-upper.head-char.default(c)
+  
+fun to-lower(c: char): char
+  c.string.to-lower.head-char.default(c)

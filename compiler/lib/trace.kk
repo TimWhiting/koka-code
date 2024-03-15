@@ -1,3 +1,4 @@
+import std/core/unsafe
 import compiler/lib/printer
 
 fun trace(s: string, a: a): a
@@ -15,6 +16,6 @@ fun traceId(s: string): string
 fun traceEq(s: string, a: a, showa: (a) -> string): a
   trace(s ++ " = " ++ a.showa, a)
 
-// fun main()
-//   ctrace(Red, "Hello, world!", 0).println
-//   trace("Hi", 0).println
+// fun example-trace()
+//   ctrace(Red, "Hello, world!", 0)
+//   trace("Hi", 0)

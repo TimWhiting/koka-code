@@ -57,7 +57,7 @@ fun name-case-overlap-prefix-of(n1: name, n2: name): bool
 fun is-same-namespace(n1: name, n2: name): bool
   n1.is-constructor-name == n2.is-constructor-name
 
-fun lower/cmp(Name(m1, _, l1, _, n1, _), Name(m2, _, l2, _, n2, _)): order
+fun lower/cmp(Name(m1, _, l1, _, n1, _): name, Name(m2, _, l2, _, n2, _): name): order
   match cmp(m1.to-lower, m2.to-lower)
     Eq -> match cmp(l1.to-lower, l2.to-lower)
       Eq -> cmp(n1.to-lower, n2.to-lower)
@@ -130,31 +130,31 @@ fun is-symbol-id(s: string): bool
 fun wrap-id(s: string): string
   if is-symbol-id(s) then "(" ++ s ++ ")" else s
 
-fun name/show(Name(m, _, l, _, n, _), explicitLocal: bool): string
+fun name/showName(Name(m, _, l, _, n, _): name, explicitLocal: bool): string
   val ln = l.join(n.wrap-id)
   if m == "" then ln 
   elif ln == "" then m
   else m ++ (if explicitLocal && l != "" then "/#" else "/") ++ ln
 
-fun show-fully-explicit(Name(m, _, l, _, n, _)): string
+fun show-fully-explicit(Name(m, _, l, _, n, _): name): string
   val ln = l.join(n.wrap-id)
   if m == "" then "#" ++ ln
   elif ln == "" then m
   else m ++ "/#" ++ ln
 
 fun show-explicit(n: name): string
-  n.show(True)
+  n.showName(True)
 
 fun show-plain(n: name): string 
   join(n.nameModule, join(n.nameLocalQual, n.nameStem))
 
-fun show(n: name): string
+fun name/show(n: name): string
   n.show-explicit()
 
 fun pretty(n: name): doc
   n.show.text
 
-fun pretty-name-ex(Name(m, _, l, _, n, _), lsep: string, cs: colorScheme): doc // explicit /# if needed
+fun pretty-name-ex(Name(m, _, l, _, n, _): name, lsep: string, cs: colorScheme): doc // explicit /# if needed
   val ln = join(l, n.wrap-id)
   if m == "" then ln.text
   else (
@@ -162,14 +162,14 @@ fun pretty-name-ex(Name(m, _, l, _, n, _), lsep: string, cs: colorScheme): doc /
            |.| ln.text
   ).color(cs.colorModule)
 
-fun pretty-name(nm: name, cs: colorScheme): <comp-flags,exn> doc // not explicit /#
+fun pretty-name(nm: name, cs: colorScheme): <exn> doc // not explicit /#
   if nm.is-implicit-param-name then "?".text |.| nm.from-implicit-param-name.requalify-locally.pretty-name-ex("/", cs)
   else nm.pretty-name-ex("/", cs)
 
 fun pretty-core-name(nm: name, cs: colorScheme): doc // explicit /# if needed
   nm.pretty-name-ex("/#", cs)
 
-fun tupled/show(Name(m, _, n, _)): string
+fun show-tupled(Name(m, _, n, _): name): string
   "(" ++ m.show ++ "," ++ n.show ++ ")"
 
 fun tupled/read(s: string): exn name
@@ -177,7 +177,7 @@ fun tupled/read(s: string): exn name
   val Cons(m, Cons(l, Cons(n, Nil))) = s'.split(",")
   new-locally-qualified(m, l, n)
 
-fun qualified/read(s: string): <div,comp-flags,exn> name
+fun qualified/read(s: string): <div,exn> name
   if s.starts-with("(").bool then tupled/read(s)
   else s.read-qualified-name
 
@@ -203,11 +203,11 @@ fun hash(s: string)
   val sn = (s ++ "____").list.take(4).string.to-lower.list.map(fn (c) { c.int })
   sn.foldl(0, fn(c, h) { h * 256 + c})
 
-fun name-map-stem(Name(m, hm, l, hl, n, _), f: (string) -> e string): e name
+fun name-map-stem(Name(m, hm, l, hl, n, _): name, f: (string) -> e string): e name
   val n' = f(n)
   Name(m, hm, l, hl, n', n'.hash)
 
-fun read-qualified-name(s0: string): <div,comp-flags,exn> name
+fun read-qualified-name(s0: string): <div,exn> name
   if s0.starts-with("?").bool then s0.slice.drop(1).string.read-qualified-name.requalify-locally.to-implicit-param-name
   else
     fun split-qual-id-rev(rs: list<char>): (string, string)
@@ -215,7 +215,7 @@ fun read-qualified-name(s0: string): <div,comp-flags,exn> name
       match rqual
         Cons('/', rs1) -> (rs1.reverse.string, rid.reverse.string) // qualifier
         _ -> ("", rid.reverse.string)
-    fun split-id-name-rev(rs: list<char>): <comp-flags,exn> (string, string, string)
+    fun split-id-name-rev(rs: list<char>): <exn> (string, string, string)
       val (rid, rest) = rs.span(fn(c) c != '#')
       match rest
         Cons('#', Cons('/', rs2)) -> // local qualifier
@@ -225,7 +225,7 @@ fun read-qualified-name(s0: string): <div,comp-flags,exn> name
           val (qual, id) = rid.split-qual-id-rev
           (qual, "", id)
         _ -> fail("Name split-id-name-rev: illegal locally qualified name: " ++ rs.reverse.string)
-    fun split-name(s: string): <comp-flags,exn> (string, string, string)
+    fun split-name(s: string): <exn> (string, string, string)
       if s.ends-with(")").bool then // operator
         val (rop, rest) = s.list.reverse.span(fn(c) c != '(')
         match rest
@@ -299,7 +299,7 @@ fun qualifier(Name(m, hm)): name
 fun name-as-module-name(n: name): name
   new-module-name(join(n.nameModule, join(n.nameLocalQual, n.nameStem)))
 
-fun qualify-locally(nl: name, n: name): <comp-flags,exn> name
+fun qualify-locally(nl: name, n: name): <exn> name
   match nl
     Name(l, _, _, 0, _, 0) ->
       new-locally-qualified(n.nameModule, join(l, n.nameLocalQual), n.nameStem)
@@ -398,11 +398,12 @@ fun make-hidden(n: name): name
 fun make-hidden-name(s: string, n: name): name
   prepend("." ++ s ++ "-", n)
 
-fun unmake-hidden(n: name, pre: string): <comp-flags,exn> name
+fun unmake-hidden(n: name, pre: string): <exn> name
   n.name-map-stem fn(stem)
     if stem.starts-with("@" ++ pre ++ "-").bool then
       stem.slice.drop(2 + pre.count).string
-    else fail("common/name/unmake-hidden: expecting hidden name prefixed with @" ++ pre ++ "-, but found: " ++ n.show)
+    else fail("common/name/unmake-hidden: expecting hidden name prefixed with @" 
+              ++ pre ++ "-, but found: " ++ n.show)
 
 fun new-hidden-name-ex(base: string, s: string): name
   make-hidden-name(base, s.new-name)
@@ -476,7 +477,7 @@ fun is-handler-name(n: name): bool
   n.hidden/starts-with("hnd")
 
 // Create an effect type name from an operations type name.
-fun from-handler-name(n: name): <comp-flags,exn> name
+fun from-handler-name(n: name): <exn> name
   n.unmake-hidden("hnd")
 
 // Create a handle function name from an effect type name.
@@ -495,7 +496,7 @@ fun is-operations-name(n: name): bool
   n.hidden/starts-with("ops")
 
 // Create an effect type name from an operations type name.
-fun from-operations-name(n: name): <comp-flags,exn> name
+fun from-operations-name(n: name): <exn> name
   n.unmake-hidden("ops")
 
 fun to-op-selector-name(n: name): name
@@ -506,7 +507,7 @@ fun is-op-selector-name(n: name): bool
   n.hidden/starts-with("select")
 
 //  Create an effect type name from an operations type name.
-fun from-op-selector-name(n: name): <comp-flags,exn> name
+fun from-op-selector-name(n: name): <exn> name
   n.unmake-hidden("select")
 
 // Create an effect tag name from an effect type name.
@@ -537,11 +538,11 @@ fun is-value-operation-name(n: name): bool
   n.hidden/starts-with("val")
 
 // Create an operation name from a value operation name
-fun from-value-operations-name(n: name): <comp-flags,exn> name
+fun from-value-operations-name(n: name): <exn> name
   n.unmake-hidden("val")
 
 // Create an operation name from either a value operation name or regular operations name
-fun to-basic-operations-name(n: name): <comp-flags,exn> name
+fun to-basic-operations-name(n: name): <exn> name
   if n.is-value-operation-name then n.from-value-operations-name else n
 
 // Implicits
@@ -554,10 +555,10 @@ fun is-implicit-param-name(n: name): bool
     Cons(m, _) -> m == implicit-namespace
     _ -> False
 
-fun to-implicit-param-name(n: name): <comp-flags,exn> name
+fun to-implicit-param-name(n: name): <exn> name
   qualify-locally(implicit-namespace-name, n)
 
-fun from-implicit-param-name(n: name): <comp-flags,exn> name
+fun from-implicit-param-name(n: name): <exn> name
   match n.split-local-qual-name
     Cons(m, ms) | m == implicit-namespace -> qualify-locally(ms.unsplit-module-name, n.unqualify-full)
     _ -> n

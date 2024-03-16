@@ -1,3 +1,5 @@
+import std/os/path
+
 value struct source (pub name: string, pub contents: string)
 
 val source/null = Source("", "")
@@ -87,7 +89,7 @@ value struct range (pub start: pos, pub end: pos)
 fun range/(==)(r1: range, r2: range): bool
   r1.start == r2.start && r1.end == r2.end
 
-fun showRange(r: range, endToo: bool)
+fun show-range(r: range, cwd: path, endToo: bool)
   if r.start.line > big-line then 
     "" 
   else 
@@ -110,8 +112,8 @@ fun range/is-after(r1: range, r2: range): bool
 
 val range/null = make-range(pos/null, pos/null)
 
-fun show-full-range(r: range): string
-  r.showRange(True)
+fun show-full-range(cwd: path, r: range): string
+  r.show-range(cwd, True)
 
 fun make-range(p1: pos, p2: pos): range
   Range(min(p1, p2), max(p1, p2))

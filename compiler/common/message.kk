@@ -3,10 +3,11 @@ import compiler/common/failure
 import compiler/platform/config
 import compiler/common/range
 import compiler/common/color-scheme
+import std/os/path
 
 // Pretty print helpers
-fun pp-range(r: range, endToo: bool)
-  r.showRange(endToo).text.color(colors.colorRange)
+fun pp-range(r: range, cwd: path, endToo: bool)
+  r.show-range(cwd, endToo).text.color(colors.colorRange)
 
 fun table(xs: list<(doc, doc)>)
   tablex(1, xs)

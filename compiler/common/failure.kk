@@ -1,4 +1,5 @@
 pub import compiler/platform/config
+import newstd/core
 
 pub alias compilerEff = <comp-flags, exn>
 
@@ -16,3 +17,13 @@ fun assert(s: string, b: bool, a: a): exn a
 
 fun todo(s: string): exn a
   fail("todo: " ++ s)
+
+fun catch(hndl: string -> e a, f: () -> <exn|e> a): e a
+  fun adjust(s: string): string
+    s // TODO: Adjust any errors if needed
+  with handler final ctl throw-exn(e)
+    hndl(e.message.adjust)
+  f()
+
+
+

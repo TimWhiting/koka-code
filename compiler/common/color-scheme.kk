@@ -1,11 +1,15 @@
 import compiler/lib/printer
 import std/core/undiv
+
+// ----------------------------
 // Global color scheme used for pretty printing
+// ----------------------------
 
-
+// ----------------------------
 // Color Scheme
-// Color scheme for the interpreter
+// ----------------------------
 
+// Color scheme for the interpreter
 effect colorSchemeEffect
   val colors: colorScheme;
 
@@ -43,6 +47,8 @@ struct colorScheme
   colorTypeSpecial: color = colorType
   colorTypeParam: color = colorParameter
   colorNameQual: color = ColorDefault
+  colorImplicitParameter: color = Gray
+  colorImplicitExpr: color = colorSource
 
 val lightColorScheme = ColorScheme(
   colorNumber = DarkGray,
@@ -57,11 +63,54 @@ val lightColorScheme = ColorScheme(
   colorString = Red
 )
 
-fun makeColorScheme(clr: color)
-  ColorScheme(clr, clr, clr, clr, clr, clr, clr, clr, clr, clr, clr, clr, clr, clr,
-    clr, clr, clr, clr, clr, clr, clr, clr, clr, clr, clr, clr, clr, clr)
+// Replace "default" with an explicit color value
+fun color/default(c: color, clr: color): color
+  if clr == ColorDefault then c else clr
 
+fun scheme/default(cs: colorScheme, clr: color): colorScheme
+  cs(
+    colorType = color/default(cs.colorType, clr),
+    colorParameter = color/default(cs.colorParameter, clr),
+    colorKind = color/default(cs.colorKind, clr),
+    colorMarker = color/default(cs.colorMarker, clr),
+    colorWarning = color/default(cs.colorWarning, clr),
+    colorError = color/default(cs.colorError, clr),
+    colorSource = color/default(cs.colorSource, clr),
+    colorInterpreter = color/default(cs.colorInterpreter, clr),
+    colorCommand = color/default(cs.colorCommand, clr),
+    colorKeyword = color/default(cs.colorKeyword, clr),
+    colorEffect = color/default(cs.colorEffect, clr),
+    colorRange = color/default(cs.colorRange, clr),
+    colorSep = color/default(cs.colorSep, clr),
+    // syntax coloring
+    colorComment = color/default(cs.colorComment, clr),
+    colorReserved = color/default(cs.colorReserved, clr),
+    colorReservedOp = color/default(cs.colorReservedOp, clr),
+    colorSpecial = color/default(cs.colorSpecial, clr),
+    colorString = color/default(cs.colorString, clr),
+    colorNumber = color/default(cs.colorNumber, clr),
+    colorModule = color/default(cs.colorModule, clr),
+    colorCons = color/default(cs.colorCons, clr),    
+    colorTypeCon = color/default(cs.colorTypeCon, clr),
+    colorTypeVar = color/default(cs.colorTypeVar, clr),
+    colorTypeKeyword = color/default(cs.colorTypeKeyword, clr),
+    colorTypeKeywordOp = color/default(cs.colorTypeKeywordOp, clr),
+    colorTypeSpecial = color/default(cs.colorTypeSpecial, clr),
+    colorTypeParam = color/default(cs.colorTypeParam, clr),
+    colorNameQual = color/default(cs.colorNameQual, clr),
+    colorImplicitParameter = color/default(cs.colorImplicitParameter, clr),
+    colorImplicitExpr = color/default(cs.colorImplicitExpr, clr)
+  )
+
+val empty = make-color-scheme(ColorDefault)
+
+fun make-color-scheme(clr: color)
+  ColorScheme(clr, clr, clr, clr, clr, clr, clr, clr, clr, clr, clr, clr, clr, clr,
+    clr, clr, clr, clr, clr, clr, clr, clr, clr, clr, clr, clr, clr, clr, clr, clr)
+
+// ----------------------------
 // Read colors
+// ----------------------------
 // Read a comma separated list of name=color pairs.
 fun read-color-flags(scheme: colorScheme, s: string)
   fun split(xs: list<char>): list<string>
@@ -141,6 +190,8 @@ fun update(scheme: colorScheme, name: string, color: string)
     "parameter" -> scheme(colorParameter=clr)
     "cons" -> scheme(colorCons=clr)
     "constructor" -> scheme(colorCons=clr)
-    "none" -> makeColorScheme(ColorDefault)
-    "all" -> makeColorScheme(clr)
+    "none" -> color-scheme/empty
+    "all" -> make-color-scheme(clr)
+    "implicitparameter" -> scheme(colorImplicitParameter=clr)
+    "implicitexpr" -> scheme(colorImplicitExpr=clr)
       

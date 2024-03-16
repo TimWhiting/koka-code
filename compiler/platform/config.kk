@@ -23,15 +23,13 @@ struct fileConfig
   dllExt: string
   objExt: string
   libExt: string
-  libPrefix: string
-  pathSep: string
-  pathDelim: string;
+  libPrefix: string;
 
 fun os-config(): <exn,ndet> fileConfig
   match get-os-name()
-    "linux" -> FileConfig(".so", ".o", ".a", "lib", "", "/", ":")
-    "windows" -> FileConfig(".exe", ".dll", ".obj", ".lib", "", "\\", ";")
-    "macos" -> FileConfig(".dylib", ".o", ".a", "lib", "", "/", ":")
+    "linux" -> FileConfig(".so", ".o", ".a", "lib", "")
+    "windows" -> FileConfig(".exe", ".dll", ".obj", ".lib", "")
+    "macos" -> FileConfig(".dylib", ".o", ".a", "lib", "")
 
 val source-ext = ".kk"
 

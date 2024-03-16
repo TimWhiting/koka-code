@@ -1,6 +1,6 @@
 fun main()
   (fn(y0) 
-    y0(1)
+    val n = y0(1)
     fn(x4)
       y0(x4)
   )(fn(x3) x3)(2)

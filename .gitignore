@@ -1,2 +1,4 @@
 **/.koka
 scratch
+graph.dot
+out.svg

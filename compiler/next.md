@@ -1,20 +1,25 @@
 # TODO
 
 ## Changes
+- [ ] check all in common/
+- [ ] check all in core/
+- [ ] check all in syntax/
+- [ ] check all in lib/ (start with finishing printer)
+- [ ] check all in kind/
+- [ ] changes in backend/c/from-core
+- [ ] integrate error effect into core effect alias
+
 - [ ] syntax/promote
-- [ ] syntax/parse
-- [ ] syntax/lexer
+- [ ] syntax/parse (move common/parser to newstd/text/parser)
+- [ ] syntax/lexer (redo with alex)
 - [ ] static/bindingGroups
 - [ ] core/parse
 - [ ] (finish kind/infer)
 - [ ] kind/inferMonad
-- [ ] lib/printer
 - [ ] type/assumption
 - [ ] type/operations
 - [ ] type/pretty
 - [ ] type/unify
-- [ ] common/colorScheme
-- [ ] error effect for core passes
 
 ## All dependencies ready
 - [ ] backend/c/parc 1037
@@ -43,7 +48,6 @@
 - [ ] syntax/colorize 607 - can be done
 - [ ] backend/csharp/from-core 1884 - can be done
 - [ ] backend/javascript/from-core 1371 - can be done
-- [ ] common/file 499 - finish as needed
 - [ ] syntax/highlight 515 - needs isocline
 - [ ] core/gendoc 598 - needs colorize / highlight
 - [ ] interpreter/interpret 734 - needs everything

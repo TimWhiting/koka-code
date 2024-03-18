@@ -5,11 +5,17 @@ import std/os/env
 fun is-windows()
   get-os-name() == "windows"
 
+//--------------------------------------------------------------------------
+//  Printer
+//--------------------------------------------------------------------------
+// A printer is an abstraction for something where we can send
+// character output to.
 linear effect printer
   fun write(text: string): ()
   fun write-ln(text: string): ()
   fun flush(): ()
 
+// A colored printer has additional coloring and formatting options
 linear effect coloredPrinter
   fun withColor(c: color): ()
   fun withBackColor(c: color): ()
@@ -17,6 +23,11 @@ linear effect coloredPrinter
   fun withUnderline(b: bool): ()
   fun withColorSettings(s: printColorSettings): ()
 
+//--------------------------------------------------------------------------
+//  Interface
+//--------------------------------------------------------------------------
+// Available colors on a console. Normally, background colors are
+// converted to their /dark/ variant.
 type color
   Black
   DarkRed
@@ -36,6 +47,17 @@ type color
   White
   ColorDefault
 
+//--------------------------------------------------------------------------
+//  Simple monochrome printer
+//--------------------------------------------------------------------------}
+val noColorPrinter = handler
+  fun withColor(c: color) ()
+  fun withBackColor(c: color) ()
+  fun withReverse(b: bool) ()
+  fun withUnderline(b: bool) ()
+  fun withColorSettings(s: printColorSettings) ()
+
+// On windows, we cannot print unicode characters :-(
 fun sanitize(s: string): <ndet> string
   match is-windows()
     False -> s
@@ -48,8 +70,11 @@ val monoPrinter = handler
   fun write(s) s.sanitize().print()
   fun write-ln(s) s.sanitize().println()
   fun flush() ()
-  
 
+//--------------------------------------------------------------------------
+//  Simple File printer
+//--------------------------------------------------------------------------}
+// Use a file printer that ignores colors. Appends, or creates the file
 fun filePrinter(filePath: string, action)
   var f := read-text-file(filePath.path)
   handle action
@@ -57,6 +82,7 @@ fun filePrinter(filePath: string, action)
     fun write-ln(s) f := f ++ s ++ "\n"
     fun flush() try{write-text-file(filePath.path, f)}.default(())
 
+// Use a file printer that ignores colors. Creates or overwrites the file
 fun newFilePrinter(filePath: string, action)
   var f := ""
   handle action
@@ -64,7 +90,27 @@ fun newFilePrinter(filePath: string, action)
     fun write-ln(s) f := f ++ s ++ "\n"
     fun flush() try{write-text-file(filePath.path, f)}.default(())
 
+
+fun stringPrinter(action: () -> <printer|e> ()): e string
+  var res := ""
+  with handler
+    fun write(s) res := res ++ s
+    fun write-ln(s) res := res ++ s ++ "\n"
+    fun flush() ()
+  mask<local>{action()}
+  res
+
+// --------------------------------------------------------------------------
+//  Standard ANSI escape sequences
+// --------------------------------------------------------------------------}
+// Use a color printer that uses ANSI escape sequences.
 effect val colorSettings: printColorSettings
+
+struct printColorSettings
+  fcolor: color = ColorDefault
+  bcolor: color = ColorDefault
+  invert: bool = False
+  underline: bool = False
 
 fun ansiPrinter(action)
   with val colorSettings = PrintColorSettings()
@@ -73,11 +119,9 @@ fun ansiPrinter(action)
     fun write-ln(s) s.println()
     fun flush() ()
 
-struct printColorSettings
-  fcolor: color = ColorDefault
-  bcolor: color = ColorDefault
-  invert: bool = False
-  underline: bool = False
+fun ansiStringPrinter(action)
+  with val colorSettings = PrintColorSettings()
+  stringPrinter(action)
 
 fun ansiWithConsole(console: printColorSettings, action)
   val old = colorSettings
@@ -114,7 +158,6 @@ fun reset(new: printColorSettings)
   seqReset() ++ 
   seqReverse(new.invert) ++ seqUnderline(new.underline) ++ 
   seqColor(False, new.fcolor) ++ ";" ++ seqColor(True, new.bcolor) 
- 
 
 fun diff(a: printColorSettings, b: printColorSettings)
   val r = if (a.invert != b.invert) then seqReverse(b.invert) else ""
@@ -157,13 +200,6 @@ fun seqSetConsole(old: printColorSettings, new: printColorSettings)
   if (old.invert && !new.invert) then reset(new)
   else if (old.underline && !new.underline) then reset(new)
   else diff(old, new)
-
-// type colorPrinter
-  // PCon(p: consolePrinter)
-  // PAnsi(p: ansiPrinter)
-  // PMono(p: monoPrinter)
-  // PFile(p: filePrinter)
-  // PHTML(p: htmlPrinter)
 
 val consolePrinter = handler
   fun write(s) s.sanitize().print()

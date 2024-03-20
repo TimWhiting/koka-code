@@ -11,7 +11,7 @@ fun main()
 
   val x = 1 + 2
   
-  val y = x * 4
+  val y = x * 4 
   
   val z = y - (y + x)
   

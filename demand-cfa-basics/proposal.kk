@@ -26,7 +26,7 @@ fun sum(xs: list<int>, f: (int) -> int)
 
 fun test3()
   val xs = [0, 1, 2, 3]
-  sum(xs, fn(x) x*x).println
+  // sum(xs, fn(x) x*x).println
   // Same as closure after the closing braces with it's body indented
   val result = sum(xs) fn(x)
     x*x
@@ -74,7 +74,7 @@ fun linear/main()
       else
         println(a)
         resume(())
-  [0, 1, 2, 3].iterate
+  [5,6,7,8].iterate
 
 
 // Returns a function that adds n to its argument

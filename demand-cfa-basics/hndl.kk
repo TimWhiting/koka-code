@@ -17,5 +17,5 @@ fun nonlinear/main()
       else
         println(a)
         resume(())
-  [0, 1, 2, 3].iterate 
+  [0, 1, 2, 3].iterate
   print("Hello")

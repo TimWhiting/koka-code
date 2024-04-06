@@ -2,6 +2,7 @@ import compiler/lib/printer
 import std/os/path
 import std/core/undiv
 import std/os/file
+import newstd/test
 import std/num/float64
 
 pub infixr 5 (/), (||), (|-|), (|--|) 
@@ -59,12 +60,12 @@ fun hcat(l: list<doc>): doc
   l.fold((|.|))
 
 fun vcat(l: list<doc>): doc
-  l.filter(fn(x) !x.is-empty).fold((||))
+  l.filter(fn(x) !x.is-empty).fold((|--|))
 
 fun fold(l: list<doc>, f: (doc, doc) -> doc): doc
   match l
     Nil -> empty
-    Cons(x, xs) -> xs.foldr(x, f)
+    Cons(x, xs) -> xs.foldl(x, f)
 
 fun (|.|)(x: doc, y: doc): doc
   x.beside(y)
@@ -154,7 +155,7 @@ fun fill(d: doc, f: int): doc
   d.width(fn(w) if w >= f then empty else spaces(f - w).text)
 
 fun width(d: doc, f: (int -> doc)): doc
-  column(fn(k1) d |.| column(fn(k2) f(k1 - k2)))
+  column(fn(k1) d |.| column(fn(k2) f(k2 - k1)))
 
 // Semi primitive: Alignment and indentation
 
@@ -501,5 +502,9 @@ fun spaces(n: int): string
 
 val defaultWidth = 160
 
-fun test()
-  ("test".text |+| "hello".text)
+fun test-pretty()
+  test("Basic Pretty Combinators")
+    expect({("test".text |+| "hello".text).show}, "test hello")
+    expect({["test".text, "hello".text].vcat.show}, r#"test
+hello"#)
+    expect({["test".text, "hello".text].hcat.show}, "testhello")

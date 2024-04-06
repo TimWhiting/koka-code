@@ -10,20 +10,24 @@ import compiler/common/failure
 import compiler/platform/config
 import compiler/common/range
 import compiler/common/color-scheme
+import compiler/lib/printer
 import std/os/path
+import newstd/test
 
 // Pretty print helpers
 fun pp-range(r: range, cwd: path, endToo: bool)
   r.show-range(cwd, endToo).text.color(colors.colorRange)
 
 fun table(xs: list<(doc, doc)>)
-  tablex(1, xs)
+  tablex(0, xs)
 
 fun tablex(n: int, xs: list<(doc, doc)>)
   val headers = xs.map(fst)
   val headerwidth = headers.map(fn(x) x.show.count).maximum
-  if headerwidth <= 0 then vcat(xs.map(snd)).indent(n)
-  else vcat(xs.map(fn((hd, d)) hd.fill(headerwidth) |.| colon |+| align(d)))
+  val doc = 
+    if headerwidth <= 0 then vcat(xs.map(snd))
+    else vcat(xs.map(fn((hd, d)) hd.fill(headerwidth) |.| colon |+| align(d)))
+  doc.indent(n)
 
 // Source from range
 fun source-from-ranges(rngs: list<range>)
@@ -56,4 +60,19 @@ fun doc-from-range(r: range)
   val x = r.source-from-range.lines.limit-lines(3).map(fn(l) l.limit-line-len(80))
   match x
     Nil -> pprint/empty
-    src -> src.map(text).vcat.align.color(colors.colorSource)
+    src -> 
+      src.map(text).vcat.align.color(colors.colorSource)
+
+fun test-message()
+  with color-scheme-default
+  test("tables")
+    expect({"\n" ++ table([("Test".text, "here".text), ("Something long".text, "there".text)]).show}, r#"
+Test          : here
+Something long: there"#)
+
+  test("doc-from-range")
+    val source = Source("test.txt", "hello\nworld")
+    val start = Pos(source, 0, 1, 1)
+    val end = Pos(source, 9, 2, 3)
+    expect({doc-from-range(Range(start, end)).show}, r#"hello
+wor"#)

@@ -21,7 +21,7 @@ import std/core/undiv
 effect colorSchemeEffect
   val colors: colorScheme;
 
-fun @default-colorSchemeEff(f)
+fun color-scheme-default(f)
   handle(f)
     val colors = ColorScheme()
 

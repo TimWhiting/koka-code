@@ -1,3 +1,11 @@
+//---------------------------------------------------------------------------
+// Copyright 2024, Microsoft Research, Daan Leijen. Tim Whiting
+//
+// This is free software; you can redistribute it and/or modify it under the
+// terms of the Apache License, Version 2.0. A copy of the License can be
+// found in the LICENSE file at the root of this distribution.
+//---------------------------------------------------------------------------
+
 import compiler/lib/printer
 import std/core/undiv
 
@@ -164,7 +172,7 @@ fun update(scheme: colorScheme, name: string, color: string)
     "fuchsia" -> Magenta
     "darkgray" -> DarkGray
     _ -> ColorDefault
-  match name
+  match name.trim.to-lower
     "type" -> scheme(colorType=clr, colorTypeCon=clr, colorTypeKeyword=clr, colorEffect=clr)
     "kind" -> scheme(colorKind=clr)
     "marker" -> scheme(colorMarker=clr)
@@ -194,4 +202,3 @@ fun update(scheme: colorScheme, name: string, color: string)
     "all" -> make-color-scheme(clr)
     "implicitparameter" -> scheme(colorImplicitParameter=clr)
     "implicitexpr" -> scheme(colorImplicitExpr=clr)
-      

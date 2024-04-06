@@ -40,12 +40,12 @@
     // },
     {
       "name": "Debug",
-      "type": "lldb-mi",
+      "type": "cppdbg",
       "request": "launch",
-      "target": "./.koka/v2.4.3/clang-debug/scratch_testh",
+      "program": "${workspaceRoot}/.koka/v3.1.2-vscode/clang-debug-6c4fa5/compiler_common_nice__main",
       "cwd": "${workspaceRoot}",
-      "lldbmipath": "/Users/timwhiting/.vscode/extensions/ms-vscode.cpptools-1.17.5-darwin-x64/debugAdapters/lldb-mi/bin/lldb-mi",
-      "valuesFormatting": "parseText",
+      "MIMode": "lldb",
+      // "lldbmipath": "/Users/timwhiting/.vscode/extensions/ms-vscode.cpptools-1.17.5-darwin-x64/debugAdapters/lldb-mi/bin/lldb-mi",
       "stopAtEntry": true
     },
     {
@@ -53,7 +53,7 @@
       "request": "launch",
       "program": "${workspaceRoot}/analysis/adi/main",
       "name": "Analysis",
-      "args": "-O2"
+      "compilerArgs": "-O2"
     },
     {
       "type": "koka",
@@ -66,7 +66,7 @@
       "request": "launch",
       "program": "${workspaceRoot}/higher-order-programs/koka/rosetta/tic-tac-toe/game",
       "name": "TicTacToe",
-      "args": "--core"
+      "compilerArgs": "--core"
     },
     {
       "type": "koka",
@@ -85,14 +85,14 @@
       "request": "launch",
       "program": "${workspaceRoot}/testcompiler/syntax/lexer",
       "name": "lexer",
-      "args": "-O2"
+      "compilerArgs": "-O2"
     },
     {
       "type": "koka",
       "request": "launch",
       "program": "${workspaceRoot}/testcompiler/syntax/lexer2",
       "name": "lexer2",
-      "args": "-O2"
+      "compilerArgs": "-O2"
     }
   ]
 }

@@ -1,3 +1,11 @@
+//----------------------------------------------------------------------------
+// Copyright 2024, Microsoft Research, Daan Leijen. Tim Whiting.
+//
+// This is free software; you can redistribute it and/or modify it under the
+// terms of the Apache License, Version 2.0. A copy of the License can be
+// found in the LICENSE file at the root of this distribution.
+//----------------------------------------------------------------------------
+
 import compiler/common/name
 import compiler/common/syntax
 import compiler/common/failure
@@ -193,7 +201,7 @@ val nameAssign      = "@assign".new-hidden-name // used for :=
 val nameRefSet      = "set".core-types-name
 val nameLocalSet    = "local-set".core-types-name
 val nameLocalGet    = "local-get".core-types-name
-val nameDeref       = unsafe-total{qualify-locally("ref".new-module-name, "!".core-types-name)}
+val nameDeref       = try({qualify-locally("ref".new-module-name, "!".core-types-name)}).default("error".new-name)
 val nameByref       = "@byref".core-types-name
 
 val namePredHeapDiv = "hdiv".core-types-name

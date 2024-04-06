@@ -1,13 +1,20 @@
+//----------------------------------------------------------------------------
+// Copyright 2024, Microsoft Research, Daan Leijen. Tim Whiting.
+//
+// This is free software; you can redistribute it and/or modify it under the
+// terms of the Apache License, Version 2.0. A copy of the License can be
+// found in the LICENSE file at the root of this distribution.
+//----------------------------------------------------------------------------
 import compiler/common/id
 import compiler/type/type
 import compiler/lib/pprint
-import newstd/data/linearmap
 import compiler/kind/kind
+import compiler/common/syntax
+import newstd/data/linearmap
+import newstd/test
 
 // Map identifiers to /nice/ strings.
 alias nice = id-map<string>
-
-val nice/empty = []
 
 effect niceEff<k>
   fun extend-nice(tv: k): ()
@@ -15,7 +22,7 @@ effect niceEff<k>
   fun get-nice-doc(tv: k): doc 
 
 fun niceEnv(f)
-  var nice := nice/empty
+  var nice := []
   var effectIndex := -1
   var heapIndex := -1
   var typeIndex := -1
@@ -26,13 +33,13 @@ fun niceEnv(f)
       val x = 
         if tv.kind == kindEffect then
           effectIndex := effectIndex + 1
-          "e" ++ (if effectIndex == 0 then "" else effectIndex.id/show)
+          "e" ++ (if effectIndex == 0 then "" else effectIndex.show-id)
         elif tv.kind == kindHeap then
           heapIndex := heapIndex + 1
-          "h" ++ (if heapIndex == 0 then "" else heapIndex.id/show)
+          "h" ++ (if heapIndex == 0 then "" else heapIndex.show-id)
         elif tv.kind == kindScope then
           scopeIndex := scopeIndex + 1
-          "s" ++ (if scopeIndex == 0 then "" else scopeIndex.id/show)
+          "s" ++ (if scopeIndex == 0 then "" else scopeIndex.show-id)
         else
           match typeLetterIndex
             4 -> 
@@ -40,7 +47,7 @@ fun niceEnv(f)
               typeLetterIndex := 0
             _ ->
               typeLetterIndex := typeLetterIndex + 1
-          (typeLetterIndex + 'a'.int).char.string ++ (if typeIndex == 0 then "" else typeIndex.id/show)
+          (typeLetterIndex + 'a'.int).char.string ++ (if typeIndex == 0 then "" else typeIndex.show-id)
       nice := nice.extend(tv.tid, x)
       ()
     fun get-nice(tv: typeVar)
@@ -57,13 +64,14 @@ fun extend(n: nice, id: int, name: string): nice
 fun nice/show(n: nice, id: id): string
   match n.maybe-get(id)
     Just(name) -> name
-    Nothing -> id.id/show
+    Nothing -> id.show-id
 
 // Pretty print an identifier nicely.
 fun nice/pretty(n: nice, id: id): doc
   n.nice/show(id).text
 
 /// Tests for identifiers
-// fun main()
-//   (idNil().newId.newIdFromId.idNumber == 1).show.println
-//   (genId("test", 1).showId == "\"1\"").show.println
+fun test-ids()
+  test("ids")
+    expect({id-nil.new-id.new-id-from}, 1, "new-id")
+    expect({gen-id("test", 1).show-id}, "\"1\"", "show-id")

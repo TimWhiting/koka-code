@@ -1,22 +1,33 @@
+//---------------------------------------------------------------------------
+// Copyright 2024, Microsoft Research, Daan Leijen. Tim Whiting.
+//
+// This is free software; you can redistribute it and/or modify it under the
+// terms of the Apache License, Version 2.0. A copy of the License can be
+// found in the LICENSE file at the root of this distribution.
+//---------------------------------------------------------------------------
+
 pub import compiler/platform/config
 import newstd/core
 
-pub alias compilerEff = <comp-flags, exn>
-
-fun raise(s: string): exn a
-  // if comp-flags.buildVariant == "debug" then 
-  //   throw(s) // Figure out stack traces
-  // else 
-  throw(s)
+//------------------------------------------
+// Internal errors and assertions
+//------------------------------------------
 
 fun fail(s: string): exn a
-  raise("*** internal compiler error " ++ s)
+  raise(s)
 
-fun assert(s: string, b: bool, a: a): exn a
-  if b then a else fail(s)
+fun assert(msg: string, test: bool, x: a): exn a
+  if test then x else fail(msg)
 
-fun todo(s: string): exn a
-  fail("todo: " ++ s)
+fun todo(msg: string): exn a
+  fail("todo: " ++ msg)
+
+fun match-failure(msg: string, ?kk-file-line: string): exn a
+  fail("unmatched pattern: " ++ msg ++ " at " ++ kk-file-line)
+
+fun raise(s: string): exn a
+  // Figure out stack traces
+  throw(s)
 
 fun catch(hndl: string -> e a, f: () -> <exn|e> a): e a
   fun adjust(s: string): string

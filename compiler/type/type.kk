@@ -22,7 +22,7 @@ fun ktype/show(tp: ktype): div string
     TForAll(vars, preds, t) -> "forall " ++ vars.show-list(show) ++ " . " ++ preds.show-list(show) ++ " => " ++ t.show
     TFun(args, eff, t) -> "(" ++ args.show-list(fn((name, tp1)) name.name/name/show ++ tp1.pretend-decreasing.show) ++ " -> " ++ eff.show ++ " " ++ t.show ++ ")"
     TCon(c) -> c.name.name/name/show
-    TVar(v) -> v.tid.id/show
+    TVar(v) -> v.tid.show-id
     TApp(t, args) -> t.show ++ " " ++ args.show
     TSyn(syn, args, t) -> syn.name.name/name/show ++ " " ++ args.show ++ " " ++ t.show
   
@@ -53,7 +53,7 @@ pub value struct typeVar
   flavour: flavour;
 
 fun show(t: typeVar): string
-  t.tid.id/show ++ "::" ++ t.kind.show
+  t.tid.show-id ++ "::" ++ t.kind.show
 
 fun tv/(==)(t1: typeVar, t2: typeVar): bool
   t1.tid == t2.tid
@@ -189,7 +189,7 @@ fun is-meta(t: typeVar): bool
 fun is-skolem(t: typeVar): bool
   t.flavour == Skolem
 
-fun pred-type(p: pred): compilerEff ktype
+fun pred-type(p: pred): exn ktype
   match p
     PredSub(t1, t2) -> TFun([("sub".new-name, t1)], typeTotal, t2)
     PredIFace(_, _) -> todo("type.kk: predType")
@@ -360,7 +360,8 @@ fun label-name(tp: tau): exn name
 
 fun label-name-full(tp: tau): pure name
   val (name, i, _) = tp.label-name-ex
-  postpend("$" ++ i.id/show, name)
+  val ids = i.show-id
+  postpend(name, "$" ++ ids)
 
 fun label-name-ex(tp: tau): exn (name, int, list<tau>)
   match tp.expandSyn
@@ -372,7 +373,6 @@ fun label-name-ex(tp: tau): exn (name, int, list<tau>)
 
 val typePartial = TApp(tconHandled, [TCon(TypeCon(nameTpPartial, kindHandled))])
 val typeLocal = TCon(TypeCon(nameTpLocal, kindLocal))
-val typeCps = TApp(tconHandled, [TCon(TypeCon(nameTpCps, kindHandled))])
 val tconHandled = TCon(TypeCon(nameTpHandled, kind-fun(kindHandled, kindLabel)))
 val tconHandled1 = TCon(TypeCon(nameTpHandled1, kind-fun(kindHandled1, kindLabel)))
 
@@ -503,8 +503,6 @@ val tconFieldAddr = TypeCon(nameTpFieldAddr, kind-fun(kindStar, kindStar))
 val typeVector = TCon(TypeCon(nameTpVector, kind-fun(kindStar, kindStar)))
 val typeList = TCon(tconList)
 val tconList = TypeCon(nameTpList, kind-fun(kindStar, kindStar))
-fun typeNull(tp: tau): tau
-  typeApp(TCon(TypeCon(nameTpNull, kindStar)), [tp])
 
 val typeEv = TCon(tconEv)
 val tconEv = TypeCon(nameTpEv, kind-fun(kindStar, kindStar))

@@ -1,9 +1,19 @@
-import compiler/lib/pprint
+//----------------------------------------------------------------------------
+// Copyright 2024, Microsoft Research, Daan Leijen. Tim Whiting.
+//
+// This is free software; you can redistribute it and/or modify it under the
+// terms of the Apache License, Version 2.0. A copy of the License can be
+// found in the LICENSE file at the root of this distribution.
+//----------------------------------------------------------------------------
+
 import compiler/common/color-scheme
 import compiler/common/range
 import compiler/common/failure
+import compiler/lib/printer
+import compiler/lib/pprint
 import std/core/undiv
 import newstd/core
+
 
 // | Names defined by the user.
 // Uses a hash to speed up comparisions. The hash is constructed
@@ -200,8 +210,10 @@ fun new-locally-qualified(m: string, l: string, n: string): name
 // The hash is done taking the first 4 characters. This is of course a
 // terrible hash but we use it mostly to speed up *comparisions* for the nameMap
 fun hash(s: string)
-  val sn = (s ++ "____").list.take(4).string.to-lower.list.map(fn (c) { c.int })
-  sn.foldl(0, fn(c, h) { h * 256 + c})
+  if s.is-empty then 0
+  else
+    val sn = (s ++ "____").list.take(4).string.to-lower.list.map(fn (c) { c.int })
+    sn.foldl(0, fn(c, h) { h * 256 + c})
 
 fun name-map-stem(Name(m, hm, l, hl, n, _): name, f: (string) -> e string): e name
   val n' = f(n)
@@ -287,7 +299,7 @@ fun qualify(a: name, b: name): name
     (Name(m, hm, _, 0, _, 0), Name(_, 0, l, hl, n, hn)) -> Name(m, hm, l, hl, n, hn)
     (Name(m1, _, _, 0, _, 0), name as Name(m2)) | m1 == m2 -> name
     _ ->
-      trace("Cannot use qualify on qualified names " ++ a.show ++ ", " ++ b.show)
+      trace("Cannot use qualify on qualified names " ++ a.show-fully-explicit ++ ", " ++ b.show-fully-explicit)
       new-name("")
 
 fun unqualify(Name(_, _,l, hl, n, hn)): name

@@ -225,25 +225,25 @@ fun read-qualified-name(s0: string): <div,exn> name
     fun split-qual-id-rev(rs: list<char>): (string, string)
       val (rid, rqual) = rs.span(fn(c) c != '/')
       match rqual
-        Cons('/', rs1) -> (rs1.reverse.string, rid.reverse.string) // qualifier
-        _ -> ("", rid.reverse.string)
+        Cons('/', rs1) -> (rid.string, rs1.string) // qualifier
+        _ -> ("", rid.string)
     fun split-id-name-rev(rs: list<char>): <exn> (string, string, string)
       val (rid, rest) = rs.span(fn(c) c != '#')
       match rest
         Cons('#', Cons('/', rs2)) -> // local qualifier
           val (lqual,id) = rid.split-qual-id-rev
-          (rs2.reverse.string, lqual, id)
+          (rs2.string, lqual, id)
         Nil ->
           val (qual, id) = rid.split-qual-id-rev
           (qual, "", id)
-        _ -> fail("Name split-id-name-rev: illegal locally qualified name: " ++ rs.reverse.string)
+        _ -> fail("Name split-id-name-rev: illegal locally qualified name: " ++ rs.string)
     fun split-name(s: string): <exn> (string, string, string)
       if s.ends-with(")").bool then // operator
         val (rop, rest) = s.list.reverse.span(fn(c) c != '(')
         match rest
           Cons('(', rs2) ->
             val (qual, lqual, id) = rs2.split-id-name-rev
-            (qual, lqual, id ++ rop.reverse.string)
+            (qual, lqual, id ++ rop.string)
           _ -> fail("Name split-name: unmatched parenthesis in name: " ++ s)
       else s.list.split-id-name-rev
     val (q, lq, id) = s0.split-name

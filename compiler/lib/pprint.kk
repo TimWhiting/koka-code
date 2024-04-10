@@ -504,7 +504,10 @@ val defaultWidth = 160
 
 fun test-pretty()
   test("Basic Pretty Combinators")
-    expect({("test".text |+| "hello".text).show}, "test hello")
-    expect({["test".text, "hello".text].vcat.show}, r#"test
-hello"#)
-    expect({["test".text, "hello".text].hcat.show}, "testhello")
+    expect("test hello") fn()
+      ("test".text |+| "hello".text).show
+    expect(r#"test
+hello"#) fn()
+      ["test".text, "hello".text].vcat.show
+    expect("testhello") fn()
+      ["test".text, "hello".text].hcat.show

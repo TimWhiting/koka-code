@@ -90,11 +90,11 @@ fun error-message(rng: range, d: doc): error-msg
 // pretty
 //---------------------------------
 fun err/pretty(msg: error-msg): doc
-  with @default-colorSchemeEff
+  with color-scheme-default
   msg.pp-error-message("".path, False)
 
 fun errs/pretty(msgs: errors): doc
-  with @default-colorSchemeEff
+  with color-scheme-default
   msgs.pp-errors("".path, False)
 
 fun pp-error-severity(sev: error-severity, ekind: error-kind): colorSchemeEffect doc

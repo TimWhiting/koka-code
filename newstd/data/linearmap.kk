@@ -5,7 +5,7 @@ pub fun show(l: linearMap<k,v>, ?key/show: (k) -> e string, ?value/show: (v) -> 
 
 pub fun (==)(l1: linearMap<k,v>, l2: linearMap<k,v>, ?key/(==): (k, k) -> e bool, ?value/(==): (v, v) -> e bool): e bool
   l1.length == l2.length && l1.all fn(x) 
-    match l2.maybe-get(x.fst)
+    match l2.lookup(x.fst)
       Just(v') -> v' == x.snd
       Nothing -> False
 
@@ -22,7 +22,7 @@ fun get(l: list<(k,v)>, k: k, ?(==): (k, k) -> e bool): <exn|e> v
     Cons((kk, vv), rst) -> if mask<exn>{kk == k} then vv else rst.get(k)
     Nil -> throw("not found")
 
-pub fun maybe-get(m: linearMap<k,v>, k: k, ?(==): (k, k) -> e bool): e maybe<v>
+pub fun map/lookup(m: linearMap<k,v>, k: k, ?(==): (k, k) -> e bool): e maybe<v>
   catch({Just(m.get(k))}, fn(x) {Nothing})
 
 fun get-default(l: list<(k,v)>, k: k, v: v, ?(==): (k, k) -> e bool): e v

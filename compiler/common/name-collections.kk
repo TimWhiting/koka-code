@@ -45,10 +45,6 @@ fun lookup/show(a: lookup<a>, ?show: (a) -> e string): e string
 fun qname-map/single(n: name, a: a): qname-map<a>
   [(n.unqualify, [(n, a)])]
 
-fun qname-map/insert(m: qname-map<a>, n: name, a: a): <comp-flags,exn> qname-map<a>
-  m.update(n.unqualify, Cons((n, a), Nil)) fn(xs, ys)
-    safe-combine("insert", xs, ys)
-
 fun qname-map/from-list(l: list<(name,a)>): <comp-flags,pure> qname-map<a>
   l.foldl([]) fn(qm, (name, x))
     qm.insert(name, x)
@@ -74,6 +70,21 @@ fun qname-map/lookup(m: qname-map<a>, c: name, name: name): lookup<a>
 fun qname-map/filter-names(m: qname-map<a>, p: (name) -> e bool): e qname-map<a>
   m.map fn(k, xs) 
     (k, xs.filter(fn((n, _)) p(n)))
+
+fun qname-map/insert(m: qname-map<a>, n: name, a: a): <comp-flags,exn> qname-map<a>
+  m.update(n.unqualify, Cons((n, a), Nil)) fn(xs, ys)
+    safe-combine("insert", xs, ys)
+
+fun qname-map/union(m1: qname-map<a>, m2: qname-map<a>): <comp-flags,exn> qname-map<a>
+  m1.union-with(m2) fn(xs, ys)
+    safe-combine("union", xs, ys)
+
+fun qname-map/union-left-bias(m1: qname-map<a>, m2: qname-map<a>): <comp-flags,exn> qname-map<a>
+  m1.union-with(m2, (++))
+
+fun qname-map/unions(ms: list<qname-map<a>>): <comp-flags,exn> qname-map<a>
+  ms.foldl([]) fn(m1, m2)
+    m1.union(m2)
 
 fun qname-map/safe-combine(s: string, xs: list<(name,a)>, ys: list<(name,a)>): <comp-flags,exn> list<(name,a)>
   if xs.any(fn(x) ys.any(fn(y) y.fst == x.fst)) then

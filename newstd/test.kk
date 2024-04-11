@@ -52,4 +52,5 @@ fun test-tests()
   test("Wrong expect")
     expect(1) fn() 2
   test("Additional info")
-    expect(1, {throw("Some error somewhere")}, details="Really expected 1 because I proved it!") 
+    expect(1, details="Really expected 1 because I proved it!") fn()
+      throw("Some error somewhere")

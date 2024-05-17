@@ -1,13 +1,15 @@
 import papers/syntax/common
 import papers/machines/common
+import std/core-extras
 
 type state
-  Eval(expr: expr, rho: env, store: store, kont: kont)
-  Continue(kond: kont, value: evalue, store: store)
+  Eval(expr: expr, rho: env, store: store, k: kont)
+  Continue(k: kont, value: evalue, store: store)
   Ans(value: evalue)
 
-alias env = linear-map<identifier,addr>
-alias store = linear-map<addr, linearSet<storeable>>
+alias env = linearMap<identifier,addr>
+struct storeables { vs: linearSet<storeable> }
+alias store = linearMap<addr, storeables>
 alias storeable = either<kont, evalue>
 
 fun expr/(==)(e1: expr, e2: expr): div bool
@@ -25,10 +27,10 @@ fun evalue/(==)(v1: evalue, v2: evalue): div bool
   match (v1, v2)
     (Clos(l1, env1), Clos(l2, env2)) -> l1 == l2 && env1 == env2
 
-fun kont/(==)(k1: kont, k2: kont): div bool
-  match (k1, k2)
-    (Epsilon, Epsilon) -> True
-    (Frame(f1, a1), Frame(f2, a2)) -> f1 == f2 && a1 == a2
+fun storeable/(==)(s1: storeable, s2: storeable): div bool
+  match (s1, s2)
+    (Left(k1), Left(k2)) -> listdiv/(==)(k1, k2)
+    (Right(v1), Right(v2)) -> v1 == v2
     (_, _) -> False
 
 fun frame/(==)(f1: frame, f2: frame): div bool
@@ -37,15 +39,17 @@ fun frame/(==)(f1: frame, f2: frame): div bool
     (AppR(v1), AppR(v2)) -> v1 == v2
     (_, _) -> False
 
-fun storeable/(==)(s1: storeable, s2: storeable): div bool
+fun storeables/(==)(s1: storeables, s2: storeables): div bool
+  linearset/(==)(s1.vs, s2.vs)
+
+fun state/(==)(s1: state, s2: state): div bool
   match (s1, s2)
-    (Left(k1), Left(k2)) -> k1 == k2
-    (Right(v1), Right(v2)) -> v1 == v2
+    (Eval(e1, rho1, st1, k1), Eval(e2, rho2, st2, k2)) -> e1 == e2 && rho1 == rho2 && st1 == st2 && listdiv/(==)(k1, k2)
+    (Continue(k1, v1, st1), Continue(k2, v2, st2)) -> listdiv/(==)(k1, k2) && v1 == v2 && st1 == st2
+    (Ans(v1), Ans(v2)) -> v1 == v2
     (_, _) -> False
 
-rec type kont
-  Epsilon
-  Frame(f: frame, addr: addr)
+alias kont = list<frame>
 
 rec type frame
   AppL(e: expr, env: env)
@@ -72,63 +76,104 @@ fun lambda/show(l: lambda): div string
   match l
     Lam(x, e) -> x ++ "." ++ e.show
 
-tail fun state/eval(s: state): <pure,abstraction,salloc<state>,tick<state>> state
-  val u = tick(s)
-  match s
-    State(Var(x), env, st, k, _) ->
-      val Right(Clos(l, env')) = each(st.lookup(env.lookup(x).unjust).unjust)
-      State(Lambda(l), env', st, k, u).eval()
-    State(App(e0, e1), env, st, k, _) ->
-      val a = salloc(s)
-      State(e0, env, st.set/join(a, Left(k)), Frame(AppL(e1, env), a), u).eval()
-    State(Lambda(l), p, st, Frame(AppL(e, p'), b), _) ->
-      State(e, p', st, Frame(AppR(Clos(l, p)), b), u).eval()
-    State(Lambda(l), po, st, Frame(AppR(Clos(Lam(x, e), p)), b), _) ->
-      val a = salloc(s)
-      val Left(k) = each(st.lookup(b).unjust)
-      State(e, p.set(x, a), st.set/join(a, Right(Clos(l, po))), k, u).eval()
-    _ -> s
+fun storeable/show(s: storeable): div string
+  s.show
 
-tail fun state/continue(s: state): <pure,abstraction,salloc<state>,tick<state>> state
-  val u = tick(s)
+fun storeables/show(s: storeables): div string
+  s.vs.list/show
+
+fun evalue/show(v: evalue): div string
+  match v
+    Clos(l, env) -> l.show ++ " " ++ env.show
+
+fun frame/show(f: frame): div string
+  match f
+    AppL(e, env) -> "AppL(" ++ e.show ++ ", " ++ env.show ++ ")"
+    AppR(v) -> "AppR(" ++ v.show ++ ")"
+
+fun state/show(s: state): div string
   match s
-    State(Var(x), env, st, k, _) ->
-      val Right(Clos(l, env')) = each(st.lookup(env.lookup(x).unjust).unjust)
-      State(Lambda(l), env', st, k, u).eval()
-    State(App(e0, e1), env, st, k, _) ->
+    Eval(e, rho, st, k) -> "Eval(" ++ e.show ++ ", " ++ rho.show ++ ", " ++ st.show ++ ", " ++ k.list/show ++ ")"
+    Continue(k, v, st) -> "Continue(" ++ k.list/show ++ ", " ++ v.show ++ ", " ++ st.show ++ ")"
+    Ans(v) -> "Ans(" ++ v.show ++ ")"
+
+fun join(s: storeables, st: storeable) 
+  Storeables(s.vs + st)
+
+fun empty(): storeables
+  Storeables([])
+
+tail fun state/eval(s: state): <pure,abstraction,cache,salloc<state>> state
+  with memo(s)
+  match s
+    Eval(Var(x), env, st, k) ->
+      val Right(v) = each(st.lookup(env.lookup(x).unjust).unjust.vs)
+      Continue(k, v, st).eval()
+    Eval(App(e0, e1), env, st, k) ->
       val a = salloc(s)
-      State(e0, env, st.set/join(a, Left(k)), Frame(AppL(e1, env), a), u).eval()
-    State(Lambda(l), p, st, Frame(AppL(e, p'), b), _) ->
-      State(e, p', st, Frame(AppR(Clos(l, p)), b), u).eval()
-    State(Lambda(l), po, st, Frame(AppR(Clos(Lam(x, e), p)), b), _) ->
+      Eval(e0, env ~! e0.fv, st, Cons(AppL(e1, env ~! e1.fv), k)).eval()
+    Eval(Lambda(l), p, st, k) ->
+      Continue(k, Clos(l, p ~! l.e.fv), st).eval()
+    Continue(Nil, v, _) -> Ans(v)
+    Continue(Cons(AppL(e, p'), rst), v, st) -> 
+      Eval(e, p', st, Cons(AppR(v), rst)).eval()
+    Continue(Cons(AppR(Clos(Lam(x, e), p)), rst), v, st) ->
       val a = salloc(s)
-      val Left(k) = each(st.lookup(b).unjust)
-      State(e, p.set(x, a), st.set/join(a, Right(Clos(l, po))), k, u).eval()
-    _ -> s
+      Eval(e, (p + (x, a)) ~! e.fv, st.join(a, Right(v)), rst).eval()
+    _ -> 
+      s.show.trace
+      s
+
+fun memo(s: state, s': () -> <cache,abstraction|e> state): <cache,abstraction|e> state
+  val res = get-cache(s)
+  match res
+    Nothing ->
+      val r = s'()
+      add-cache(s, r)
+      r
+    Just(rs) -> each(rs)
+
+effect cache
+  fun get-cache(s: state): maybe<linearSet<state>>
+  fun add-cache(s: state, s': state): ()
 
 fun expr/eval(e: expr): <pure,console> ()
   var x := 0
-  var t := 0
+  var cache: linearMap<state, linearSet<state>> := []
+  var cacheids: linearMap<state, int> := []
   with handler
-    fun tick(s)
-      t := t + 1
-      t
+    fun get-cache(s: state)
+      cache.lookup(s)
+    fun add-cache(s: state, s': state)
+      val ss = cache.lookup(s).default([])
+      cache := cache.set(s, member/(+)(ss, s'))
   with handler
     fun salloc(z)
-      x := x + 1
-      x
-  val res = 
+      match cacheids.map/lookup(z)
+        Nothing ->
+          cacheids := cacheids.linearmap/set(z,x)
+          x := x + 1
+          x
+        Just(y) -> y
+  val res =
     with handler
       ctl each(xs)
         xs.map(resume).concat()
       return (res) 
         [res]
-    State(e, [], [], Epsilon, 0).eval()
-  res.map(fn(s) s.expr.show).join("\n").println
+    Eval(e, [], [], []).eval()
+  res.map(fn(Ans(Clos(e1, _))) e1.show).join("\n").println
 
 fun tests(): <pure, console> ()
   App(Lambda(Lam("x", App(Var("x"), Var("x")))), Lambda(Lam("y", App(Var("y"), Var("y"))))).eval
 
 
+fun lam/fv(l: lambda): div linearSet<identifier>
+  match l
+    Lam(x, e) -> fv(e) - x
 
-
+fun expr/fv(e: expr): div linearSet<identifier>
+  match e
+    Var(x) -> [x]
+    App(e1, e2) -> e1.fv.union(e2.fv)
+    Lambda(l) -> fv(l)

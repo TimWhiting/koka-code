@@ -33,6 +33,13 @@ fun join/join(l: linearMap<a,b>, a: a, b: b, ?a/(==): (a,a) -> e bool, ?join: (b
     Nil -> Cons((a,b), Nil)
     Cons((a',bold), l') -> 
       if a == a' then Cons((a', b.join(bold)), l')
+      else Cons((a',bold), join/join(l', a, b))
+
+fun joinc/join(l: linearMap<a,b>, a: a, b: c, ?a/(==): (a,a) -> e bool, ?join: (b, c) -> e b, ?empty: () -> b): e list<(a,b)>
+  match l
+    Nil -> Cons((a,empty().join(b)), Nil)
+    Cons((a',bold), l') -> 
+      if a == a' then Cons((a', bold.join(b)), l')
       else Cons((a',bold), join(l', a, b))
 
 fun joinlist/join(l: linearMap<a,b>, l2: linearMap<a,b>, ?a/(==): (a,a) -> e bool, ?join: (b, b) -> b): e list<(a,b)>

@@ -110,7 +110,6 @@ tail fun state/eval(s: state): <pure,abstraction,cache,salloc<state>> state
       val Right(v) = each(st.lookup(env.lookup(x).unjust).unjust.vs)
       Continue(k, v, st).eval()
     Eval(App(e0, e1), env, st, k) ->
-      val a = salloc(s)
       Eval(e0, env ~! e0.fv, st, Cons(AppL(e1, env ~! e1.fv), k)).eval()
     Eval(Lambda(l), p, st, k) ->
       Continue(k, Clos(l, p ~! l.e.fv), st).eval()

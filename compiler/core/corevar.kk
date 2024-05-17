@@ -1,5 +1,5 @@
 import compiler/core/core
-import newstd/data/linearset
+import std/data/linearset
 import compiler/common/name
 import compiler/type/typevar
 

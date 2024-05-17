@@ -1,4 +1,4 @@
-import newstd/data/linearmap
+import std/data/linearmap
 
 fun main()
   val h = linearMap([(1, "a"), (2, "b")], (==), (==), show, show)

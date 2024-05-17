@@ -1,6 +1,6 @@
 import std/os/path
 import std/os/file
-import newstd/data/linearmap
+import std/data/linearmap
 import compiler/common/parse
 import compiler/common/id
 import compiler/syntax/lexeme

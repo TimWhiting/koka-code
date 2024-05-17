@@ -20,7 +20,7 @@ import compiler/backend/c/dup-drops
 import compiler/backend/c/constructors
 import compiler/backend/c/expr
 import std/os/path
-import newstd/data/linearset
+import std/data/linearset
 
 val externalNames = [(exprTrue.conName, "true"), (exprFalse.conName, "false")]
 

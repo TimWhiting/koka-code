@@ -1,6 +1,6 @@
 import sexpr
 import syntax
-import newstd/data/linearset
+import std/data/linearset
 import std/os/path
 import std/os/file
 import std/os/dir

@@ -12,7 +12,7 @@ import compiler/backend/c/dup-drops
 import compiler/common/failure
 import compiler/platform/config
 import compiler/common/syntax
-import newstd/data/linearset
+import std/data/linearset
 import compiler/common/color-scheme
 import compiler/common/nice
 

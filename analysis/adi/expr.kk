@@ -1,4 +1,5 @@
 import utils
+import std/core-extras
 
 type expr
   Num(i: int)
@@ -10,19 +11,6 @@ type expr
   App(e0: expr, e1: expr)
   Let(v: string, e0: expr, e1s: list<expr>)
 
-fun (==)(e1: expr, e2: expr): div bool
-  with traceEq(e1, e2, show)
-  match (e1, e2)
-    (Num(i1), Num(i2)) -> i1 == i2
-    (If0(e1, e2, e3), If0(e4, e5, e6)) -> e1 == e4 && e2 == e5 && e3 == e6
-    (Op2(op1, e1, e2), Op2(op2, e3, e4)) -> op1 == op2 && e1 == e3 && e2 == e4
-    (Id(x1), Id(x2)) -> x1 == x2
-    (Rec(x1, e1), Rec(x2, e2)) -> x1 == x2 && e1 == e2
-    (Lam(x1, e1), Lam(x2, e2)) -> x1 == x2 && e1 == e2
-    (App(e1, e2), App(e3, e4)) -> e1 == e3 && e2 == e4
-    (Let(x1, e1, e2), Let(x2, e3, e4)) -> x1 == x2 && e1 == e3 && (==)(e2, e4, (==), show)
-    _ -> False
-
 fun show(e: expr): div string
   match e
     Num(n) -> n.show
@@ -33,6 +21,19 @@ fun show(e: expr): div string
     Lam(v, e0) -> "fun " ++ v ++ " -> " ++ show(e0)
     App(e0, e1) -> "(" ++ show(e0) ++ " " ++ show(e1) ++ ")"  
     Let(v, e0, e1) -> "let " ++ v ++ " = " ++ show(e0) ++ " in " ++ show-list(e1, show)
+
+fun (==)(e1: expr, e2: expr): div bool
+  with traceEq(e1, e2) 
+  match (e1, e2)
+    (Num(i1), Num(i2)) -> i1 == i2
+    (If0(e1, e2, e3), If0(e4, e5, e6)) -> e1 == e4 && e2 == e5 && e3 == e6
+    (Op2(op1, e1, e2), Op2(op2, e3, e4)) -> op1 == op2 && e1 == e3 && e2 == e4
+    (Id(x1), Id(x2)) -> x1 == x2
+    (Rec(x1, e1), Rec(x2, e2)) -> x1 == x2 && e1 == e2
+    (Lam(x1, e1), Lam(x2, e2)) -> x1 == x2 && e1 == e2
+    (App(e1, e2), App(e3, e4)) -> e1 == e3 && e2 == e4
+    (Let(x1, e1, e2), Let(x2, e3, e4)) -> x1 == x2 && e1 == e3 && eql/(==)(e2, e4)
+    _ -> False
 
 fun subexprs(e: expr): div list<expr>
   match e

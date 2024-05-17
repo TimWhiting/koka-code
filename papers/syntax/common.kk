@@ -1,35 +1,44 @@
-pub import newstd/data/linearmap
-pub import newstd/data/linearset
+pub import std/data/linearmap
+pub import std/data/linearset
+import std/core/undiv
 
 alias identifier = string
 alias variable = identifier
 
-fun listdiv/(==)(l: list<a>, l2: list<a>, ?a/(==): (a,a) -> div bool): div bool
+fun listdiv/(==)(l: list<a>, l2: list<a>, ?a/(==): (a,a) -> e bool): e bool
   match (l, l2)
     (Nil, Nil) -> True
     (Cons(a, l'), Cons(a', l2')) ->
-      if a == a' then listdiv/(==)(l', l2')
+      if a == a' then listdiv/(==)(l'.pretend-decreasing, l2'.pretend-decreasing)
       else False
     _ -> False
 
-fun set/join(l: linearMap<a,linearSet<b>>, a: a, b: b, ?a/(==): (a,a) -> pure bool, ?b/(==): (b,b) -> pure bool): pure list<(a,list<b>)>
+fun listdiv/show(l: list<a>, ?a/show: a -> e string): e string
+  match l
+    Nil -> "[]"
+    Cons(a, l') -> a.show ++ ", " ++ l'.listdiv/show
+
+fun set/join(l: linearMap<a,linearSet<b>>, a: a, b: b, ?a/(==): (a,a) -> e bool, ?b/(==): (b,b) -> e bool): e list<(a,list<b>)>
   match l
     Nil -> Cons((a,[b]), Nil)
     Cons((a',bs), l') -> 
       if a == a' then Cons((a', bs.add(b)), l')
       else Cons((a',bs), join(l', a, b))
 
-fun listset/join(l: linearMap<a,linearSet<b>>, l2: linearMap<a,b>, ?a/(==): (a,a) -> pure bool, ?b/(==): (b,b) -> pure bool): pure list<(a,list<b>)>
+fun listset/join(l: linearMap<a,linearSet<b>>, l2: linearMap<a,b>, ?a/(==): (a,a) -> e bool, ?b/(==): (b,b) -> e bool): e list<(a,list<b>)>
   l2.foldl(l, fn(l', (a,b)) join(l', a, b))
 
-fun join/join(l: linearMap<a,b>, a: a, b: b, ?a/(==): (a,a) -> pure bool, ?join: (b, b) -> b): pure list<(a,b)>
+fun join/join(l: linearMap<a,b>, a: a, b: b, ?a/(==): (a,a) -> e bool, ?join: (b, b) -> e b): e list<(a,b)>
   match l
     Nil -> Cons((a,b), Nil)
     Cons((a',bold), l') -> 
       if a == a' then Cons((a', b.join(bold)), l')
       else Cons((a',bold), join(l', a, b))
 
-fun joinlist/join(l: linearMap<a,b>, l2: linearMap<a,b>, ?a/(==): (a,a) -> pure bool, ?join: (b, b) -> b): pure list<(a,b)>
+fun joinlist/join(l: linearMap<a,b>, l2: linearMap<a,b>, ?a/(==): (a,a) -> e bool, ?join: (b, b) -> b): e list<(a,b)>
   l2.foldl(l, fn(l', (a,b)) join(l', a, b))
 
 
+// Restricts the domain of a linear map to a linear set
+fun env/(~!)(e1: linearMap<a,s>, e: linearSet<a>, ?(==): (a,a) -> e bool): e linearMap<a,s>
+  e1.filter(fn((a,_)) e.member(a))

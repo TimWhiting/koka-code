@@ -3,8 +3,8 @@ import compiler/common/name-collections
 import compiler/core/core
 import compiler/core/corevar
 import compiler/type/type
-import newstd/data/linearset
-import newstd/data/linearmap
+import std/data/linearset
+import std/data/linearmap
 
 alias locals = nameSet;
 alias renaming = name-map<name>

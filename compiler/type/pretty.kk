@@ -6,8 +6,8 @@ import compiler/type/type
 import compiler/type/typevar
 import compiler/common/name
 import compiler/common/name-prim
-import newstd/data/linearmap
-import newstd/data/linearset
+import std/data/linearmap
+import std/data/linearset
 import compiler/kind/importmap
 import compiler/platform/config
 import compiler/common/nice

@@ -1,4 +1,4 @@
-import newstd/data/linearset
+import std/data/linearset
 
 fun main()
   val h = linearSet([(1, "a"), (2, "b")], fn(a,b) a.fst == b.fst && a.snd == b.snd, fn(a) a.show-tuple(show, show))

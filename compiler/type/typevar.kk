@@ -1,6 +1,6 @@
 import compiler/type/type
-import newstd/data/linearset
-import newstd/data/linearmap
+import std/data/linearset
+import std/data/linearmap
 import compiler/core/core
 import compiler/type/kind
 import compiler/kind/kind

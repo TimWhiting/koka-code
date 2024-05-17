@@ -2,7 +2,7 @@ import compiler/core/core
 import compiler/common/name
 import compiler/common/name-prim
 import compiler/common/name-collections
-import newstd/data/linearmap
+import std/data/linearmap
 
 alias inlines = name-map<inlineDef>
 

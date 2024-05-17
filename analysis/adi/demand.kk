@@ -1,4 +1,5 @@
 import expr
+import std/core/undiv
 
 type contextexpr 
   AppFCtx(fct: expr, parent: contextexpr)
@@ -20,4 +21,4 @@ fun bind(v: string, c: contextexpr): contextexpr
     LamCtx(_, vbl) | vbl == v -> c.parent
     RecBCtx(_, vbl) | vbl == v -> c.parent
     LetBCtx(_, vbl, _, _) | vbl == v -> c.parent
-    _ -> bind(v, c.parent.unsafe-decreasing)
+    _ -> bind(v, c.parent.pretend-decreasing)

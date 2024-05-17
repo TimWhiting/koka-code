@@ -10,7 +10,7 @@ import compiler/type/type
 import compiler/lib/pprint
 import compiler/kind/kind
 import compiler/common/syntax
-import newstd/data/linearmap
+import std/data/linearmap
 import newstd/test
 
 // Map identifiers to /nice/ strings.

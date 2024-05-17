@@ -9,7 +9,7 @@ import compiler/kind/kind
 import compiler/type/typevar
 import compiler/type/pretty
 import newstd/data/sort
-import newstd/data/linearset
+import std/data/linearset
 
 pub infixr 5 (|->)
 

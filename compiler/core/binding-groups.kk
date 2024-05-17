@@ -4,8 +4,8 @@ import compiler/core/corevar
 import compiler/common/name
 import compiler/common/failure
 import compiler/platform/config
-import newstd/data/linearmap
-import newstd/data/linearset
+import std/data/linearmap
+import std/data/linearset
 
 // Re-analyze a recursive binding group just after type checking.
 // Due to overloading, functions that seem mutually recursive may not

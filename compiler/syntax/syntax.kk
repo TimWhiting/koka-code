@@ -6,7 +6,7 @@ import compiler/common/name-collections
 import compiler/common/syntax
 import compiler/common/failure
 import compiler/platform/config
-import newstd/data/linearset
+import std/data/linearset
 import newstd/core
 import std/core/undiv
 

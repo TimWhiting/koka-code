@@ -12,7 +12,7 @@ import compiler/type/type
 import compiler/type/typevar
 import compiler/type/pretty
 import compiler/type/assumption
-import newstd/data/linearmap
+import std/data/linearmap
 
 pub infixr 5 (|->)
 // inf gamma

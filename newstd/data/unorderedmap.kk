@@ -1,6 +1,10 @@
 // Adapted from https://github.com/haskell-unordered-containers/unordered-containers/blob/master/Data/HashMap/Internal.hs
 import std/num/int32
-import newstd/data/vector
+import std/data/vector-list
+import std/core-extras
+import std/core/undiv
+import std/core/unsafe
+import vector
 
 value type leaf<k,v>
   L(key: k, value: v)
@@ -42,12 +46,12 @@ pub fun internal/size(h: hashMapI<k,v>): int
     BitmapIndexed(_, vals) -> 
       var res := 0
       vals.foreach() fn(e)
-        res := res + e.unsafe-decreasing.size
+        res := res + e.pretend-decreasing.size
       res
     Full(vals) ->
       var res := 0
       vals.foreach() fn(e)
-        res := res + e.unsafe-decreasing.size
+        res := res + e.pretend-decreasing.size
       res
     Collision(_, vals) -> vals.length
 
@@ -64,10 +68,10 @@ fun lookupInternal(h: hashMapI<k,v>, hash: int32, k: k, s: int32, eq: (k, k) -> 
     BitmapIndexed(b, vals) -> 
       val m = maskbit(hash, s)
       val child = unsafe-total{vals[b.sparseIndex(m)]}
-      if b.and(m) == zero then Nothing else child.unsafe-decreasing.lookupInternal(hash, k, s.nextShift, eq)
+      if b.and(m) == zero then Nothing else child.pretend-decreasing.lookupInternal(hash, k, s.nextShift, eq)
     Full(vals) ->
       val child = unsafe-total{vals[index(hash, s)]}
-      child.unsafe-decreasing.lookupInternal(hash, k, s.nextShift, eq)
+      child.pretend-decreasing.lookupInternal(hash, k, s.nextShift, eq)
     Collision(_, vals) ->
       vals.foreach-while(fn(x) if eq(x.key, k) then Just(x.value) else Nothing)
 
@@ -107,7 +111,7 @@ fun insertInternal(h: hashMapI<k,v>, hash: int32, k: k, v: v, s: int32, eq: (k, 
         bitmapIndexedOrFull(b.or(m), vals)
       else
         val old = unsafe-total{vals[i]}
-        val new = old.unsafe-decreasing.insertInternal(hash, k, v, s.nextShift, eq)
+        val new = old.pretend-decreasing.insertInternal(hash, k, v, s.nextShift, eq)
         if old.unsafePtrEq(new) then
           old
         else
@@ -115,7 +119,7 @@ fun insertInternal(h: hashMapI<k,v>, hash: int32, k: k, v: v, s: int32, eq: (k, 
           BitmapIndexed(b, vals)
     Full(vals) ->
       val old = unsafe-total{vals[index(hash, s)]}
-      val new = old.unsafe-decreasing.insertInternal(hash, k, v, s.nextShift, eq)
+      val new = old.pretend-decreasing.insertInternal(hash, k, v, s.nextShift, eq)
       if old.unsafePtrEq(new) then
         old
       else
@@ -129,7 +133,7 @@ fun insertInternal(h: hashMapI<k,v>, hash: int32, k: k, v: v, s: int32, eq: (k, 
             _ -> L(k, v)
         Collision(hash, newVals)
       else
-        BitmapIndexed(maskbit(hash, s), [h].vector).unsafe-decreasing.insertInternal(hash, k, v, s, eq)
+        BitmapIndexed(maskbit(hash, s), [h].vector).pretend-decreasing.insertInternal(hash, k, v, s, eq)
 
 pub fun insertWith(h: hashMap<k,v>, k: k, v: v, update: (v) -> v): e hashMap<k,v>
   h(map=insertUpdateInternal(h.map, (h.hash)(k), k, v, fn (old, new) update(old), zero, h.eq))
@@ -155,7 +159,7 @@ fun insertUpdateInternal(h: hashMapI<k,v>, hash: int32, k: k, v: v, update: (v, 
         bitmapIndexedOrFull(b.or(m), vals)
       else
         val old = unsafe-total{vals[i]}
-        val new = old.unsafe-decreasing.insertUpdateInternal(hash, k, v, update, s.nextShift, eq)
+        val new = old.pretend-decreasing.insertUpdateInternal(hash, k, v, update, s.nextShift, eq)
         if old.unsafePtrEq(new) then
           old
         else
@@ -163,7 +167,7 @@ fun insertUpdateInternal(h: hashMapI<k,v>, hash: int32, k: k, v: v, update: (v, 
           BitmapIndexed(b, vals)
     Full(vals) ->
       val old = unsafe-total{vals[index(hash, s)]}
-      val new = old.unsafe-decreasing.insertUpdateInternal(hash, k, v, update, s.nextShift, eq)
+      val new = old.pretend-decreasing.insertUpdateInternal(hash, k, v, update, s.nextShift, eq)
       if old.unsafePtrEq(new) then
         old
       else
@@ -177,7 +181,7 @@ fun insertUpdateInternal(h: hashMapI<k,v>, hash: int32, k: k, v: v, update: (v, 
             _ -> L(k, v)
         Collision(hash, newVals)
       else
-        BitmapIndexed(maskbit(hash, s), [h].vector).unsafe-decreasing.insertUpdateInternal(hash, k, v, update, s, eq)
+        BitmapIndexed(maskbit(hash, s), [h].vector).pretend-decreasing.insertUpdateInternal(hash, k, v, update, s, eq)
 
 fun two(s: int32, h1: int32, k1: k, v1: v, h2: int32, t2: hashMapI<k,v>): hashMapI<k,v>
   val bp1 = h1.maskbit(s)
@@ -187,7 +191,7 @@ fun two(s: int32, h1: int32, k1: k, v1: v, h2: int32, t2: hashMapI<k,v>): hashMa
   val idx2 = i1 < i2
   fun go(s', h1', k1', v1', h2', t2')
     if bp1 == bp2 then
-      val st = go(s.nextShift.unsafe-decreasing, h1', k1', v1', h2', t2')
+      val st = go(s.nextShift.pretend-decreasing, h1', k1', v1', h2', t2')
       val ary = vector([st])
       BitmapIndexed(bp1, ary)
     else

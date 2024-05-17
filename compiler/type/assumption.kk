@@ -7,8 +7,8 @@ import compiler/type/pretty
 import compiler/core/core
 import compiler/common/name-collections
 import compiler/lib/pprint
-import newstd/data/linearmap
-import newstd/data/linearset
+import std/data/linearmap
+import std/data/linearset
 import newstd/data/sort
 import compiler/common/failure
 import compiler/platform/config

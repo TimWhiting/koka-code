@@ -1,5 +1,5 @@
-import newstd/data/linearmap
-import newstd/data/linearset
+import std/data/linearmap
+import std/data/linearset
 import utils
 import expr
 

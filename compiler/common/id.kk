@@ -5,8 +5,8 @@
 // terms of the Apache License, Version 2.0. A copy of the License can be
 // found in the LICENSE file at the root of this distribution.
 //----------------------------------------------------------------------------
-import newstd/data/linearmap
-import newstd/data/linearset
+import std/data/linearmap
+import std/data/linearset
 import compiler/lib/pprint
 
 /// Internal identifiers (just 'Int's).

@@ -1,7 +1,7 @@
 import expr
 import utils
-import newstd/data/linearset
-import newstd/data/linearmap
+import std/data/linearset
+import std/data/linearmap
 import ev
 
 value type lattice<a>

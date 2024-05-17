@@ -1,10 +1,11 @@
 import newstd/text/parse
-import newstd/data/linearmap
+import std/data/linearmap
 import std/text/regex
 import std/os/path
 import std/os/file
 import std/os/dir
 import std/num/float64
+import std/core/undiv
 
 pub value struct position
   start: int
@@ -59,23 +60,23 @@ fun updatePos(s: sexpr, p: position)
 
 pub alias sprogram = list<sexpr>
 
-pub fun show(p: sprogram): div string
+pub fun sprog/show(p: sprogram): div string
   p.map(show).join("\n")
 
 pub fun toList(s: sexpr): pure list<sexpr>
   match s
-    SCons(car, cdr) -> Cons(car, cdr.unsafe-decreasing.toList)
+    SCons(car, cdr) -> Cons(car, cdr.pretend-decreasing.toList)
     SNil() -> []
     _ -> throw("toList not implemented for " ++ s.show) 
 
 pub fun toDottedList(s: sexpr): (list<sexpr>, sexpr)
   match s
     SCons(car, cdr) -> 
-      val (lst, end) = cdr.unsafe-decreasing.toDottedList
+      val (lst, end) = cdr.pretend-decreasing.toDottedList
       (Cons(car, lst), end)
     _ -> ([], s)
 
-pub fun show(s: sexpr): div string
+pub fun sexpr/show(s: sexpr): div string
   match s
     SBool(b) -> if b then "#t" else "#f"
     SChar(c) -> r"#\" ++ c
@@ -160,7 +161,7 @@ fun parseCells()
 fun mklist(l: list<sexpr>, m: maybe<sexpr> = Nothing): sexpr
   match l
     Nil -> m.default(SNil())
-    Cons(h, t) -> SCons(h, mklist(t.unsafe-decreasing, m)) 
+    Cons(h, t) -> SCons(h, mklist(t.pretend-decreasing, m)) 
 
 fun isList(s: sexpr): bool
   match s
@@ -296,13 +297,13 @@ fun (==)(s1: sexpr, s2: sexpr): bool
     (SString(s1), SString(s2)) -> s1 == s2
     (SName(n1), SName(n2)) -> n1 == n2
     (SNil(), SNil()) -> True
-    (SCons(h1, t1), SCons(h2, t2)) -> (==)(h1.unsafe-decreasing, h2.unsafe-decreasing) && (==)(t1.unsafe-decreasing, t2.unsafe-decreasing)
+    (SCons(h1, t1), SCons(h2, t2)) -> (==)(h1.pretend-decreasing, h2.pretend-decreasing) && (==)(t1.pretend-decreasing, t2.pretend-decreasing)
     _ -> False
 
 alias nameMap = some<e> linearMap<string,int>
-val globalNameGen:ref<global,nameMap> = unsafe-total{ref(linearMap([], fn(x1: string, x2: string) x1 == x2))}
+val globalNameGen:ref<global,nameMap> = pretend-total{ref(linearMap([], fn(x1: string, x2: string) x1 == x2))}
 fun genName(n: string): sexpr
-  unsafe-total
+  pretend-total
     val m = !globalNameGen
     val newM = m.update(n, 1, fn(x, _) x + 1)
     globalNameGen.set(newM)

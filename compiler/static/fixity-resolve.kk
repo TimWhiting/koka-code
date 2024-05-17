@@ -7,7 +7,7 @@ import compiler/common/range
 import compiler/syntax/syntax
 import compiler/common/syntax
 import compiler/common/color-scheme
-import newstd/data/linearmap
+import std/data/linearmap
 import compiler/lib/pprint
 
 fun fixityResolve(fixMap: fixities, program: userProgram)

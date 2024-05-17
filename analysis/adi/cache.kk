@@ -2,8 +2,8 @@ import ev
 import abev
 import expr
 import utils
-import newstd/data/linearmap
-import newstd/data/linearset
+import std/data/linearmap
+import std/data/linearset
 
 alias cache-entry<a,s> = linearSet<(s, linearMap<a, s>)>
 alias cache<a,s,p> = linearMap<(expr, p, linearMap<a, s>), cache-entry<a, s>>

@@ -3,7 +3,7 @@ import compiler/common/name-prim
 import compiler/common/resume-kind
 import compiler/core/core
 import compiler/core/corevar
-import newstd/data/linearset
+import std/data/linearset
 
 fun analyzeResume(defNm: name, opNm: name, isRaw: bool, e: expr)
   match e

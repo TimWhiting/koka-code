@@ -31,8 +31,8 @@ import compiler/type/kind
 import compiler/kind/infer-kind
 import compiler/kind/infer-effect
 import compiler/kind/unify
-import newstd/data/linearset
-import newstd/data/linearmap
+import std/data/linearset
+import std/data/linearmap
 
 // Kindcheck a program and calculate types
 fun inferKinds(

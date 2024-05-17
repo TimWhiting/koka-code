@@ -16,7 +16,7 @@ import compiler/type/type
 import compiler/syntax/range-map
 import compiler/syntax/syntax
 import compiler/core/core
-import newstd/data/linearmap
+import std/data/linearmap
 
 struct inferKindEnv
   currentModule: name

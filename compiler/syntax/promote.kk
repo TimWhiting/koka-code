@@ -3,7 +3,7 @@ import compiler/common/range
 import compiler/common/name-prim
 import compiler/common/name-collections
 import compiler/syntax/syntax
-import newstd/data/linearset
+import std/data/linearset
 
 fun promoteType(tp: userType): div userType
   val free = tp.free-type-vars

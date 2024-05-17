@@ -6,8 +6,8 @@
 // found in the LICENSE file at the root of this distribution.
 //----------------------------------------------------------------------------
 
-import newstd/data/linearmap
-import newstd/data/linearset
+import std/data/linearmap
+import std/data/linearset
 import compiler/common/name
 import compiler/common/failure
 import compiler/platform/config

@@ -1,3 +1,5 @@
+import std/core/undiv
+
 effect state<i,o,a,d>
   fun getAll(): a
   fun setAll(a: a): ()
@@ -41,7 +43,7 @@ fun unwind(steps: int, comb: forall<d,c> combinator<d,c>)
 
 fun repeat(f: comb<d,c>, steps: int): comb<d,c>
   fn (a)
-    f.repeat((steps - 1).unsafe-decreasing)(a)
+    f.repeat((steps - 1).pretend-decreasing)(a)
 
 fun dispatch<d,c,e>(choose: combE<d, int, e>, combs: list<combinatorE<d,c,e>>): combinatorE<d,c,e>
   fn(f:some<d,c,e> combE<d,c,e>)
@@ -71,6 +73,6 @@ fun product(s1: sensitivity<d,c1>, s2: sensitivity<d,c2>): sensitivity<d,(c1,c2)
 fun (&&)(s1: sensitivity<d,c1>, s2: sensitivity<d,c2>): sensitivity<d,(c1,c2)>
   product(s1, s2)
 
-fun contextual(contexts: sensitivity<d,c>, contextFree: combinator<d,c> -> combinator<d,c>, contextSensitive: combinatorE<d,c,e> -> combinator<d,c,e>):
-  fn(f) 
-    cFix(fixpointAlgorithm(contexts, contextFree, contextSensitive))
+// fun contextual(contexts: sensitivity<d,c>, contextFree: combinator<d,c> -> combinator<d,c>, contextSensitive: combinatorE<d,c,e> -> combinator<d,c,e>)
+//   fn(f) 
+//     cFix(fixpointAlgorithm(contexts, contextFree, contextSensitive))

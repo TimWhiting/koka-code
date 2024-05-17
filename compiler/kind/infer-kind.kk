@@ -9,8 +9,8 @@ import compiler/common/name-collections
 import compiler/platform/config
 import compiler/kind/kind
 import compiler/kind/pretty
-import newstd/data/linearmap
-import newstd/data/linearset
+import std/data/linearmap
+import std/data/linearset
 
 pub infixr 5 (|->)
 // Inference Kind: These kinds contain meta kind variables

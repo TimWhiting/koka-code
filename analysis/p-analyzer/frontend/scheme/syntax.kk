@@ -1,7 +1,7 @@
 import analysis/p-analyzer/ir
 import analysis/cps/sexpr
-import newstd/data/linearmap
-import newstd/data/linearset
+import std/data/linearmap
+import std/data/linearset
 import macros
 
 pub fun exception_context(c: string, f)

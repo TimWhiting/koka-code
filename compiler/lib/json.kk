@@ -1,5 +1,5 @@
 import newstd/text/parse
-import newstd/data/linearmap
+import std/data/linearmap
 import std/text/regex
 import std/num/float64
 

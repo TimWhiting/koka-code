@@ -13,8 +13,8 @@ import compiler/type/kind
 import compiler/type/pretty
 import compiler/type/operations
 import compiler/core/core
-import newstd/data/linearset
-import newstd/data/linearmap
+import std/data/linearset
+import std/data/linearmap
 
 effect unify
   final ctl unifyError(e: unifyErr): a

@@ -1,19 +1,20 @@
 import data
-import list
+import std/data/linearset
+import std/data/linearmap
 
-fun lset(eq: (a, a) -> e bool): lattice<list<a>,e>
-  ([], fn(l, a) setunion(l, a, eq), list-eq(eq))
+fun lset(eq: (a, a) -> e bool): lattice<linearSet<a>,e>
+  Lattice([], fn(l, a) setunion(l, a, eq), list-eq(eq))
 
 fun lmap(l: lattice<list<b>,e>, eqK: (a, a) -> e bool): lattice<list<(a,list<b>)>,e>
   val (bottom, union, eq) = l
   val nunion = fn(h0, h1) h1.foldl(h0, fn(acc, (k, v)) acc.update(k, fn(b1) union(b1, v), bottom, eqK))
-  ([], nunion, list-eq(tup-eq(eqK, eq)))
+  Lattice([], nunion, list-eq(tup-eq(eqK, eq)))
 
 fun lpowerset(a: lattice<a,e>, b: lattice<b,e>): lattice<(a, b),e>
   val bottom = (a.bottom, b.bottom)
   val union = fn((a1, b1), (a2, b2)) (a.union()(a1, a2), b.union()(b1, b2))
   val eq = tup-eq(a.eq, b.eq)
-  (bottom, union, eq)
+  Lattice(bottom, union, eq)
 
 fun cache(bottom: s, union: (s, s) -> e s, singleton: (c, r) -> e s, lookup: (s, c) -> e r, eq: (c, c) -> e bool): e1 (((c) -> e ((list<c>, s) -> e (r, s))) -> ((c) -> e ((list<c>, s) -> e (r, s))))
   fn(exec)

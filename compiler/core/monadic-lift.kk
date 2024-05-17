@@ -8,7 +8,7 @@ import compiler/kind/kind
 import compiler/core/core
 import compiler/core/corevar
 import compiler/type/typevar
-import newstd/data/linearset
+import std/data/linearset
 import compiler/platform/config
 
 fun monadicLift()

@@ -1,4 +1,4 @@
-import newstd/data/linearset
+import std/data/linearset
 import compiler/common/name
 import compiler/common/name-collections
 

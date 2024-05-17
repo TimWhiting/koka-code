@@ -4,8 +4,8 @@ import compiler/common/range
 import compiler/common/syntax
 import compiler/syntax/syntax
 import compiler/lib/scc
-import newstd/data/linearset
-import newstd/data/linearmap
+import std/data/linearset
+import std/data/linearmap
 
 // Program
 fun bindingGroups(program: userProgram)

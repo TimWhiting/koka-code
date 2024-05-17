@@ -3,8 +3,8 @@ import abev
 import expr
 import utils
 import cache
-import newstd/data/linearmap
-import newstd/data/linearset
+import std/data/linearmap
+import std/data/linearset
 
 fun test-abstract-normal(e)
   test-abstract(evnormalabs, e).show(show).trace

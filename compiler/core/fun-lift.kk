@@ -12,7 +12,7 @@ import compiler/type/assumption
 import compiler/core/core
 import compiler/core/corevar
 import compiler/platform/config
-import newstd/data/linearset
+import std/data/linearset
 
 fun liftFunctions()
   with handleFunLift()

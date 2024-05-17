@@ -6,7 +6,7 @@ import compiler/type/type
 import compiler/common/syntax
 import compiler/common/failure
 import compiler/platform/config
-import newstd/data/linearmap
+import std/data/linearmap
 
 alias kGamma = qname-map<kind>
 

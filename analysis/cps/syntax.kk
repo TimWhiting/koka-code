@@ -1,5 +1,5 @@
 import sexpr
-import newstd/data/linearset
+import std/data/linearset
 
 type program
   Program(defs: list<def>, free: vars = defs.map(free).foldl(noFreeVars, fn(a, b) a + b), label:int=getLabel())

@@ -1,6 +1,10 @@
 import papers/syntax/common
+import std/core/undiv
 
-alias state = (expr, env, kont)
+type state
+  Eval(e: expr, p: env, k: kont)
+  Continue(k: kont, v: evalue)
+  Ans(v: evalue)
 alias env = list<(identifier,evalue)>
 alias kont = list<frame>
 
@@ -16,36 +20,63 @@ rec type expr
   App(e1: expr, e2: expr)
   Lambda(l: lambda)
 
-fun expr/show(e: expr): div string
-  match e
-    Var(x) -> x
-    App(e1, e2) -> e1.show ++ " " ++ e2.show
-    Lambda(l) -> "λ" ++ l.show
-
-fun lambda/show(l: lambda): div string
-  match l
-    Lam(x, e) -> x ++ "." ++ e.show
-
-
-fun state/next(s: state)
+fun state/eval(s: state): pure state 
   match s
-    (Var(id), env, kont) ->
-      val Clos(l, env') = env.lookup(id).unjust
-      (Lambda(l), env', kont).next()
-    (App(e1, e2), env, kont) ->
-      (e1, env, Cons(AppL(e2, env), kont)).next()
-    (Lambda(l), env, Cons(AppL(e, env'), kont)) -> 
-      (e, env', Cons(AppR(Clos(l, env)), kont)).next()
-    (Lambda(l), env, Cons(AppR(Clos(Lam(id, e), env')), kont)) ->
-      (e, env'.set(id, Clos(l, env)), kont).next()
-    (e, env, k) -> (e, env, k)
+    Eval(Var(id), env, kont) ->
+      Continue(kont, env.lookup(id).unjust).eval()
+    Eval(App(e1, e2), env, kont) ->
+      Eval(e1, env, Cons(AppL(e2, env), kont)).eval()
+    Eval(Lambda(l), env, kont) ->
+      Continue(kont, Clos(l, env ~! fv(l))).eval()
+    Continue(Cons(AppL(e, env'), kont), Clos(l, env)) -> 
+      Eval(e, env', Cons(AppR(Clos(l, env)), kont)).eval()
+    Continue(Cons(AppR(Clos(Lam(id, e), env')), kont), Clos(l, env)) ->
+      Eval(e, env'.set(id, Clos(l, env)), kont).eval()
+    Continue([], v) -> Ans(v)
+
 
 fun expr/eval(e: expr): <pure,console> ()
-  val res = (e, [], []).next()
-  match res
-    (l, _, _) -> l.show.println
+  val res = Eval(e, [], []).eval()
+  res.show.println
 
 fun tests(): <pure, console> ()
   Lambda(Lam("x", Var("x"))).eval
 
 
+fun lam/fv(l: lambda): div linearSet<identifier>
+  match l
+    Lam(x, e) -> fv(e) - x
+
+fun expr/fv(e: expr): div linearSet<identifier>
+  match e
+    Var(x) -> [x]
+    App(e1, e2) -> e1.fv.union(e2.fv)
+    Lambda(l) -> fv(l)
+
+fun expr/show(e: expr): div string
+  match e
+    Var(x) -> x
+    App(e1, e2) -> e1.show ++ " " ++ e2.show
+    Lambda(l) -> l.show
+
+fun lambda/show(l: lambda): div string
+  match l
+    Lam(x, e) -> "λ" ++ x ++ "." ++ e.show
+
+fun result/show(r: evalue): div string
+  match r
+    Clos(l, env) -> l.show ++ " " ++ env.show
+
+fun env/show(e: env): div string
+  "<env>[" ++ e.map(fn((x, v)) x ++ " -> " ++ v.result/show).join(", ") ++ "]"
+
+fun frame/show(f: frame): div string
+  match f
+    AppL(e, env) -> "AppL(" ++ e.show ++ ", " ++ env.show ++ ")"
+    AppR(v) -> "AppR(" ++ v.result/show ++ ")"
+
+fun state/show(s: state): div string
+  match s
+    Eval(e, env, kont) -> e.show ++ " " ++ env.show ++ " " ++ kont.listdiv/show()
+    Continue(k, v) -> k.listdiv/show ++ " " ++ v.show
+    Ans(v) -> v.show

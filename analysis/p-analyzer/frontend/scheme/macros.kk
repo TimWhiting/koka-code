@@ -1,5 +1,5 @@
 import analysis/cps/sexpr
-import newstd/data/linearset
+import std/data/linearset
 
 type capture
   Empty

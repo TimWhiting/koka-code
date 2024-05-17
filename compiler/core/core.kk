@@ -7,7 +7,7 @@ import compiler/common/range
 import compiler/type/type
 import compiler/type/kind
 import compiler/kind/kind
-import newstd/data/linearset
+import std/data/linearset
 import compiler/common/name-collections
 
 fun isUnit(e: expr): bool

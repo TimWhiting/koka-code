@@ -8,8 +8,8 @@ struct state
   kont: kont
   t: time
 
-alias env = list<(identifier,addr)>
-alias store = list<(addr, list<storeable>)>
+alias env = linearMap<identifier,addr>
+alias store = linearMap<addr, linearSet<storeable>>
 alias storeable = either<kont, evalue>
 
 fun expr/(==)(e1: expr, e2: expr): div bool

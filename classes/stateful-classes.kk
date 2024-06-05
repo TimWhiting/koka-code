@@ -1,4 +1,4 @@
-module classes/stateful_classes
+module classes/stateful-classes
 
 named effect animalSpeak
   fun speak(): ()
@@ -10,7 +10,7 @@ struct animalInfo
   sound: string
   calls: int;
 
-open type animalInfoX
+pub open type animalInfoX
   BaseAnimal
   DogInfo(breed: string)
 
@@ -48,7 +48,7 @@ fun dog(action)
 fun cat(action)
   animalDefault(ref(AnimalInfo(name = "cat", sound = "meow", calls=0)), action)
 
-fun main()
+pub fun main()
   with d <- dog()
   with c <- cat()
   d.speak()

@@ -29,7 +29,7 @@ type state
 
 fun inj(e: expr): state
   Eval(e, Env(LinearMap([])), Mt)
-
+ 
 fun cek-eval(s: state): pure state
   match s
     Eval(Lam(l), rho, k) -> Cont(l, rho, k)
@@ -80,8 +80,8 @@ fun evalue/show(l: evalue): div string
 
 fun kont/show(k: kont): string
   match k
-    Arg(e, rho, k) -> "Arg(...)"
-    Fun(v, rho, k) -> "Fun(...)"
+    Arg -> "Arg(...)"
+    Fun -> "Fun(...)"
     Mt -> "Mt"
 
 fun test-cek()
@@ -89,6 +89,6 @@ fun test-cek()
     expect(Mt)
       val s = inj(App(Lam(ELam("x", Var("x"))), Lam(ELam("y", Var("y")))))
       val s' = run/eval(s)
-      val Cont(v, rho, k) = s'
+      val Cont(v, _, k) = s'
       trace(v.show)
       k

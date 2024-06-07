@@ -1,3 +1,6 @@
+import std/num/float64
+import std/core-extras
+
 struct typeVar
   name: string;
 
@@ -60,14 +63,14 @@ type assumption
 alias assumptions = list<assumption>
 
 // Helper functions for stringifying datatypes
-fun show(v: literal): string
+fun lit/show(v: literal): string
   match v
     BoolL(b) -> b.show
     IntL(i) -> i.show
     CharL(c) -> c.show
     FloatL(f) -> f.show
 
-fun show(t: ttype): div string
+fun ttp/show(t: ttype): div string
   match t
     TVar(typeVar) -> typeVar.name
     TApp(typeConstructor, args) -> 
@@ -76,32 +79,32 @@ fun show(t: ttype): div string
     TFun(t0, t1) -> "(" ++ t0.show ++ " -> " ++ t1.show ++ ")"
     ErrorT -> "ErrorT"
 
-fun show(t: maybe<ttype>): div string
+fun mt/show(t: maybe<ttype>): div string
   match t
     Just(t0) -> t0.show
     Nothing -> "unknown"
 
-fun show(TPred(preds, t): typePred): div string
+fun tpred/show(TPred(preds, t): typePred): div string
   preds.map(fn(x:(ident,ttype)) x.fst.name ++ "::" ++ show(x.snd)).join(".") ++ t.show
 
-fun show(ForAll(vars, t): typeScheme): div string
+fun scheme/show(ForAll(vars, t): typeScheme): div string
   if vars.is-empty then t.show
   else "forall " ++ vars.map(fn(x) x.name).join(",") ++ ". " ++ t.show
 
-fun show(t: maybe<typeScheme>): div string
+fun mscheme/show(t: maybe<typeScheme>): div string
   match t
     Just(t0) -> t0.show
     Nothing -> "??"
 
-fun show(t: ident): div string
+fun ident/show(t: ident): div string
   match t.signature
     Just(t0) -> t.name ++ "::" ++ t0.show
     Nothing -> t.name
 
-fun show(e: expr): div string
+fun expr/show(e: expr): div string
   match e
     ELit(value, t) -> "(Lit " ++ value.show ++ ": " ++ t.show ++ ")"
-    ETup(es, t) -> "(" ++ es.foldl("", fn(acc, i) -> acc ++ i.show ++ ",") ++ ")" ++ " : " ++ t.show
+    ETup(es, t) -> "(" ++ es.foldl("", fn(acc, i) acc ++ i.show ++ ",") ++ ")" ++ " : " ++ t.show
     EVar(ident, t) -> ident.show ++ ": " ++ t.show
     App(e0, e1, t) -> "\n(" ++ e0.show ++ " " ++ e1.show ++ ")" ++ ": " ++ t.show
     Lam(ident, e0, t) -> "\n(\\" ++ ident.name ++ "." ++ e0.show ++ ": " ++ t.show ++ ")"
@@ -110,7 +113,7 @@ fun show(e: expr): div string
     Over(ident, cond, e0) -> "\nover " ++ ident.name ++ " " ++ cond.show ++ " " ++ e0.show
     Inst(ident, cond, e0, e1) -> "\ninst " ++ ident.name ++ " " ++ cond.show ++ " " ++ e0.show ++ " " ++ e1.show
 
-fun show(v: evalue): div string
+fun evalue/show(v: evalue): div string
   match v
     Bool(b) -> b.show
     Int(i) -> i.show
@@ -120,61 +123,56 @@ fun show(v: evalue): div string
     Clos(arg, body, env) -> "Clos(" ++ arg.name.show ++ ", " ++ body.show ++ ", " ++ env.show ++ ")"
     PrimClos(_) -> "Primitive Operation"
 
-fun show(l: environment): div string
+fun env/show(l: environment): div string
   if l.is-empty then "Environment: ()" else
     "Environment: (\n\t" ++ l.map(fn(x) x.fst.name ++ " = " ++ x.snd.show).join("\n\t") ++ ")\n"
 
-fun show(l: typeEnv): div string
+fun tpenv/show(l: typeEnv): div string
   if l.is-empty then "Type Environment: ()" else
     "Type Environment: (\n\t" ++ l.map(fn(x) x.fst.name ++ " = " ++ x.snd.show).join("\n\t") ++ ")\n"
 
-fun show(s: subst): div string
+fun subs/show(s: subst): div string
   "Substitutions: (\n\t" ++ s.map(fn (x) x.fst.name ++ " ==> " ++ x.snd.show).join("\n\t") ++ ")\n"
 
-fun show(s: assumptions): div string
+fun assums/show(s: assumptions): div string
   "Assumptions: (\n\t" ++ s.map(show).join("\n\t") ++ ")\n"
 
-fun show(a: assumption): div string
+fun assum/show(a: assumption): div string
   match a
     Overloaded(ident, t) -> "Overloaded " ++ ident.name ++ " " ++ t.show
     Instance(ident, t, newIdent) -> "Instance " ++ ident.name ++ " " ++ t.show ++ " " ++ newIdent.name
     Variable(ident, t, newIdent) -> "Variable " ++ ident.name ++ " " ++ t.show ++ " " ++ newIdent.name
 
-fun show(x: (a,b), showA: (a) -> e string, showB: (b) -> e string): e string
+fun tup/show(x: (a,b), showA: (a) -> e string, showB: (b) -> e string): e string
   showA(x.fst) ++ "," ++ showB(x.snd)
 
-fun (==)(a: typeVar, b: typeVar): bool
+fun tv/(==)(a: typeVar, b: typeVar): bool
   a.name == b.name
 
-fun (==)(a: typeConstructor, b: typeConstructor): bool
+fun tc/(==)(a: typeConstructor, b: typeConstructor): bool
   a.name == b.name
 
-fun eq(l1: list<a>, l2: list<a>, equal: (a, a) -> e bool): e bool
-  match (l1, l2)
-    ([], []) -> True
-    (Cons(a,aas), Cons(b, bs)) -> equal(a, b) && aas.eq(bs,equal)
-    _ -> False
 
-fun (==)(t1: ttype, t2: ttype): div bool
+fun tt/(==)(t1: ttype, t2: ttype): div bool
   match (t1, t2)
     (TVar(a), TVar(b)) -> a == b
-    (TApp(a, aas), TApp(b, bs)) -> a == b && aas.eq(bs,(==))
+    (TApp(a, aas), TApp(b, bs)) -> a == b && aas == bs
     (TFun(a, b), TFun(c, d)) -> a == c && b == d
     (ErrorT, ErrorT) -> True
     _ -> False
 
-fun (==)(t1: typeScheme, t2: typeScheme): div bool
+fun tpscheme/(==)(t1: typeScheme, t2: typeScheme): div bool
   match (t1, t2)
-    (ForAll(aas, a), ForAll(bs, b)) -> aas.eq(bs,(==)) && a == b
+    (ForAll(aas, a), ForAll(bs, b)) -> aas == bs && a == b
 
-fun (==)(t1: typePred, t2: typePred): div bool
+fun tpred/(==)(t1: typePred, t2: typePred): div bool
   match (t1, t2)
-    (TPred(aas, a), TPred(bs, b)) -> aas.eq(bs,(==)) && a == b
+    (TPred(aas, a), TPred(bs, b)) -> aas == bs && a == b 
 
-fun (==)(t1: (ident, ttype), t2: (ident, ttype)): div bool
+fun mix/(==)(t1: (ident, ttype), t2: (ident, ttype)): div bool
   t1.fst == t2.fst && t1.snd == t2.snd
 
-fun (==)(i1: ident, i2: ident): div bool
+fun ident/(==)(i1: ident, i2: ident): div bool
   match (i1, i2)
     (Ident(a, sa), Ident(b, sb)) -> 
       val nameMatch = a == b

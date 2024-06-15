@@ -4,24 +4,24 @@ named rec effect rref<s::S, a::V> in providerHeap<s>
   ctl yield(): ()
 
 scoped rec effect providerHeap<s::S>
-  ctl mkProvider<a,e>(reactor: rref<s,a> -> <pure,providerHeap<s>,st<global>|e> a, show: (a) -> <pure,providerHeap<s>,st<global>|e> string, name: string): provider<s,a>
+  ctl mkProvider<a,e>(reactor: ev<rref<s,a>> -> <pure,providerHeap<s>,st<global>|e> a, name: string, show: (a) -> <pure,providerHeap<s>,st<global>|e> string): provider<s,a>
 
-fun watch(r: rref<s,a>, p: provider<s,b>, immediate: bool = True): <pure,providerHeap<s>,st<global>> b
+fun watch(r: ev<rref<s,a>>, p: provider<s,b>, immediate: bool = True): <pure,providerHeap<s>,st<global>> b
   r.watch_(p, immediate)
 
 rec type provider<s,a>
   Provider(
     listeners: some<e> ref<global, list<(a) -> <pure,providerHeap<s>,st<global>|e> ()>>,
     current: some<e> () -> <pure,providerHeap<s>,st<global>|e> a,
-    r: ref<global, maybe<rref<s,a>>>,
+    r: ref<global, maybe<ev<rref<s,a>>>>,
     name: string
   )
 
 fun heap(action: forall<s> () -> <providerHeap<s>,pure|e> ()): <pure|e> ()
   with handler
-    ctl mkProvider(reactor: some<s> forall<a,e> rref<s,a> -> <pure,providerHeap<s>,st<global>|e> a, show: some<s> forall<e,a> (a) -> <pure,providerHeap<s>,st<global>|e> string, name: string)
+    ctl mkProvider(reactor: some<s> forall<a,e> ev<rref<s,a>> -> <pure,providerHeap<s>,st<global>|e> a, name: string, show: some<s> forall<e,a> (a) -> <pure,providerHeap<s>,st<global>|e> string)
       val lcurrent : some<a> ref<global, maybe<a>> = ref(Nothing)
-      val r : some<a> ref<global, maybe<rref<s,a>>> =  ref(Nothing)
+      val r : some<a> ref<global, maybe<ev<rref<s,a>>>> =  ref(Nothing)
       val listeners0 : some<a,e> ref<global, list<(a) -> <pure,providerHeap<s>,st<global>|e> ()>> = ref(Nil)
       val continuex: ref<global, () -> e ()> = ref(fn(){})
       val doInit = fn(r1)
@@ -72,7 +72,7 @@ fun main()
   val result = try
     with heap
     val oProvider = mkProvider(
-      fn(r: rref<s,int>) {
+      fn(r: ev<rref<s,int>>) {
         r.emit(1)
         r.emit(2)
         0
@@ -81,7 +81,7 @@ fun main()
       "o"
     )
     val sProvider = mkProvider(
-      fn(r: rref<s,int>){
+      fn(r: ev<rref<s,int>>){
         trace("Hi")
         r.emit(100)
         val x = r.watch(oProvider, True)

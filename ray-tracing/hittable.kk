@@ -2,6 +2,7 @@ import vec
 import ray
 import interval
 import std/num/random
+import std/num/float64
 
 type material
   Lambertian(albedo: color)

@@ -3,7 +3,7 @@ import std/num/random
 import utils
 import interval
 
-fun neg(f: float64): float64
+fun float/neg(f: float64): float64
   0.0 - f
 
 struct vec3
@@ -38,7 +38,7 @@ fun (+)(v1: vec3, v2: vec3): vec3
 fun dot(v1: vec3, v2: vec3): float64
   v1.x * v2.x + v1.y * v2.y + v1.z * v2.z
 
-fun (*)(v1: vec3, v2: vec3): vec3
+fun vec2/(*)(v1: vec3, v2: vec3): vec3
   Vec3(v1.x * v2.x, v1.y * v2.y, v1.z * v2.z)
 
 fun cross(v1: vec3, v2: vec3): vec3
@@ -46,7 +46,7 @@ fun cross(v1: vec3, v2: vec3): vec3
        v1.z * v2.x - v1.x * v2.z,
        v1.x * v2.y - v1.y * v2.x)
 
-fun (*)(v: vec3, t: float64): vec3
+fun vecfloat/(*)(v: vec3, t: float64): vec3
   Vec3(v.x * t, v.y * t, v.z * t)
 
 fun (/)(v: vec3, t: float64): vec3
@@ -55,13 +55,13 @@ fun (/)(v: vec3, t: float64): vec3
 inline fun(*)(t: float64, v: vec3): vec3
   v*t
 
-fun neg(v: vec3): vec3
+fun vec/neg(v: vec3): vec3
   Vec3(0.0 - v.x, 0.0 - v.y, 0.0 - v.z)
 
-fun random(): random vec3
+fun vec/random(): random vec3
   Vec3(random_double(), random_double(), random_double())
 
-fun random(min: float64, max: float64): random vec3
+fun vecrange/random(min: float64, max: float64): random vec3
   Vec3(random_double(min, max), random_double(min, max), random_double(min, max))
 
 fun random_in_unit_sphere(): <div,random> vec3
@@ -125,7 +125,7 @@ fun show_color(c: color, samples: int): string
   val c' = c * scale
   c'.x.linear_to_gamma.showPixel ++ " " ++ c'.y.linear_to_gamma.showPixel ++ " " ++ c'.z.linear_to_gamma.showPixel
 
-fun [](v: vec3, i: int): float64
+fun vecfloat/@index(v: vec3, i: int): float64
   if i == 0 then v.x elif i == 1 then v.y else v.z
 
 

@@ -5,6 +5,7 @@ import std/num/random
 import material
 import hittable
 import utils
+import std/num/float64
 
 fun add(l, v)
   Cons(v, l)

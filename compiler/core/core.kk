@@ -151,9 +151,9 @@ fun external/show(e: external): div string
   match e
     External(name, typeScheme, params, format, visibility, fipT, rng, doc) -> 
       "External(" ++ name.name/name/show ++ "," ++ typeScheme.show ++ "," ++ params.show-list(show) ++ "," ++ 
-      format.show-list(fn(f) f.show-tuple(show, show)) ++ "," ++ visibility.show ++ "," ++ fipT.show ++ "," ++ rng.show-full-range ++ "," ++ doc.show ++ ")"
+      format.show-list(fn(f) f.show-tuple(show, show)) ++ "," ++ visibility.show ++ "," ++ fipT.show ++ "," ++ rng.show ++ "," ++ doc.show ++ ")"
     ExternalImport(imports, rng) -> 
-      "ExternalImport(" ++ imports.show-list(fn((t, ls)) t.show ++ ":" ++ ls.show-list(fn((s1, s2)) s1.show ++ ":" ++ s2.show)) ++ "," ++ rng.show-full-range ++ ")"
+      "ExternalImport(" ++ imports.show-list(fn((t, ls)) t.show ++ ":" ++ ls.show-list(fn((s1, s2)) s1.show ++ ":" ++ s2.show)) ++ "," ++ rng.show ++ ")"
 
 fun external/vis(e: external)
   match e
@@ -441,7 +441,7 @@ struct def
 
 fun def/show(d: def): div string
   "Def(" ++ d.def-name.name/name/show ++ "," ++ d.ktype.show ++ "," ++ d.defExpr.show ++ "," ++ d.vis.show ++ "," ++
-  d.sort.show ++ "," ++ d.kinline.show ++ "," ++ d.nameRange.show-full-range ++ "," ++ d.doc.show ++ ")"
+  d.sort.show ++ "," ++ d.kinline.show ++ "," ++ d.nameRange.show ++ "," ++ d.doc.show ++ ")"
 
 struct inlineDef
   def-name: name
@@ -787,7 +787,7 @@ fun get-effect(e: expr): keffect
 
 // Type variables
 fun tnames(l: list<tName>): linearSet<tName>
-  l
+  LinearSet(l)
 
 fun cmp(t1: tName, t2: tName): order
   name/name/cmp(t1.get-name, t2.get-name)
@@ -956,11 +956,11 @@ fun splitTForAll(tp: ktype): <exn> (list<typeVar>, ktype)
 
 alias deps = linearSet<name>
 fun depsUnions(l: list<deps>): deps
-  l.foldl([], fn(s: deps, a: deps) s + a)
+  l.foldl(LinearSet([]), fn(s: deps, a: deps) s + a)
 fun tname/dep(t: tName): deps
   dep(t.get-name)
 fun name/dep(n: name): deps
-  if n.is-qualified then [n.qualifier] else []
+  if n.is-qualified then LinearSet([n.qualifier]) else LinearSet([])
 
 fun idefscore/deps(l: list<inlineDef>, c: core): div deps
   depsUnions(l.map(fn(i) i.expr.dep)) + c.deps
@@ -969,11 +969,9 @@ fun idefs/deps(l: list<inlineDef>): div deps
   depsUnions(l.map(fn(i) i.expr.dep))
 
 fun core/deps(c: core): div deps
-  val x0 = depsUnions(c.defs.flatten.map(dep)) + depsUnions(c.typeDefs.flatten.map(dep))
-  val x3 = c.imports.filter(fn(i) i.visibility.is-public).map(fn(i) i.importName)
-  val x4 : deps = x0 + x3
-  x4 - c.coreName
-
+  val x0 : deps = depsUnions(c.defs.flatten.map(dep)) + depsUnions(c.typeDefs.flatten.map(dep))
+  val x1 : deps = LinearSet(c.imports.filter(fn(i) i.visibility.is-public).map(importName))
+  x0 + x1 - c.coreName
 
 fun td/dep(td: typeDef): div deps
   match td
@@ -985,7 +983,7 @@ fun ktype/dep(t: ktype): div deps
     TForAll(_, _, rho) -> rho.dep
     TFun(args, eff, res) -> depsUnions(Cons(eff.dep, args.map(fn((_, t')) t'.dep))) + res.dep
     TCon(tc) -> tc.name.dep
-    TVar -> []
+    TVar -> LinearSet([])
     TApp(tp, tps) -> tp.dep + depsUnions(tps.map(dep))
     TSyn(_, args, tp) -> tp.dep + depsUnions(args.map(dep))
 
@@ -1000,7 +998,7 @@ fun expr/dep(e: expr): div deps
     TypeLam(_, body) -> body.dep
     TypeApp(e, tps) -> e.dep + depsUnions(tps.map(dep))
     Con(tn) -> tn.dep
-    ELit(_) -> []
+    ELit(_) -> LinearSet([])
     Let(defs, body) -> depsUnions(Cons(body.dep, defs.flatten.map(dep)))
     Case(exprs, branches) -> depsUnions(exprs.map(dep) ++ branches.map(dep))
 
@@ -1014,4 +1012,4 @@ fun pattern/dep(p: pattern): div deps
   match p
     PatCon(tn, pats) -> tn.dep + depsUnions(pats.map(dep))
     PatVar(_, p) -> p.dep
-    _ -> []
+    _ -> LinearSet([])

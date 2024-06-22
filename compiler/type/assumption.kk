@@ -146,7 +146,7 @@ fun gammaPublicNames(g: gamma)
   g.filter(fn(n, nis) nis.all(fn((_, ni)) ni.isVisible && !n.isHiddenName)).list.map(fst)
 
 fun extractGammaImports(imports: list<(name,name)>, modName: name): gamma
-  val modAlias = modName.nameId.list.reverse.take-while(fn(a) a != '.').reverse.string.newName
+  val modAlias = modName.nameStem.list.reverse.take-while(fn(a) a != '.').reverse.string.newName
   imports.map(extractImport).gammaUnions.gammaExtend(modAlias, InfoImport(Private, typeVoid, modAlias, modName, rangeNull))
 
 fun extractImport((name, qname))

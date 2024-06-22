@@ -22,7 +22,7 @@ effect niceEff<k>
   fun get-nice-doc(tv: k): doc 
 
 fun niceEnv(f)
-  var nice := []
+  var nice := LinearMap([])
   var effectIndex := -1
   var heapIndex := -1
   var typeIndex := -1
@@ -51,9 +51,9 @@ fun niceEnv(f)
       nice := nice.extend(tv.tid, x)
       ()
     fun get-nice(tv: typeVar)
-      nice.nice/show(tv.tid)
+      nice.show(tv.tid)
     fun get-nice-doc(tv: typeVar)
-      nice.nice/pretty(tv.tid)
+      nice.pretty(tv.tid)
   f()
 
 // Add fresh identifier substitutions give an (infinite) list of nice names.
@@ -61,17 +61,17 @@ fun extend(n: nice, id: int, name: string): nice
   n.set(id, name)
 
 // Show the nice version of an identifier
-fun nice/show(n: nice, id: id): string
-  match n.maybe-get(id)
+fun show(n: nice, id: id): string
+  match n.lookup(id)
     Just(name) -> name
     Nothing -> id.show-id
 
 // Pretty print an identifier nicely.
-fun nice/pretty(n: nice, id: id): doc
-  n.nice/show(id).text
+fun pretty(n: nice, id: id): doc
+  n.show(id).text
 
 /// Tests for identifiers
 fun test-ids()
   test("ids")
-    expect({id-nil.new-id.new-id-from}, 1, "new-id")
-    expect({gen-id("test", 1).show-id}, "\"1\"", "show-id")
+    expect(1, {id-nil.new-id.new-id-from}, "new-id")
+    expect("\"1\"", {gen-id("test", 1).show-id} , "show-id")

@@ -152,7 +152,7 @@ fun synAccessors(di: dataInfo, modName: name)
           [(ci.vis, Branch(PatCon(ci.name, patterns, r, r), [Guard(guardTrue, Var(fld, False, r))]))]
         _ -> []
     val messages = [Literal(LitString(rng.start.source.name ++ rng.show, rng)), Literal(LitString(nm.show, rng))]
-    val doc = "// Automatically generated. Retrieves the `" ++ nm.show ++ "` constructor field of the `" ++ di.name.nameId ++ "` type.\n"
+    val doc = "// Automatically generated. Retrieves the `" ++ nm.show ++ "` constructor field of the `" ++ di.name.nameStem ++ "` type.\n"
     val defaultBranch = if isPartial then [Branch(PatWild(rng), [Guard(guardTrue, App(Var(namePatternMatchError, False, rng), message.map(fn(msg) (Nothing, msg)), rng))])]
     val branches = di.constrs.map(makeBranch).concat
     val isPartial = branches.length < di.constrs.length || di.isOpen
@@ -172,7 +172,7 @@ fun synTester(di: dataInfo, ci: conInfo)
     val branch2 = Branch(PatWild(rc), [Guard(guardTrue, Var(nameFalse, False, rc))])
     val caseExpr = Case(Var(arg, False, rc), [branch1, branch2], rc)
     val expr = Lam([ValueBinder(arg, Nothing, Nothing, rc, rc)], caseExpr, rc)
-    val doc = "// Automatically generated. Tests for the `" ++ ci.name.nameId ++ "` constructor of the `:" ++ di.name.nameId ++ "` type.\n"
+    val doc = "// Automatically generated. Tests for the `" ++ ci.name.nameStem ++ "` constructor of the `:" ++ di.name.nameStem ++ "` type.\n"
     [DefNonRec(Def(ValueBinder(def-name, (), expr, rc, rc), rc, ci.vis, defFunEx([Borrow], Fip(AllocAtMost(0))), InlineAlways, doc))]
 
 fun synConstrTag(ci: conInfo)

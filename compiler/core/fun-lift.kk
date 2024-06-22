@@ -132,7 +132,7 @@ fun makeDef(fvs: list<tName>, tvs: list<typeVar>, pinfos: list<paramInfo>, origN
   val dnames = currentDefNames()
   val (name, inl) = uniqueNameCurrentDef()
   fun unwild(TName(nm, tp): tName)
-    TName(if nm.nameId.head-char.unjust == '_' then prepend("wild", name) else name, tp) 
+    TName(if nm.nameStem.head-char.unjust == '_' then prepend("wild", name) else name, tp) 
   val (tpars, pars, eff, body) = match expr
     TypeLam(tpars, Lam(pars, eff, lbody)) -> (tpars, pars.map(unwild), eff, lbody)
     Lam(pars, eff, lbody) -> ([], pars.map(unwild), eff, lbody)

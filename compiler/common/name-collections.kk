@@ -43,10 +43,10 @@ fun lookup/show(a: lookup<a>, ?show: (a) -> e string): e string
     NotFound -> "NotFound"
 
 fun qname-map/single(n: name, a: a): qname-map<a>
-  [(n.unqualify, [(n, a)])]
+  LinearMap([(n.unqualify, [(n, a)])])
 
 fun qname-map/from-list(l: list<(name,a)>): <comp-flags,pure> qname-map<a>
-  l.foldl([]) fn(qm, (name, x))
+  l.foldl(LinearMap([])) fn(qm, (name, x))
     qm.insert(name, x)
 
 // Lookup a fully qualified name
@@ -83,7 +83,7 @@ fun qname-map/union-left-bias(m1: qname-map<a>, m2: qname-map<a>): <comp-flags,e
   m1.union-with(m2, (++))
 
 fun qname-map/unions(ms: list<qname-map<a>>): <comp-flags,exn> qname-map<a>
-  ms.foldl([]) fn(m1, m2)
+  ms.foldl(LinearMap([])) fn(m1, m2)
     m1.union(m2)
 
 fun qname-map/safe-combine(s: string, xs: list<(name,a)>, ys: list<(name,a)>): <comp-flags,exn> list<(name,a)>

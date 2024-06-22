@@ -149,7 +149,7 @@ fun liftLocalFun(e: expr, eff: keffect)
 fun makeDef(e: expr, fvs: list<tName>, tvs: list<typeVar>)
     
   fun unwild(TName(name, tp): tName)
-    TName(if name.nameId == "" || name.nameId.starts-with("_").is-just then prepend("wild", name) else name, tp)
+    TName(if name.nameStem == "" || name.nameStem.starts-with("_").is-just then prepend("wild", name) else name, tp)
   val (tpars, pars, eff, body) = match e
     TypeLam(tpars, Lam(pars, eff, lbody)) -> (tpars, pars.map(unwild), eff, lbody)
     Lam(pars, eff, lbody) -> ([], pars.map(unwild), eff, lbody)

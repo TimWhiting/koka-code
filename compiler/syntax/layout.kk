@@ -185,7 +185,7 @@ fun isStartContinuationToken(lex)
   match lex
     LexSpecial(s) -> [")",">","]",",","{","}"].find(fn(c) -> c == s).bool
     LexKeyword(k, _) -> ["then","else","elif","->","=","|",":",".",":="].find(fn(c) -> c == k).bool
-    LexOp(op) -> op.nameId != "<"
+    LexOp(op) -> op.nameStem != "<"
     LexInsLCurly -> True
     LexInsRCurly -> True
     _ -> False
@@ -195,7 +195,7 @@ fun isEndContinuationToken(lex)
     LexSpecial(s) -> ["(","<","[",",","{"].find(fn(c) -> c == s).bool
     LexKeyword(k, _) -> k == "."
     LexInsLCurly -> True
-    LexOp(op) -> op.nameId != ">"
+    LexOp(op) -> op.nameStem != ">"
     _ -> False
 
 inline fun isCloseBrace(lex)

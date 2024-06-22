@@ -25,13 +25,13 @@ fun parseCore(fname: path)
 
 fun requalify(lexes: list<lexeme>): div list<lexeme>
   match lexes
-    Cons(Lexeme(r1, LexId(modName)), Cons(Lexeme(_, LexOp(slash)), Cons(Lexeme(r2, LexId(nm)), lexx)))  | slash.nameId  == "/"
+    Cons(Lexeme(r1, LexId(modName)), Cons(Lexeme(_, LexOp(slash)), Cons(Lexeme(r2, LexId(nm)), lexx)))  | slash.nameStem  == "/"
       -> requalify(Cons(Lexeme(r1.combine(r2), LexId(qualify(newName(modName.showPlain), nm))), lexx))
-    Cons(Lexeme(r1, LexId(modName)), Cons(Lexeme(_, LexOp(slash)), Cons(Lexeme(r2, LexIdOp(nm)), lexx)))  | slash.nameId  == "/"
+    Cons(Lexeme(r1, LexId(modName)), Cons(Lexeme(_, LexOp(slash)), Cons(Lexeme(r2, LexIdOp(nm)), lexx)))  | slash.nameStem  == "/"
       -> requalify(Cons(Lexeme(r1.combine(r2), LexId(qualify(newName(modName.showPlain), nm))), lexx))
-    Cons(Lexeme(r1, LexId(modName)), Cons(Lexeme(_, LexOp(slash)), Cons(Lexeme(r2, LexOp(nm)), lexx)))  | slash.nameId  == "/"
+    Cons(Lexeme(r1, LexId(modName)), Cons(Lexeme(_, LexOp(slash)), Cons(Lexeme(r2, LexOp(nm)), lexx)))  | slash.nameStem  == "/"
       -> requalify(Cons(Lexeme(r1.combine(r2), LexId(qualify(newName(modName.showPlain), nm))), lexx))
-    Cons(Lexeme(r1, LexId(modName)), Cons(Lexeme(_, LexOp(slash)), Cons(Lexeme(r2, LexCons(nm)), lexx)))  | slash.nameId  == "/"
+    Cons(Lexeme(r1, LexId(modName)), Cons(Lexeme(_, LexOp(slash)), Cons(Lexeme(r2, LexCons(nm)), lexx)))  | slash.nameStem  == "/"
       -> requalify(Cons(Lexeme(r1.combine(r2), LexCons(qualify(newName(modName.showPlain), nm))), lexx))
     Cons(lex, lexx)
       -> Cons(lex, requalify(lexx))
@@ -183,7 +183,7 @@ fun pConDecl(tname0: name, foralls: list<typeVar>, sort: dataKind)
   val params = pParameters()
   val vrepr = pValueRepr()
   val tp = pTypeAnnot()
-  val params2 = params.zip(list(1, params.length)).map(fn(((n, t), i)) (if n.nameId == "" then i.newFieldName else name, t))
+  val params2 = params.zip(list(1, params.length)).map(fn(((n, t), i)) (if n.nameStem == "" then i.newFieldName else name, t))
   val orderedFields = []
   ConInfo(qualify(modname, name), tname0, foralls, exists0, params2, tp, sort, rangeNull, params2.map(fn(_) rangeNull), params2.map(fn(_) Public), False, orderedFields, vrepr, vis, doc)
 

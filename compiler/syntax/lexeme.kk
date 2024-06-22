@@ -1,14 +1,15 @@
-import std/text/parse
 import std/text/regex
+import std/os/path
 import std/text/unicode
 import compiler/common/name
 import compiler/common/range
 import std/num/float64
+import compiler/common/id
 
 val typeVarRegex = "^[a-z][0-9]*$".regex();
 
 pub fun isTypeVar(n: name): bool
-  !typeVarRegex.exec(n.nameId).is-empty
+  !typeVarRegex.exec(n.nameStem).is-empty
 
 pub struct lexeme ( pub range: range, pub lex: lex )
 
@@ -164,7 +165,7 @@ pub fun from-enum(l: lex): <> int
     LexTypeId(_, _) -> 18
 
 pub fun lexeme/show(l: lexeme): <> string
-  l.range.show-full-range ++ ": " ++ l.lex.show
+  l.range.show-full-range("".path) ++ ": " ++ l.lex.show
 
 pub fun lex/show(l: lex): <> string
   match l
@@ -172,12 +173,12 @@ pub fun lex/show(l: lex): <> string
     LexFloat(_, s) -> "float " ++ s.show
     LexChar(c) -> "char " ++ c.show
     LexString(s) -> "string \"" ++ s ++ "\""
-    LexId(n) -> "identifier \"" ++ n.name/name/show ++ "\""
-    LexOp(n) -> "operator \"" ++ n.name/name/show ++ "\""
-    LexPrefix(n) -> "prefix operator \"" ++ n.name/name/show ++ "\""
-    LexIdOp(n) -> "identifier (operator) \"" ++ n.name/name/show ++ "\""
-    LexWildCard(n) -> "wildcard \"" ++ n.name/name/show ++ "\""
-    LexModule(n, _) -> "module \"" ++ n.name/name/show ++ "\""
+    LexId(n) -> "identifier \"" ++ n.show ++ "\""
+    LexOp(n) -> "operator \"" ++ n.show ++ "\""
+    LexPrefix(n) -> "prefix operator \"" ++ n.show ++ "\""
+    LexIdOp(n) -> "identifier (operator) \"" ++ n.show ++ "\""
+    LexWildCard(n) -> "wildcard \"" ++ n.show ++ "\""
+    LexModule(n, _) -> "module \"" ++ n.show ++ "\""
     LexKeyword(k, d) -> "keyword \"" ++ k.show ++ "\"" ++ (if d.is-empty then "" else " (" ++ d ++ ")")
     LexSpecial(s) -> "special \"" ++ s ++ "\""
     LexComment(s) -> "comment \"" ++ s.show ++ "\""
@@ -186,5 +187,5 @@ pub fun lex/show(l: lex): <> string
     LexInsRCurly -> "end of statements ('}')"
     LexInsSemi -> "end of statement (';')"
     LexError(s) -> "error: " ++ s ++ ""
-    LexCons(n) -> "constructor \"" ++ n.name/name/show ++ "\""
-    LexTypeId(n, s) -> "typedid " ++ n.name/name/show ++ ":" ++ s
+    LexCons(n) -> "constructor \"" ++ n.show ++ "\""
+    LexTypeId(n, s) -> "typedid " ++ n.show ++ ":" ++ s

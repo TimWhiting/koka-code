@@ -120,7 +120,10 @@ fun range/is-after(r1: range, r2: range): bool
 
 val range/null = make-range(pos/null, pos/null)
 
-fun show-full-range(cwd: path, r: range): string
+fun range/show(r: range): string
+  r.show-full-range("".path)
+
+fun show-full-range(r: range, cwd: path): string
   r.show-range(cwd, True)
 
 fun make-range(p1: pos, p2: pos): range

@@ -16,6 +16,7 @@ import newstd/test
 alias name-map<a> = linearMap<name, a>;
 
 alias nameSet = linearSet<name>;
+val names/empty: nameSet = LinearSet([])
 
 alias qname-map<a> = linearMap<name,list<(name,a)>>;
 

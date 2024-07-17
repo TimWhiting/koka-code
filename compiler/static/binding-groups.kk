@@ -13,7 +13,7 @@ fun bindingGroups(program: userProgram)
 
 // Binding groups in type definitions
 fun bindingsTypeDefs(tdGroups: list<userTypeDefGroup>)
-  val (ds, extends) = tdGroups.flatten.partition(isDefinition)
+  val (ds, extends) = tdGroups.flatten.partition(is-definition)
   ds.groupTypeDefs(emptyDeps.addAll(ds.map(dependencyTypeDef))) ++ extends.map(TypeDefNonRec)
 
 fun flatten(grps: list<userTypeDefGroup>)
@@ -23,39 +23,39 @@ fun flatten(grps: list<userTypeDefGroup>)
       TypeDefNonRec(td) -> [td]
   xs.concat
 
-fun isDefinition(td: userTypeDef)
+fun is-definition(td: userTypeDef)
   match td
     DataType(isExtend=False) -> True
     _ -> True
 
-fun dependencyTypeDef(td: userTypeDef): pure (name, nameSet)
+fun dependencyTypeDef(td: userTypeDef, ?(==): (k,k) -> e bool): <pure|e> (name, nameSet)
   match td
-    Synonym(_, _, t) -> (td.typeDefName, t.freeTypes)
-    DataType(_, _, c) -> (td.typeDefName, c.map(fn(c') c'.freeTypes(freeTypes)).unions)
+    Synonym(_, _, t) -> (td.name, t.free-types)
+    DataType(_, _, c) -> (td.name, c.map(fn(c') c'.free-types(free-types)).unions)
 
 // Free type constructors
-fun freeTypes(l: list<kUserType<k>>): pure nameSet
-  l.map(fn(t) t.freeTypes).unions
+fun union/free-types(l: list<kUserType<k>>, ?(==): (k,k) -> e bool): <pure|e> nameSet
+  l.map(fn(t) t.free-types).unions
 
-fun freeTypes(tp: kUserType<k>): pure nameSet
+fun ktp/free-types(tp: kUserType<k>, ?(==): (k,k) -> e bool): <pure|e> nameSet
   match tp
-    TpQuan(_, _, t) -> t.freeTypes
-    TpQual(preds, t) -> Cons(t, preds).freeTypes
-    TpFun(args, eff, t) -> args.map(snd).freeTypes + eff.freeTypes + t.freeTypes
-    TpApp(t, args) -> Cons(t, args).freeTypes
-    TpVar -> namesEmpty
-    TpCon(nm) -> namesEmpty + nm
-    TpParens(t) -> t.freeTypes
-    TpAnn(t) -> t.freeTypes
+    TpQuan(_, _, t) -> t.free-types
+    TpQual(preds, t) -> Cons(t, preds).free-types
+    TpFun(args, eff, t) -> args.map(snd).free-types + eff.free-types + t.free-types
+    TpApp(t, args) -> Cons(t, args).free-types
+    TpVar -> names/empty
+    TpCon(nm) -> LinearSet([]) + nm
+    TpParens(t) -> t.free-types
+    TpAnn(t) -> t.free-types
 
-fun freeTypes(vb: valueBinder<t,e>, freeTypesT: (t) -> pure nameSet): pure nameSet
-  vb.binderType.freeTypesT
+fun vb/free-types(vb: valueBinder<t,e>, free-typesT: (t) -> pure nameSet): pure nameSet
+  vb.binderType.free-typesT
 
-fun freeTypes(vbs: list<valueBinder<t,e>>, freeTypesT: (t) -> pure nameSet): pure nameSet
-  vbs.map(fn(vb) vb.freeTypes(freeTypesT)).unions
+fun unionvb/free-types(vbs: list<valueBinder<t,e>>, free-typesT: (t) -> pure nameSet): pure nameSet
+  vbs.map(fn(vb) vb.free-types(free-typesT)).unions
 
-fun freeTypes(c: userCon<t,u,k>, freeTypesT: (t) -> pure nameSet): pure nameSet
-  c.params.map(snd).freeTypes(freeTypesT) + c.result.map(fn(r) r.freeTypesT).default(namesEmpty)
+fun uc/free-types(c: userCon<t,u,k>, free-typesT: (t) -> pure nameSet): pure nameSet
+  c.params.map(snd).free-types(free-typesT) + c.result.map(fn(r) r.free-typesT).default(empty)
 
 // Binding groups in definitions
 fun bindings(dgs: list<userDefGroup>, modName: name)
@@ -239,7 +239,7 @@ fun freeBoundVar(dg: defGroup<t>): pure (nameSet, nameSet)
 // Dependencies
 alias deps = name-map<nameSet>
 alias freeVar = nameSet
-val emptyDeps: linearMap<name, nameSet> = linearMap([], fn(x1:name, x2) x1 == x2, fn(y1:nameSet, y2) y1 == y2, fn(x) x.show, fn(y) y.show)
+val emptyDeps: linearMap<name, nameSet> = LinearMap([])
 
 // Topological sort
 
@@ -263,7 +263,7 @@ fun group(defs: list<userDef>, deps: deps): pure list<userDefGroup>
     val (xxs, xys) = xs.partition(isHidden) // and hidden names first inside those
     xxs ++ xys ++ ys
   // create a map from definition id's to definitions
-  val defMap = defs.map(fn(d) (d.def-name, [d])).foldl(linearMap([], fn(n1:name, n2) n1 == n2, fn(d1: list<userDef>, d2: list<userDef>) False, fn(n) n.show, fn(u) "")) fn(acc, (id, v))
+  val defMap = defs.map(fn(d) (d.def-name, [d])).foldl(LinearMap([])) fn(acc, (id, v))
     acc.update(id, v, fn(old:list<userDef>, new) old ++ new)
   // create a definition group from a list of mutal recursive identifiers
   fun makeGroup(ids:list<name>)
@@ -285,7 +285,7 @@ fun groupTypeDefs(tdefs: list<userTypeDef>, deps: deps)
   val typeOrder0 = scc(typeDeps0, fn(n1, n2) n1 == n2, fn(n) n.show)
   // create a map from type id's to type defs
   // note: due to duplicate definitions (which are checked for during kind checking), we map to a list of possible definitions
-  val typeMap = tdefs.map(fn(d) (d.typeDefName, [d])).foldl(linearMap([], fn(n1:name, n2) n1 == n2, fn(d1: list<userTypeDef>, d2: list<userTypeDef>) False, fn(n) n.show, fn(u) "")) fn(acc, (id, v))
+  val typeMap = tdefs.map(fn(d) (d.typeDefName, [d])).foldl(LinearMap([])) fn(acc, (id, v))
     acc.update(id, v, fn(old:list<userTypeDef>, new) old ++ new)
   // create a (recursive) definition group
   fun makeGroup(ids: list<name>)
@@ -378,8 +378,8 @@ fun groupTypeDefs(tdefs: list<userTypeDef>, deps: deps)
 //   | Def   lhs.deps  = M.single @name @body.freeVar
 
 // SEM TypeDef
-//   | Synonym lhs.deps = M.single @name @tp.freeTypes
-//   | Newtype lhs.deps = M.single @name @tp.freeTypes
+//   | Synonym lhs.deps = M.single @name @tp.free-types
+//   | Newtype lhs.deps = M.single @name @tp.free-types
 
 // {--------------------------------------------------------------------
 //   Free variables (and defined variables)
@@ -408,7 +408,7 @@ fun groupTypeDefs(tdefs: list<userTypeDef>, deps: deps)
 // {--------------------------------------------------------------------------
 //   Free types
 // --------------------------------------------------------------------------}
-// ATTR UserTypes UserType [ || freeTypes USE {`S.union`} {S.empty} : {S.NameSet} ]
+// ATTR UserTypes UserType [ || free-types USE {`S.union`} {S.empty} : {S.NameSet} ]
 
 // SEM UserType
-//   | TpCon       lhs.freeTypes = S.single @name
+//   | TpCon       lhs.free-types = S.single @name

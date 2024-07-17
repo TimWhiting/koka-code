@@ -73,9 +73,9 @@ fun liftExprInl(expr': expr, topLevel: bool): liftedEff (expr, expr)
       val b = TypeVar(1, kindStar, Bound)
       val e = TypeVar(2, kindEffect, Bound)
       val typeBind2 = TForAll([a, b, e], [], 
-        TFun([(nameNil, TVar(a)), 
-                 (nameNil, TFun([(nameNil, TVar(a))], TVar(e), TVar(b))),
-                 (nameNil, TFun([(nameNil, TVar(a))], TVar(e), TVar(b))),
+        TFun([(nil, TVar(a)), 
+                 (nil, TFun([(nil, TVar(a))], TVar(e), TVar(b))),
+                 (nil, TFun([(nil, TVar(a))], TVar(e), TVar(b))),
                  ], TVar(e), TVar(b)))
       val ibind = App(TypeApp(Var(TName(nameBind2, typeBind2), InfoArity(3, 3)), [tpArg, tpRes, tpEff]), [bexpr', f, (Lam([arg], eff, ibody'))])
       (bind, ibind)
@@ -140,7 +140,7 @@ fun liftExpr(expr': expr, topLevel: bool): liftedEff expr
     _ -> expr'
 
 fun liftLocalFun(e: expr, eff: keffect)
-  val fvs = e.freeLocals.list
+  val fvs = e.free-locals.list
   val tvs = e.free-type-vars.list
   val (expr2, liftDef) = e.makeDef(fvs, tvs)
   emit(DefNonRec(liftDef))
@@ -158,9 +158,9 @@ fun makeDef(e: expr, fvs: list<tName>, tvs: list<typeVar>)
   val allpars = fvs ++ pars
   val allargs = allpars.map(fn(tn) Var(tn, InfoNone))
   val liftedFun = addTypeLambdas(alltpars, Lam(allpars, eff, body))
-  val liftedTp = liftedFun.typeOf
+  val liftedTp = liftedFun.type-of
   fun liftedDef(nm, inl)
-    Def(nm, liftedTp, liftedFun, Private, defFun([]), InlineAuto, rangeNull, "// monadic lift")
+    Def(nm, liftedTp, liftedFun, Private, DefFun([]), InlineAuto, range/null, "// monadic lift")
   fun funExpr(n: name)
     Var(TName(n, liftedTp), InfoArity(alltpars.length, allargs.length))
   fun etaExpr(n: name)
@@ -183,5 +183,5 @@ fun liftGuard(Guard(guard, body): guard)
 fun uniqueNameCurrentDef()
   val d = currentDef.last.unjust
   val i = new-unique()
-  val udef-name = toHiddenUniqueName(i, "mlift", d.def-name)
+  val udef-name = to-hidden-unique-name(i, "mlift", d.def-name)
   (udef-name, d.kinline)

@@ -11,6 +11,7 @@ import compiler/kind/kind
 import compiler/common/failure
 import compiler/platform/config
 import compiler/common/color-scheme
+import std/core/undiv
 
 // Box / unbox transformation
 alias boxEff = <uniquePhase,comp-flags,documentation,pure,colorSchemeEffect,ppEnvEff>
@@ -182,7 +183,7 @@ fun boxCoerceFun(toParTps: list<(name, ktype)>, toEffTp: ktype, toResTp: ktype, 
 
 fun zip3(l1: list<a>, l2: list<b>, l3: list<c>): list<(a,b,c)>
   match (l1, l2, l3)
-    (Cons(x1, xs1), Cons(x2, xs2), Cons(x3, xs3)) -> Cons((x1, x2, x3), zip3(xs1.unsafe-decreasing, xs2, xs3))
+    (Cons(x1, xs1), Cons(x2, xs2), Cons(x3, xs3)) -> Cons((x1, x2, x3), zip3(xs1.pretend-decreasing, xs2, xs3))
     _ -> Nil
 
 fun boxBindExprAsValue(fromTp: ktype, toTp: ktype, ex: expr, f: expr -> boxEff expr)

@@ -17,17 +17,17 @@ effect synonymsEff
   fun getSynonyms(): synonyms
   fun setSynonyms(syns: synonyms): ()
 
-fun withSynonyms(synonyms0: synonyms, f: () -> <synonymsEff,exn,comp-flags|e> a): <exn,comp-flags|e> a
+fun withSynonyms(synonyms0: synonyms, f: () -> <synonymsEff,pure,comp-flags|e> a): <pure,comp-flags|e> a
   var synonyms := synonyms0
   with handler
     fun getSynonyms() synonyms
     fun setSynonyms(syns: synonyms) synonyms := syns
     fun synonymsExtend(k: synInfo)
-      synonyms := synonyms.synonymsExtend(k)
+      synonyms := synonyms.extend(k)
     fun synonymsLookup(name: name)
-      synonyms.maybeGet(name)
+      synonyms.lookup(name)
     fun synonymsFind(name: name)
-      synonyms.synonymsFind(name)
+      synonyms.synonyms/find(name)
     fun synonymsList()
       synonyms.list
     fun synonymsFilter(modName: name)
@@ -35,37 +35,37 @@ fun withSynonyms(synonyms0: synonyms, f: () -> <synonymsEff,exn,comp-flags|e> a)
       // TODO: Should this modify the synonyms?
   f()
 
-fun synonymsNew(ls: list<synInfo>)
-  linearMap(ls.map(fn(si) (si.name, si)))
-fun synonymsExtend(synonyms: synonyms, k: synInfo)
+fun new(ls: list<synInfo>)
+  LinearMap(ls.map(fn(si) (si.name, si)))
+fun extend(synonyms: synonyms, k: synInfo)
   synonyms.set(k.name, k)
-fun synonymsLookup(synonyms: synonyms, name: name)
-  synonyms.maybeGet(name)
-fun synonymsFind(synonyms: synonyms, name: name)
-  match synonyms.maybeGet(name)
+fun lookup(synonyms: synonyms, name: name)
+  synonyms.lookup(name)
+fun find(synonyms: synonyms, name: name)
+  match synonyms.lookup(name)
     Just(di) -> di
     _ -> fail("synonyms lookup failed")
-fun synonymsDiff(synonyms: synonyms, syns1: synonyms, syns2: synonyms)
-  syns2.filter(fn(k, v) syns1.maybeGet(k).is-nothing)
-fun synonymsFilter(synonyms: synonyms, modName: name)
+fun diff(synonyms: synonyms, syns1: synonyms, syns2: synonyms)
+  syns2.filter(fn(k, v) syns1.lookup(k).is-nothing)
+fun synonyms/filter(synonyms: synonyms, modName: name)
   synonyms.filter(fn(k, v) (k.qualifier) == modName)
 
-fun synonymsCompose(syns1: synonyms, syns2: synonyms)
+fun compose(syns1: synonyms, syns2: synonyms)
   unions([syns2, syns1])
 
 fun single(name: name, s: synInfo): synonyms
-  linearMap([(name, s)])
-val emptySynonyms:synonyms = linearMap([])
+  LinearMap([(name, s)])
+val empty:synonyms = LinearMap([])
 
-fun extractSynonyms(c: core): <pure,comp-flags> synonyms
-  c.typeDefs.map(extractTypeDefGroup).unions
+fun core/extract-synonyms(c: core): <pure,comp-flags> synonyms
+  c.typeDefs.map(extract-synonyms).unions
 
-fun extractTypeDefGroup(g: typeDefGroup): <pure,comp-flags> synonyms
-  g.map(extractSynonyms).unions
+fun tdg/extract-synonyms(g: typeDefGroup): <pure,comp-flags> synonyms
+  g.map(extract-synonyms).unions
 
-fun extractSynonyms(d: typeDef): <pure,comp-flags> synonyms
+fun td/extract-synonyms(d: typeDef): <pure,comp-flags> synonyms
   match d
     Synonym(synInfo) -> single(synInfo.name, synInfo)
-    _ -> emptySynonyms
+    _ -> empty
 
 // TODO: Pretty print

@@ -12,8 +12,7 @@ fun getLabel(): int
     val l = !globalLabel
     globalLabel.set(l + 1)
     l
-val sExprEq = analysis/cps/sexpr/(==)
-val noFreeVars = linearSet([], sExprEq)
+val noFreeVars = LinearSet([])
 
 type def
   DefImplicit(value: exp, free: vars = value.free, label:int=getLabel(), name: sexpr = genName("_"))
@@ -47,13 +46,13 @@ type clause
 type exp
   SelfLit(lit: sexpr, free: vars = noFreeVars, label:int=getLabel())
   QuoteLit(lit: sexpr, free: vars = noFreeVars, label:int=getLabel())
-  Ref(name: sexpr, free: vars = linearSet([name], sExprEq), label:int=getLabel())
+  Ref(name: sexpr, free: vars = LinearSet([name]), label:int=getLabel())
   App(f: exp, args: list<exp>, free: vars = f.free + args.map(free).foldl(noFreeVars, fn(a, b) a + b), label:int=getLabel())
   KLambda(formals: (list<sexpr>, maybe<sexpr>), body: body, free: vars = body.free - formals, label:int=getLabel())
   ULambda(formals: (list<sexpr>, maybe<sexpr>), body: body, free: vars = body.free - formals, label:int=getLabel())
   Lambda(formals: (list<sexpr>, maybe<sexpr>), body: body, free: vars = body.free - formals, label:int=getLabel())
   IfE(test: exp, ifTrue: exp, ifFalse: maybe<exp>, free: vars = test.free + ifTrue.free + ifFalse.map(free).default(noFreeVars), label:int=getLabel())
-  SetE(name: sexpr, value: exp, free: vars = linearSet([name], sExprEq) + value.free, label:int=getLabel())
+  SetE(name: sexpr, value: exp, free: vars = LinearSet([name]) + value.free, label:int=getLabel())
   Values(vals: list<exp>, free: vars = vals.map(free).foldl(noFreeVars, fn(a, b) a + b), label:int=getLabel())
   LetValues(bindings: list<(sexpr, exp)>, body: body, free: vars = body.free + bindings.map(free).foldl(noFreeVars, fn(a, b) a + b), label:int=getLabel())
   Begin(body: body, free: vars = body.free, label:int=getLabel())

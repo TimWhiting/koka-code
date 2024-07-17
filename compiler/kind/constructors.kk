@@ -24,7 +24,7 @@ fun withConstructors(cnstrs0: qname-map<conInfo>, f: () -> <constructors,exn,com
     fun constructorsLookup(ctxt, name: name)
       cnstrs.lookup(ctxt, name)
     fun constructorsLookupQ(name: name)
-      cnstrs.lookupQ(name)
+      cnstrs.lookup-qualified(name)
     fun constructorsFind(ctxt: name, name: name)
       match cnstrs.lookup(ctxt, name)
         Found((qn, conInfo)) -> (qn, conInfo)
@@ -32,29 +32,25 @@ fun withConstructors(cnstrs0: qname-map<conInfo>, f: () -> <constructors,exn,com
     fun constructorsList()
       cnstrs.list
     fun constructorsFilter(modName: name)
-      cnstrs.filterNames(fn(n) n == modName)
+      cnstrs.filter-names(fn(n) n == modName)
     fun constructorsUnions(cs: list<qname-map<conInfo>>)
       cnstrs := unions(cs.reverse) // Assumes left bias
       cnstrs
   f()
 
-val eqC = fn(c1:conInfo, c2:conInfo) c1 == c2
-val showC = fn(c:conInfo) c.show
-fun single(name: name, c: conInfo): qname-map<conInfo>
-  name-collections/single(name, c, eqC, showC)
 
-val empty = name-collections/qname-empty(eqC, showC)
+val contructor/empty = LinearMap([])
 
-fun extractConstructors(c: core): <pure,comp-flags> qname-map<conInfo>
-  c.typeDefs.map(extractTypeDefGroup).unions
+fun core/extract-coninfo(c: core): <pure,comp-flags> qname-map<conInfo>
+  c.typeDefs.map(extract-coninfo).unions
 
-fun extractTypeDefGroup(g: typeDefGroup): <pure,comp-flags> qname-map<conInfo>
-  g.map(extractTypeDef).unions
+fun tdg/extract-coninfo(g: typeDefGroup): <pure,comp-flags> qname-map<conInfo>
+  g.map(extract-coninfo).unions
 
-fun extractTypeDef(d: typeDef): <pure,comp-flags> qname-map<conInfo>
+fun td/extract-coninfo(d: typeDef): <pure,comp-flags> qname-map<conInfo>
   match d
     Data(dataInfo) | dataInfo.vis.is-public -> 
-      fromList(dataInfo.constrs.filter(fn(ci) ci.vis.is-public).map(fn(ci) (ci.name, ci)), eqC, showC)
+      LinearMap([]) + dataInfo.constrs.filter(fn(ci) ci.vis.is-public).map(fn(ci) (ci.name, ci))
     _ -> empty
 
 // TODO: Pretty print

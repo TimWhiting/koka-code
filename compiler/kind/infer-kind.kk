@@ -64,15 +64,15 @@ fun infExtractKindFun(infkind: infKind)
 alias ksub = id-map<infKind>
 alias kvs = id-set
 
-fun ksubSingle(id: id, infkind: infKind)
-  [].add(id, infkind)
+fun ksubSingle(id: id, infkind: infKind): ksub
+  LinearMap([(id, infkind)])
 
 fun compose(sub1: ksub, sub2: ksub): ksub
   sub1.union(sub1 |-> sub2)
 
 fun inf/(|->)(sub: ksub, k: infKind): infKind
   match k
-    KIVar(kid) -> sub.maybe-get(kid).default(k)
+    KIVar(kid) -> sub.lookup(kid).default(k)
     KIApp(k1, k2) -> KIApp(sub |-> k1, sub |-> k2)
     KICon(k) -> KICon(k)
 
@@ -80,23 +80,23 @@ fun sub/(|->)(sub1: ksub, sub2: ksub): ksub
   sub2.map(fn(k, v) (k, inf/(|->)(sub1, v)))
 
 fun sub/fkv(sub: ksub): pure kvs
-  sub.map(fn((_, s)) s.fkv).unions
+  sub.list.map(fn((_, s)) s.fkv).unions
 
 fun inf/fkv(k: infKind): kvs
   match k
-    KIVar(kid) -> [] + kid
+    KIVar(kid) -> LinearSet([]) + kid
     KIApp(k1, k2) -> k1.fkv.union(k2.fkv)
-    KICon(_) -> []
+    KICon(_) -> LinearSet([])
 
 // Pretty printing
 fun infkind/show(infkind: infKind): <comp-flags,pure,colorSchemeEffect> string
   with niceKindEnv()
-  infkind.fkv.foreach(extend-nice)
+  infkind.fkv.list.foreach(fn(fk) fk.extend-nice)
   infkind.ppInfKind(precInfKindTop).pprint/show
 
 fun niceInfKinds(kinds: list<infKind>): <pure,comp-flags,colorSchemeEffect> list<doc>
   with niceKindEnv()
-  kinds.map(fkv).unions.map(extend-nice)
+  kinds.map(fkv).unions.list.map(extend-nice)
   kinds.map(fn(k) k.liftKApp.ppInfKind(precInfKindTop))
 
 fun ppInfKind(k: infKind, prec: int): <pure, niceEff<id>, comp-flags, colorSchemeEffect> doc
@@ -124,7 +124,7 @@ fun ppInfKind(k: infKind, prec: int): <pure, niceEff<id>, comp-flags, colorSchem
       doc.pparens(prec, precInfKindApp)
 
 fun niceKindEnv(f: () -> <niceEff<id>|e> a): e a
-  var nice := []
+  var nice := LinearMap([])
   var kindIndex := -1
   with handler
     fun extend-nice(k: id)

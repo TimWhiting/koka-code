@@ -89,7 +89,7 @@ fun coreExpr(info: nameInfo, qname: name)
 // Due to overloading there may be multiple entries for the same qualified name
 
 alias gamma = name-map<list<(name, nameInfo)>>
-val empty = linearMap([])
+val empty:gamma = LinearMap([])
 
 fun gammaList(g: gamma): list<(name, nameInfo)>
   g.list.map(snd).concat.sortBy(fn((n, _), (n2, _)) n.compare(n2))

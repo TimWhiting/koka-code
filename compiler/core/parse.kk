@@ -720,11 +720,11 @@ struct envv
 
 fun withEnvInitial(modName: name, imports0, f: () -> <eenv,ast,comp-flags,synonyms> a): <comp-flags,ast> a
   with withSynonyms(synonyms/empty)
-  var bound := linearMap([], fn(x: name, y: name) x == y, fn(x: typeVar, y: typeVar) x == y, fn(x) x.show, fn(x) x.show)
+  var bound := LinearMap([])
   var imports := imports0
   var unique := 1000
   var gamma := assumption/empty
-  var locals := linearMap([], fn(x: name, y: name) x == y, fn(x: ktype, y: ktype) x == y, fn(x) x.show, fn(x) x.show)
+  var locals := LinearMap([])
   fun qualify(n: name)
     if n.isQualified then
       match imports.importsExpand(n)

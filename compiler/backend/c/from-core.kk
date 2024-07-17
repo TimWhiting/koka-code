@@ -39,7 +39,7 @@ fun cFromCore(cTarget: cTarget, b: buildType, sourceDir: path,
   var ridoc := [] // initialization expressions
   var rtdoc := [] // toplevel (goes to either H or C)
   var rddoc := [] // done expressions
-  var canonicalLamTypes := linearSet([], fn(c1: canonicalLambda, c2: canonicalLambda) c1 == c2, show)
+  var canonicalLamTypes := LinearSet([])
   with handler
     fun emitToH(d: doc) rhdoc := Cons(d, rhdoc)
     fun emitToC(d: doc) rcdoc := Cons(d, rcdoc)

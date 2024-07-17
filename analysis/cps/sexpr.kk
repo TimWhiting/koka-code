@@ -301,7 +301,7 @@ fun (==)(s1: sexpr, s2: sexpr): bool
     _ -> False
 
 alias nameMap = some<e> linearMap<string,int>
-val globalNameGen:ref<global,nameMap> = pretend-total{ref(linearMap([], fn(x1: string, x2: string) x1 == x2))}
+val globalNameGen:ref<global,nameMap> = pretend-total{ref(LinearMap([]))}
 fun genName(n: string): sexpr
   pretend-total
     val m = !globalNameGen

@@ -17,6 +17,7 @@ import compiler/common/file
 import compiler/lib/printer
 import compiler/common/color-scheme
 import std/os/path
+import std/core/undiv
 
 alias asmEff = <pure,asm,comp-flags,uniquePhase,colorSchemeEffect,newtypesEff,printer,subst,documentation,niceEff<typeVar>,ppEnvEff,precEff,prettyTypeEff>
 
@@ -59,7 +60,7 @@ value struct canonicalLambda
 
 fun (==)(fn1: list<(name, bool)>, fn2: list<(name, bool)>): bool
   match (fn1, fn2)
-    (Cons((n1, b1), r1), Cons((n2, b2), r2)) -> n1 == n2 && b1 == b2 && r1.unsafe-decreasing == r2 
+    (Cons((n1, b1), r1), Cons((n2, b2), r2)) -> n1 == n2 && b1 == b2 && r1.pretend-decreasing == r2 
     _ -> False
 
 fun (==)(c1: canonicalLambda, c2: canonicalLambda): pure bool
@@ -218,12 +219,12 @@ fun isPureExpr(ex: expr): pure bool
 
 fun isTailCalling(ex: expr, n: name): bool
   fun f2(g: guard)
-    g.body.unsafe-decreasing.isTailCalling(n) // does the guarded expression tailcall?
+    g.body.pretend-decreasing.isTailCalling(n) // does the guarded expression tailcall?
   fun f1(b: branch)
     b.guards.any(f2) // does any of the guards tailcall?
   match ex
-    TypeApp(e) -> isTailCalling(e.unsafe-decreasing, n) // trivial
-    TypeLam(_, e) -> isTailCalling(e.unsafe-decreasing, n) // trivial
+    TypeApp(e) -> isTailCalling(e.pretend-decreasing, n) // trivial
+    TypeLam(_, e) -> isTailCalling(e.pretend-decreasing, n) // trivial
     Lam -> False // lambda body is a new context, can't tailcall
     Var -> False // variable is not a call
     Con -> False // constructor is not a call
@@ -232,7 +233,7 @@ fun isTailCalling(ex: expr, n: name): bool
     App(TypeApp(Var(tn, info)), args) | tn.getName == n -> info.arity == args.length // polymorphic direct application can be a tail call
     App(Var(tn), [e]) | tn.getName == nameReturn -> e.isTailCalling(n) // return is transparent in terms of tail calling
     App -> False
-    Let(_, e) -> e.unsafe-decreasing.isTailCalling(n) // tail calls can only happen in the actual body
+    Let(_, e) -> e.pretend-decreasing.isTailCalling(n) // tail calls can only happen in the actual body
     Case(_, bs) -> bs.any(f1)
 
 type result
@@ -250,7 +251,7 @@ type cType
 fun cType(tp: ktype): cType
   match tp
     TForAll(_, _, t) -> t.cType
-    TFun(pars, _, res) -> CFun(pars.map(fn(p) p.snd.unsafe-decreasing.cType), res.cType)
+    TFun(pars, _, res) -> CFun(pars.map(fn(p) p.snd.pretend-decreasing.cType), res.cType)
     TApp(t) -> t.cType
     TCon(c) -> c.cTypeCon
     TVar -> CBox

@@ -15,6 +15,7 @@ import compiler/common/syntax
 import std/data/linearset
 import compiler/common/color-scheme
 import compiler/common/nice
+import std/core/undiv
 
 fun genLocalGroups(dgs: defGroups): asmEff list<doc>
   dgs.map(genLocalGroup)
@@ -216,7 +217,7 @@ fun genLambda(body: expr, params: list<tName>, eff: ktype)
 
 fun zip3(l1: list<a>, l2: list<b>, l3: list<c>): list<(a,b,c)>
   match (l1, l2, l3)
-    (Cons(x1, xs1), Cons(x2, xs2), Cons(x3, xs3)) -> Cons((x1, x2, x3), zip3(xs1.unsafe-decreasing, xs2, xs3))
+    (Cons(x1, xs1), Cons(x2, xs2), Cons(x3, xs3)) -> Cons((x1, x2, x3), zip3(xs1.pretend-decreasing, xs2, xs3))
     _ -> Nil
 
 fun unzip4(l: list<(a,b,c,d)>): (list<a>, list<b>, list<c>, list<d>)

@@ -47,7 +47,7 @@ fun urDef(d: def)
   val kexpr = d.defExpr.urExpr
   (fn(e) d(defExpr = e), kexpr)
 
-fun urExpr(e: expr)
+fun urExpr(e: expr): <comp-flags,corePhase,div,exn,ur> expr
   match e
     // lambdas and type lambdas use UnK to contain returns inside their body
     Lam(pars, eff, body) ->
@@ -65,7 +65,7 @@ fun urExpr(e: expr)
     Case(scruts, branches) ->
       e.urCase(scruts, branches)
     // return
-    App(Var(v), [arg]) | v.getName == nameReturn -> R(arg)
+    App(Var(v), [arg]) | v.get-name == nameReturn -> R(arg)
     // pure expressions that do not contain return (as checked by the grammar)
     App(f, args) ->
       I(App(f.urPure, args.map(urPure)))
@@ -92,7 +92,7 @@ fun urLet(org: expr, defgroups: list<defGroup>, kbody: kexpr): ureff kexpr
       DefNonRec(d) ->
         val (mkDef, kexpr) = d.urDef
         Right((fn(e) DefNonRec(mkDef(e)), kexpr))
-  fun isUnchanged(e: maybechanged)
+  fun is-unchanged(e: maybechanged): bool
     match e
       Left((_, dgs)) -> dgs.all(is-u)
       Right((_, dg)) -> dg.is-u
@@ -110,11 +110,11 @@ fun urLet(org: expr, defgroups: list<defGroup>, kbody: kexpr): ureff kexpr
           addDef(mkDefGroup(e1), e2)
         kdefgs.fold(Nothing.bind(combine, kdefexpr, kexpr))
   val kdefgs = defgroups.map(urLetDefGroup)
-  if kdefgs.all(isUnchanged) then
+  if kdefgs.all(is-unchanged) then
     Just(org).emapK(fn(e) makeLet(defgroups, e), kbody)
   else kdefgs.reverse.fold(kbody)
 
-fun urCase(org: expr, scruts: list<expr>, branches: list<branch>)
+fun urCase(org: expr, scruts: list<expr>, branches: list<branch>): <div,exn,uniquePhase,ur,comp-flags,corePhase> kexpr
   val (mkBranches, kexprss) = branches.map(urBranch).unzip
   val ks = kexprss.concat
   if ks.all(is-u) then U(org)
@@ -127,16 +127,16 @@ fun urCase(org: expr, scruts: list<expr>, branches: list<branch>)
     F(f)
   else
     // generate a local continuation function
-    val name = "cont".uniqueName
-    val pname = "x".uniqueName
+    val name = "cont".unique-name
+    val pname = "x".unique-name
     val eff = currentEff.unjust
-    val tp = org.typeOf
+    val tp = org.type-of
     val parName = TName(pname, tp)
     val parVar = Var(parName, InfoNone)
     fun f(c)
       val lam = Lam([parName], eff, c(parVar))
-      val defTp = lam.typeOf
-      val def = Def(name, defTp, lam, Private, defFun([Own]), InlineAuto, rangeNull, "")
+      val defTp = lam.type-of
+      val def = Def(name, defTp, lam, Private, DefFun([Own]), InlineAuto, range/null, "")
       val defVar = Var(TName(name, defTp), InfoNone)
       fun app(e)
         App(defVar, [e])

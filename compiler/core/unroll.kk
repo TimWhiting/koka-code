@@ -1,6 +1,7 @@
 import compiler/core/core
 import compiler/type/type
 import compiler/common/name
+import std/core/undiv
 
 fun unrollDefs(unrollMax: int)
   setCoreDefs(unrollDefGroups(getCoreDefs()))
@@ -47,12 +48,12 @@ fun extractNonRecBranches(dname: tName, recs: list<branch>, bs: list<branch>): (
     // Stop on end
     Nil -> (Nil, recs)
     // stop also when we cannot push down patterns of recursive branches any further
-    Cons(b, bs') | recs.any(fn(r) r.matchCanOverlap(b)) ->
+    Cons(b, _) | pretend-no-div({recs.any(fn(r) r.matchCanOverlap(b))}) ->
       (Nil, recs ++ [b] ++ bs)
     // otherwise
     Cons(b as Branch(pats, guards)) ->
       // we only want cheap matches in the unrolling, and they should be non-recursive    
-      if pats.any(fn(p) !p.singletonPat) || guards.freeVars.mamber(defname) then
+      if pats.any(fn(p) !p.singletonPat) || guards.free-vars.mamber(defname) then
         // assume it contains a recursive call
         // push down as long the other patterns don't match to maximize non-recursive matches
         extractNonRecBranches(dname, (recs ++ [b]), bs')

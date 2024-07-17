@@ -708,7 +708,7 @@ fun resolveKind(infkind: infKind)
       KIApp(k1, k2) -> KApp(k1.resolve, k2.resolve)
   skind.resolve
 
-val nameTVMapEmpty = linearMap([])
+val nameTVMapEmpty = LinearMap([])
 
 fun resolveConstructor(typeName: name, typeSort: dataKind, isSingleton: bool, typeResult: ktype, typeParams: list<typeVar>,
   idmap: name-map<typeVar>, UserCon(name, exists0, params, mbResult, rngName, rng, vis, doc): userCon<kUserType<infKind>, userType, infKind>)

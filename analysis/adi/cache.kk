@@ -27,7 +27,7 @@ fun show(c: config)
   val (e, p, s) = c
   expr/show(e) ++ " " ++ utils/show(p, core/show) ++ " " ++ linearmap/show(s)
 
-val emptyCacheValStore = linearSet([(Abvalue(Nothing, Nothing), linearMap([], fn(i1, i2: int) i1 == i2, fn(a1: abvalue<int>, a2: abvalue<int>) (==)(a1, a2, (==), showA), fn(k) k.show, fn(v) v.show(showA)))], eqCacheValue, fn(s) s.fst.show(showA) ++ "," ++ s.snd.show)
+val emptyCacheValStore = LinearSet([(Abvalue(Nothing, Nothing), LinearMap([]))])
 alias arinterp<a,s> = <rinterp<a,s>,ecache<a,s,env<a>>,ecachevisit<a,s>>
 alias rarinterp<e> = (expr) -> <arinterp<int, abvalue<int>>|e> abvalue<int>
 
@@ -48,14 +48,14 @@ fun evcache(ev0 : (rarinterp<e> -> rarinterp<e>)): <> (rarinterp<e> -> rarinterp
           _ -> fail()
       else
         val inC = get-cache-in()
-        val v-store = inC.getDefault(config, linearSet([], eq-v-store, fn(s':(abvalue<int>, linearMap<int, abvalue<int>>)) s'.fst.show(showA) ++ "," ++ s'.snd.show))
+        val v-store = inC.getDefault(config, LinearSet([]))
         put-cache-out(config, v-store)
         val v = ev0(ev)(e)
         val s' = get-store()
         update-cache(config, v, s')
         v
 
-val emptyCache = linearMap([], eqConfig, fn(a:cache-entry<int,abvalue<int>>, b:cache-entry<int,abvalue<int>>) a == b, show, show)
+val emptyCache = LinearMap([])
 
 fun fixcache(eval: rarinterp<e>, e: expr): <div,exn|e> abvalue<int>
   var cachein := emptyCache

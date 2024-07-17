@@ -218,7 +218,7 @@ fun handleNdet(f)
 
 fun test-concrete(f: ((expr) -> <rinterp<int,evalue<int>>|e> evalue<int>), e: expr): <div,exn|e> evalue<int>
   var env := []
-  var store := linearMap([], eqAddr, fn(a:evalue<int>, b:evalue<int>) (==)(a, b, eqAddr, showA), showA, show)
+  var store: linearMap<int,evalue<int>> := LinearMap([])
   with handler
     fun inj(e1)
       e1

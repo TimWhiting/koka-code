@@ -69,7 +69,7 @@ fun infGammaList()
 val eqK = fn(ni1:nameInfo, ni2:nameInfo) ni1 == ni2
 val showK = fn(ni:nameInfo) ni.show
 
-val emptyInfGamma = linearMap([], fn(n1, n2: name) n1 == n2, eqK, show, showK)
+val emptyInfGamma = LinearMap([])
 
 fun (|->)(sub: sub, inf: infGamma): pure infGamma
   inf.map(fn(k, ni) (k, sub |-> ni))

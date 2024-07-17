@@ -20,42 +20,42 @@ fun withNewtypes(newtps0: newtypes, f: () -> <newtypesEff,exn,comp-flags|e> a): 
   var newtps := newtps0
   with handler
     fun newtypesExtend(name: name, k: dataInfo) newtps := newtps.set(name, k)
-    fun newtypesLookupAny(name: name) newtps.maybe-get(name)
-    fun newtypesLookupPublic(name: name) newtps.newtypesLookupPublic(name)
-    fun newtypesFind(name: name) newtps.newtypesFind(name)
-    fun newtypesList() newtps
+    fun newtypesLookupAny(name: name) newtps.lookup-any(name)
+    fun newtypesLookupPublic(name: name) newtps.lookup-public(name)
+    fun newtypesFind(name: name) newtps.newtypes/find(name)
+    fun newtypesList() newtps.list
   f()
 
-fun nt/newtypesNew(lst: list<dataInfo>): newtypes
-  lst.map(fn(di) (di.name, di))
-fun nt/newtypesExtend(newtps: newtypes, name: name, k: dataInfo)
+fun newtypes/new(lst: list<dataInfo>): newtypes
+  LinearMap(lst.map(fn(di) (di.name, di)))
+fun newtypes/extend(newtps: newtypes, name: name, k: dataInfo)
   newtps.set(name, k)
-fun nt/newtypesLookupAny(newtps: newtypes, name: name)
-  newtps.maybe-get(name)
-fun nt/newtypesLookupPublic(newtps: newtypes, name: name)
-  match newtps.maybe-get(name)
+fun newtypes/lookup-any(newtps: newtypes, name: name)
+  newtps.lookup(name)
+fun newtypes/lookup-public(newtps: newtypes, name: name)
+  match newtps.lookup(name)
     Just(di) | di.vis.is-public -> Just(di)
     _ -> Nothing
-fun nt/newtypesFind(newtps: newtypes, name: name)
-  match newtps.maybe-get(name)
+fun newtypes/find(newtps: newtypes, name: name)
+  match newtps.lookup(name)
     Just(di) -> di
     _ -> fail("newTypes lookup failed")
 fun newtypesCompose(ntps1: newtypes, ntps2: newtypes)
   unions([ntps2, ntps1])
 
 fun single(name: name, d: dataInfo): newtypes
-  [(name, d)]
-val emptyNewtypes:newtypes = []
+  LinearMap([(name, d)])
+val newtypes/empty:newtypes = LinearMap([])
 
-fun extractNewtypes(c: core): <pure,comp-flags> newtypes
-  c.typeDefs.map(extractTypeDefGroup).unions
+fun core/extract-newtypes(c: core): <pure,comp-flags> newtypes
+  c.typeDefs.map(extract-newtypes).unions
 
-fun extractTypeDefGroup(g: typeDefGroup): <pure,comp-flags> newtypes
-  g.map(extractTypeDef).unions
+fun tdg/extract-newtypes(g: typeDefGroup): <pure,comp-flags> newtypes
+  g.map(extract-newtypes).unions
 
-fun extractTypeDef(d: typeDef): <pure,comp-flags> newtypes
+fun td/extract-newtypes(d: typeDef): <pure,comp-flags> newtypes
   match d
     Data(dataInfo, False) -> single(dataInfo.name, dataInfo)
-    _ -> emptyNewtypes
+    _ -> newtypes/empty
 
 // TODO: Pretty print

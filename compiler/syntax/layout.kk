@@ -5,6 +5,7 @@ import compiler/common/range
 import compiler/common/name
 import std/os/file
 import std/os/path
+import std/core/undiv
 
 
 fun testFile(fname: string)
@@ -90,7 +91,7 @@ fun associateComments(lexs: list<lexeme>): list<lexeme>
 fun combineLineComments(lexs: list<lexeme>): list<lexeme>
   match lexs
     Cons(Lexeme(r1, LexComment(c1)), Cons(Lexeme(r2, LexComment(c2)), ls)) | (c1.starts-with("//").bool 
-      && c2.starts-with("//").bool) -> combineLineComments(Cons(Lexeme(r1.combine(r2), LexComment(c1 ++ c2)), ls).unsafe-decreasing)
+      && c2.starts-with("//").bool) -> combineLineComments(Cons(Lexeme(r1.combine(r2), LexComment(c1 ++ c2)), ls).pretend-decreasing)
     Cons(l, ls) -> Cons(l, combineLineComments(ls))
     Nil -> Nil
 

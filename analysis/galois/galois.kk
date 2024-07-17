@@ -1,6 +1,7 @@
 import data
 import std/data/linearset
 import std/data/linearmap
+import std/core/undiv
 
 fun lset(eq: (a, a) -> e bool): lattice<linearSet<a>,e>
   Lattice([], fn(l, a) setunion(l, a, eq), list-eq(eq))
@@ -26,11 +27,11 @@ fun cache(bottom: s, union: (s, s) -> e s, singleton: (c, r) -> e s, lookup: (s,
 fun lfp((bottom, _, _): lattice<a,e>, f: (a) -> e a, eq: (a, a) -> e bool): e a
   fun loop(x0)
     val x = f(x0)
-    if (eq(x,x0)) then x else loop(x0.unsafe-decreasing)
+    if (eq(x,x0)) then x else loop(x0.pretend-decreasing)
   loop(bottom)
 
 fun fix(f: (a) -> e a): e a
-  f(fix(f.unsafe-decreasing))
+  f(fix(f.pretend-decreasing))
 
 fun makeeval(monad)
   val Monad(unit, bind, sigma-lookup, sigma-extend) = monad

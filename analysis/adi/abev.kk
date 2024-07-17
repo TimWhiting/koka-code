@@ -47,7 +47,7 @@ fun eqConfig(c1: config, c2: config): div bool
 fun injectConcrete(c: evalue<a>, eqA: some<e> (a, a) -> <div|e> bool, showA: some<e> (a) -> <div|e> string): abvalue<a>
   match c
     NumV(i) -> Abvalue(Just(Elem(i)), Nothing)
-    ClosV(c) -> Abvalue(Nothing, Just(linearSet([c], fn(a, b) (==)(a, b, fn(p1, p2) (==)(p1, p2, eqA, showA)), fn(s) s.show(fn(e) e.show(showA)))))
+    ClosV(c) -> Abvalue(Nothing, Just(LinearSet([c])))
     ErrorV -> Abvalue(Nothing, Nothing)
 
 fun join(m1: maybe<a>, m2: maybe<a>, joinA: (a, a) -> e a): e maybe<a>
@@ -126,11 +126,11 @@ fun handleAbsValue(f)
     val show-addr = showA
     val eq-addr = eqAddr
 
-val emptyAbsStore = linearMap([], eqAddr, fn(a:abvalue<int>, b:abvalue<int>) (==)(a, b, eqAddr, showA), showA, fn(v) v.show(showA))
+val emptyAbsStore = LinearMap([])
 
 fun handle-store(f)
   var store := emptyAbsStore
-  var xmap: linearMap<string, int> := linearMap([], fn(s1:string, s2:string) s1 == s2, fn(i1:int, i2:int) i1 == i2, show, show)
+  var xmap: linearMap<string, int> := LinearMap([])
   with handler
     fun ext(a, v)
       store := store.update(a, v, fn(o, n) o.join(n))
@@ -149,7 +149,7 @@ fun handle-store(f)
 
 fun handle-store2(f)
   var store: linearMap<int, abvalue<int>> := get-store()
-  var xmap: linearMap<string, int> := linearMap([], fn(s1:string, s2:string) s1 == s2, fn(i1:int, i2:int) i1 == i2, show, show)
+  var xmap: linearMap<string, int> := LinearMap([])
   val x = handle({mask behind<estore>{f()}})
     fun ext(a, v)
       store := store.update(a, v, fn(o, n) o.join(n))

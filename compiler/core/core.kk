@@ -786,6 +786,9 @@ fun get-effect(e: expr): keffect
 // TODO: More here
 
 // Type variables
+
+val tnames/empty: linearSet<tName> = LinearSet([])
+
 fun tnames(l: list<tName>): linearSet<tName>
   LinearSet(l)
 

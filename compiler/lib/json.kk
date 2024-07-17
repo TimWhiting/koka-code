@@ -6,13 +6,13 @@ import std/num/float64
 type jsValue
   JsNull
   JsBool(b: bool)
-  JsInt(s: string, i:int = s.std/num/parse)
-  JsDouble(s: string, d:float64 = s.std/num/float64/parse)
+  JsInt(s: string, i:int)
+  JsDouble(s: string, d:float64)
   JsString(s: string)
   JsArray(l: list<jsValue>)
   JsObject(o: jsObject<jsValue>)
 
-alias jsObject<a> = linearMap<string, a, <>>
+alias jsObject<a> = linearMap<string, a>
 
 fun toString(v: jsValue)
   match v
@@ -23,9 +23,9 @@ fun show(v: jsValue)
   match v
     JsNull -> "null"
     JsBool(b) -> if b then "true" else "false"
-    JsInt(i) -> i.std/core/show
-    JsDouble(d) -> d.std/core/show
-    JsString(s) -> s.std/core/show
+    JsInt(i) -> i.show
+    JsDouble(d) -> d.show
+    JsString(s) -> s.show
     JsArray(l) -> "[" ++ l.map(show).join(", ") ++ "]"
     JsObject(o) -> "{" ++ o.list.map(fn ((k, v1)) k ++ ": " ++ v1.show).join(",\n ") ++ "}"
 
@@ -35,11 +35,11 @@ fun jsLookup(v: jsValue, keys: list<string>): jsValue
     Cons(k, ks) ->
       match v
         JsObject(o) -> 
-          match o.maybeGet(k)
+          match o.lookup(k)
             Just(v1) -> jsLookup(v1, ks)
             Nothing -> JsNull
         JsArray(vs) -> 
-          match k.std/core/parse-int
+          match k.parse-int
             Just(i) -> 
               match vs[i]
                 Just(v1) -> jsLookup(v1, ks)
@@ -54,23 +54,23 @@ fun jsFind(v: jsValue, def: jsValue, keys: list<string>): jsValue
 
 val hexLeadRegex = r"0[xX]".regex();
 fun hexadecimal()
-  takePattern(leadingRegex) ++ takePattern(hexLeadRegex) ++ takePattern(integerRegex)
+  takePattern(leadingRegex).string ++ takePattern(hexLeadRegex).string ++ takePattern(integerRegex).string
 
 val leadingHexDotRegex = r"^.[0-9a-fA-F_]+([eEpP][+-]?[0-9a-fA-F_]+)?".regex() 
 val wholeHexFloatRegex = r"^[0-9a-fA-F_]+(\.[0-9a-fA-F_]+)?([eEpP][+-]?[0-9a-fA-F_]+)?".regex() 
 val integerRegex = r"^[0-9a-fA-F_]+".regex() 
 fun integer()
-  takePattern(leadingRegex) ++ takePattern(integerRegex)
+  takePattern(leadingRegex).string ++ takePattern(integerRegex).string
 
 val leadingRegex = r"[+-]".regex()
 fun exp()
-  takePattern(leadingRegex) ++ integer()
+  takePattern(leadingRegex).string ++ integer()
   
 fun decfloat()
-  takePattern(leadingRegex) ++ (fn() takePattern(wholeHexFloatRegex)).or({takePattern(leadingHexDotRegex)})
+  takePattern(leadingRegex).string ++ (fn() takePattern(wholeHexFloatRegex).string).or({takePattern(leadingHexDotRegex).string})
 
 fun hexfloat()
-  takePattern(leadingRegex) ++ hexadecimal() ++ (fn() takePattern(wholeHexFloatRegex)).or({takePattern(leadingHexDotRegex)})
+  takePattern(leadingRegex).string++ hexadecimal() ++ (fn() takePattern(wholeHexFloatRegex).string).or({takePattern(leadingHexDotRegex).string})
 
 fun pLit()
   with scope("plit")
@@ -79,22 +79,22 @@ fun pLit()
 fun pFloat()
   with atomic
   val d = or({decfloat().split("_").join}, {hexfloat().split("_").join})
-  JsDouble(d)
+  JsDouble(d, d.parse-float64.unjust)
 
 fun pInteger()
   with atomic
   val d = integer().split("_").join
-  JsInt(d)
+  JsInt(d, d.parse-int.unjust)
 
 val stringRegex = "^\"[^\\\\\"]*(?:\\\\.[^\"\\\\]*)*\"".regex()
 
-inline fun takeString()
+inline fun takeString(): parse<string> sslice
   takePattern(stringRegex)
 
 fun pString()
   with scope("pstring")
   val s = takeString()
-  JsString(s.slice.substr(1, s.count - 1).string)
+  JsString(s.subslice(1, s.count - 1).string)
 
 fun pArray()
   with scope("parray")
@@ -104,24 +104,24 @@ fun pArray()
   pToken("]")
   JsArray(xs)
 
-fun pMember()
+fun pMember(): <pure,parse<string>> (string, jsValue)
   with scope("pmember")
   val k = takeString()
   optional(pWhitespace)
   pToken(":")
   val v = pValue()
-  (k, v)
+  (k.string, v)
 
 fun pObject()
   with scope("pobject")
   pToken("{")
   val members = separatedTrailing(pMember, {pToken(",")})
   optional(pWhitespace)
-  val o = JsObject(linearMap(members, fn(s: string, s1: string) s == s1))
+  val o = JsObject(LinearMap(members))
   pToken("}")
   o
 
-fun pValue()
+fun pValue(): <pure,parse<string>> jsValue
   with scope("pvalue")
   val v = ors([pArray,pObject,pLit,pFloat,pInteger,pString])
   optional(pWhitespace)
@@ -135,18 +135,18 @@ fun pToken(s: string)
   text(s)
   optional(pWhitespace)
 
-fun parse(s: string)
+fun parse(s: string): ()
   s.println
   val x = match pValue.run(s)
     Right(e) -> e.show
-    Left(err) -> "Error:\n" ++ err.show(fn(x: string) x, s)
+    Left(err) -> "Error:\n" ++ err.show()
   x.println
   
 fun parse2(p, s: string, rshow)
   s.println
   val x = match p.run(s)
     Right(e) -> e.rshow
-    Left(err) -> "Error:\n" ++ err.show(fn(x: string) x, s)
+    Left(err) -> "Error:\n" ++ err.show()
   x.println
   
 fun main()

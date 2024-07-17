@@ -15,6 +15,7 @@ import compiler/type/kind
 import compiler/kind/kind
 import compiler/kind/pretty
 import compiler/common/syntax
+import std/core/undiv
 
 alias prec = int;
 val precTopTop = -1 // most outer level: used to suppress 'forall'
@@ -27,7 +28,7 @@ val precPred = 5
 
 alias tvScheme = linearMap<typeVar, (prec -> doc)>;
 
-val rankedDefault = linearMap([])
+val rankedDefault:tvScheme = LinearMap([])
 
 fun keyword(s: string)
   s.text.color(colors.colorTypeKeyword)
@@ -93,8 +94,8 @@ fun handlePrettyEff(f)
     val prec = precTopTop
   with handler 
     val ranked = rankedDefault
-    val moduleContext = "Main".newName
-    val importsMap = emptyImports
+    val moduleContext = "Main".new-name
+    val importsMap = LinearMap([])
   f()
  
 fun typeColon()
@@ -106,15 +107,15 @@ fun minCanonical(tp: ktype): pure string
 fun canonical(tp: ktype): pure string
   tp.canonicalForm.show.compress
 
-fun compress(s: string): string
+fun string/compress(s: string): string
   s.list.compress.string
 
-fun compress(l: list<char>): list<char>
+fun list/compress(l: list<char>): list<char>
   match l
     Nil -> Nil
     Cons(c, cs) ->
-      if c == '\n' then compress(cs.drop-while(isSpace).unsafe-decreasing)
-      elif c.isSpace then  Cons(' ', compress(cs.drop-while(isSpace).unsafe-decreasing))
+      if c == '\n' then compress(cs.drop-while(isSpace).pretend-decreasing)
+      elif c.isSpace then  Cons(' ', compress(cs.drop-while(isSpace).pretend-decreasing))
       else Cons(c, compress(cs))
 
 fun niceType(tp)
@@ -125,7 +126,7 @@ fun niceTypes(tps: list<ktype>): ppTypeEff list<doc>
     tp.ppType.color(colors.colorType)
 
 fun niceList(schemes: list<ktype>, f: (ktype) -> ppTypeEff doc): ppTypeEff list<doc>
-  schemes.map(fn(tp) tp.free-type-vars).unions.list.map(extendNice)
+  schemes.map(fn(tp) tp.free-type-vars).unions.list.map(extend-nice)
   schemes.map(f)
 
 // Pretty print a type
@@ -240,7 +241,7 @@ fun prettyComment(d: doc, comment: string)
     val cmt = if clist.last.unjust == '\n' then clist.init.string else comment
     (cmt.text |-| d).color(colors.colorComment)
 
-fun ppVis(v: visibility)
+fun ppVis(v: visibility): colorSchemeEffect doc
   match v
     Private -> empty
     Public -> "pub ".keyword

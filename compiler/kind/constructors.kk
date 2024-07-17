@@ -9,48 +9,47 @@ import std/data/linearmap
 
 effect constructors
   fun constructorsExtend(name: name, c: conInfo): ()
-  fun constructorsLookup(ctxt: name, name: name): lookup<conInfo>
-  fun constructorsLookupQ(name: name): maybe<conInfo>
-  fun constructorsFind(ctxt: name, name: name): (name, conInfo)
-  fun constructorsList(): list<(name, list<(name, conInfo)>)>
-  fun constructorsFilter(modName: name): qname-map<conInfo>
-  fun constructorsUnions(cs: list<qname-map<conInfo>>): qname-map<conInfo>
+  fun constructorsLookup(name: name): maybe<conInfo>
+  fun constructorsFind(name: name): conInfo
+  fun constructorsList(): list<(name, conInfo)>
+  fun constructorsFindScheme(name: name): ktype
+  fun constructorsUnions(cs: list<name-map<conInfo>>): name-map<conInfo>
 
-fun withConstructors(cnstrs0: qname-map<conInfo>, f: () -> <constructors,exn,comp-flags|e> a): <exn,comp-flags|e> a
+fun withConstructors(cnstrs0: name-map<conInfo>, f: () -> <constructors,exn,comp-flags|e> a): <exn,comp-flags|e> a
   var cnstrs := cnstrs0
   with handler
     fun constructorsExtend(name: name, k: conInfo)
-      cnstrs := cnstrs.insert(name, k)
-    fun constructorsLookup(ctxt, name: name)
-      cnstrs.lookup(ctxt, name)
-    fun constructorsLookupQ(name: name)
-      cnstrs.lookup-qualified(name)
-    fun constructorsFind(ctxt: name, name: name)
-      match cnstrs.lookup(ctxt, name)
-        Found((qn, conInfo)) -> (qn, conInfo)
+      cnstrs := cnstrs.set(name, k)
+    fun constructorsLookup(name: name)
+      cnstrs.lookup(name)
+    fun constructorsFind(name: name)
+      match cnstrs.lookup(name)
+        Just(conInfo) -> conInfo
         _ -> fail("conInfo lookup failed")
     fun constructorsList()
       cnstrs.list
-    fun constructorsFilter(modName: name)
-      cnstrs.filter-names(fn(n) n == modName)
-    fun constructorsUnions(cs: list<qname-map<conInfo>>)
+    fun constructorsFindScheme(name: name)
+      cnstrs.map/get(name).typeScheme
+    fun constructorsUnions(cs: list<name-map<conInfo>>)
       cnstrs := unions(cs.reverse) // Assumes left bias
       cnstrs
   f()
 
+val contructors/empty: name-map<conInfo> = LinearMap([])
 
-val contructor/empty = LinearMap([])
+fun compose(a: name-map<conInfo>, b: name-map<conInfo>): name-map<conInfo>
+  a.union(b) // ASSUMES left biased union
 
-fun core/extract-coninfo(c: core): <pure,comp-flags> qname-map<conInfo>
+fun core/extract-coninfo(c: core): <pure,comp-flags> name-map<conInfo>
   c.typeDefs.map(extract-coninfo).unions
 
-fun tdg/extract-coninfo(g: typeDefGroup): <pure,comp-flags> qname-map<conInfo>
+fun tdg/extract-coninfo(g: typeDefGroup): <pure,comp-flags> name-map<conInfo>
   g.map(extract-coninfo).unions
 
-fun td/extract-coninfo(d: typeDef): <pure,comp-flags> qname-map<conInfo>
+fun td/extract-coninfo(d: typeDef): <pure,comp-flags> name-map<conInfo>
   match d
     Data(dataInfo) | dataInfo.vis.is-public -> 
-      LinearMap([]) + dataInfo.constrs.filter(fn(ci) ci.vis.is-public).map(fn(ci) (ci.name, ci))
+      LinearMap(dataInfo.constrs.filter(fn(ci) ci.vis.is-public).list/map(fn(ci) (ci.conInfo/name, ci)))
     _ -> empty
 
 // TODO: Pretty print

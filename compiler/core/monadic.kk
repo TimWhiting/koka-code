@@ -184,7 +184,7 @@ val typeBind = TForAll([tvarA, tvarB, tvarE], [],
       (nameNil, TFun([(nameNil, TVar(tvarA))], TVar(tvarE), typeYld(TVar(tvarB))))], TVar(tvarE), typeYld(TVar(tvarB))))
 
 fun typeYld(tp: ktype) 
-  tp // TSyn(TypeSyn(nameTypeYld, kindFun(kindStar, kindStar), 0, Nothing), [tp], tp)
+  tp // TSyn(TypeSyn(nameTypeYld, kind-fun(kindStar, kindStar), 0, Nothing), [tp], tp)
 
 val tvarA = TypeVar(0, kindStar, Bound)
 val tvarB = TypeVar(1, kindStar, Bound)

@@ -1,7 +1,10 @@
 import compiler/core/core
 import compiler/type/type
 import compiler/common/name
+import compiler/common/syntax
+import compiler/core/corevar
 import std/core/undiv
+import std/data/linearset
 
 fun unrollDefs(unrollMax: int)
   setCoreDefs(unrollDefGroups(getCoreDefs()))
@@ -19,31 +22,31 @@ fun unrollRecDef(d: def)
     Lam(pars, eff, body) -> unrollBody(d, [], pars, eff, body)
     TypeLam(tpars, Lam(pars, eff, body)) -> unrollBody(d, tpars, pars, eff, body)
     _ -> []
-  if dgs.is-nil then DefRec([d]) else dgs
+  if dgs.is-nil then [DefRec([d])] else dgs
 
 fun unrollBody(d: def, tpars: list<typeVar>, pars: list<tName>, eff: keffect, body: expr)
   match body
-    Case(exprs, branches as Cons(Branch(pats))) | exprs.all(fn(x) x.cost == 0)
-      match branches.extractNonRecBranches(d.def-name, [])
+    Case(exprs, brnchs as Cons(Branch(pats))) | pretend-no-div{exprs.all(fn(x:expr) x.cost == 0)} ->
+      match extractNonRecBranches(d.defTname, [], brnchs)
         (nonrecbs, recbs) | nonrecbs.length > 0 && recbs.length > 0 ->
-          val dname = d.def-name
+          val dname = d.defTname
           val rname = dname.uniqueTNameFrom
           val info = InfoArity(tpars.length, pars.length)
           val sub = [(dname, Var(rname, info))]
-          val rdef = d(def-name=rname.getName, defExpr=(sub |-> d.defExpr), vis=Private)
-          val rcall = App(TypeApp(Var(rname, info), tpars.map(fn(tv) TVar(tv)), pars.map(fn(v) Var(v, InfoNone))))
+          val rdef = d(def-name=rname.get-name, defExpr=(sub |-> d.defExpr), vis=Private)
+          val rcall = App(TypeApp(Var(rname, info), tpars.map(fn(tv) TVar(tv))), pars.map(fn(v) Var(v, InfoNone)))
           val wild = Branch(pats.map(fn(_) PatWild), [Guard(exprTrue, rcall)])
           fun mkFun(b)
             val l = Lam(pars, eff, b)
-            if tpars.is-nil then l else fn(e) TypeLam(tpars, tpars, l)
-          val ddef = d(defExpr=mkFun(Case(exprs, nonrecbs ++ [wild])), inl=InlineAlwyas,
-            doc="// unrolling of singleton matches of " ++ rname.getName.show ++ "\n")
+            if tpars.is-nil then l else TypeLam(tpars, l)
+          val ddef = d(defExpr=mkFun(Case(exprs, nonrecbs ++ [wild])), kinline=InlineAlways,
+            doc="// unrolling of singleton matches of " ++ rname.get-name.show ++ "\n")
           // TODO: Verbose doc
           [DefRec([rdef]), DefNonRec(ddef)]
         _ -> []
-    -> [] // TODO: small let bindings?
+    _ -> [] // TODO: small let bindings?
 
-fun extractNonRecBranches(dname: tName, recs: list<branch>, bs: list<branch>): (list<branch>, list<branch>)
+fun extractNonRecBranches(dname: tName, recs: list<branch>, bs: list<branch>): div (list<branch>, list<branch>)
   match bs
     // Stop on end
     Nil -> (Nil, recs)
@@ -51,9 +54,9 @@ fun extractNonRecBranches(dname: tName, recs: list<branch>, bs: list<branch>): (
     Cons(b, _) | pretend-no-div({recs.any(fn(r) r.matchCanOverlap(b))}) ->
       (Nil, recs ++ [b] ++ bs)
     // otherwise
-    Cons(b as Branch(pats, guards)) ->
+    Cons(b as Branch(pats, guards), bs') ->
       // we only want cheap matches in the unrolling, and they should be non-recursive    
-      if pats.any(fn(p) !p.singletonPat) || guards.free-vars.mamber(defname) then
+      if pats.any(fn(p) !p.singletonPat) || guards.free-vars.member(dname) then
         // assume it contains a recursive call
         // push down as long the other patterns don't match to maximize non-recursive matches
         extractNonRecBranches(dname, (recs ++ [b]), bs')
@@ -94,6 +97,5 @@ fun dontSkip(Branch(pats, guards): branch)
       _ -> pat 
   Branch(pats.map(noSkip), guards)
 
-
-
-
+fun uniqueTNameFrom(tn: tName): <ndet,uniquePhase> tName
+  TName(to-hidden-unique-name(unique(), "unroll", tn.get-name), tn.type-of)

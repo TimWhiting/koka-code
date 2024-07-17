@@ -36,7 +36,7 @@ fun urTopDef(d: def): ureff def
 effect ur
   val currentEff: maybe<keffect>
 
-alias ureff = <ur,comp-flags,pure,corePhase>
+alias ureff = <ur,comp-flags,pure,corePhase,uniquePhase>
 
 fun currentEffect(eff: keffect, k: () -> <ur|e> a): <ur|e> a
   with override
@@ -47,7 +47,7 @@ fun urDef(d: def)
   val kexpr = d.defExpr.urExpr
   (fn(e) d(defExpr = e), kexpr)
 
-fun urExpr(e: expr): <comp-flags,corePhase,div,exn,ur> expr
+fun urExpr(e: expr): <comp-flags,corePhase,div,exn,ur,uniquePhase> kexpr
   match e
     // lambdas and type lambdas use UnK to contain returns inside their body
     Lam(pars, eff, body) ->

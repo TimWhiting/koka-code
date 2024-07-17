@@ -1,9 +1,6 @@
 # TODO
 
 ## Syntax errors
-- [ ] core/analysis-resume.kk
-- [ ] core/unreturn.kk
-- [ ] core/unroll.kk
 
 ## Changes
 - [ ] check all in common/

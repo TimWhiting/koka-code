@@ -148,9 +148,9 @@ fun newQName(s': string)
   val s = s'.list 
   val (rname, rsmod) = s.reverse.span(fn(c) { c != '/' })
   match rsmod // TODO: First case needs condition on rname == Nil
-    Cons('/', Cons('/', rmod)) -> newQualified(rmod.reverse.string, "/")
-    Cons('/', rmod) -> newQualified(rmod.reverse.string, rname.reverse.string)
-    _ -> s.string.newName
+    Cons('/', Cons('/', rmod)) -> new-qualified(rmod.reverse.string, "/")
+    Cons('/', rmod) -> new-qualified(rmod.reverse.string, rname.reverse.string)
+    _ -> s.string.new-name
 
 fun char/from-char-esc(c)
   match c

@@ -271,14 +271,14 @@ fun lex-lowerid()
   else if l.isMalformed then
     LexError(messageMalformed)
   else
-    LexId(s.newName)
+    LexId(s.new-name)
 
 fun lex-conid()
-  LexCons(conid().string.newName)
+  LexCons(conid().string.new-name)
 
 fun lex-idchars()
   pstring("_")
-  LexWildCard(many(idchar).string.newName)
+  LexWildCard(many(idchar).string.new-name)
 
 fun lex-special()
   LexSpecial(special().string)
@@ -296,25 +296,25 @@ fun lex-integer()
   LexInt(d.parse-int.default(-1), d)
 
 fun lex-or()
-  LexOp(pstring("||").newName)
+  LexOp(pstring("||").new-name)
 
 fun lex-anglebar() // TODO: Fix this
   val x = Cons(anglebar(), many1(anglebar)).string
   match x
     "|" -> LexKeyword(x, "")
-    _ -> LexOp(x.newName)
+    _ -> LexOp(x.new-name)
 
 fun lex-idop()
-  LexIdOp(idop().stripParens.string.newName)
+  LexIdOp(idop().stripParens.string.new-name)
 
 fun lex-symbols()
   val s = psymbols().string
   if s.isReserved then
     LexKeyword(s, "")
   else if s.isPrefixOp then
-    LexPrefix(s.newName)
+    LexPrefix(s.new-name)
   else
-    LexOp(s.newName)
+    LexOp(s.new-name)
 
 fun lex-stringbegin()
   pstring("\"")
@@ -351,19 +351,19 @@ fun lex-charesc()
   pstring("\'\\")
   val c = char-esc()
   pstring("'")
-  LexChar(c.string)
+  LexChar(c)
 
 fun lex-hexesc()
   pstring("\'\\")
   val c = hex-esc()
   pstring("'")
-  LexChar(c.drop(3).head('*').fromCharEsc.string)
+  LexChar(c.drop(3).head('*').fromCharEsc.string.head-char.unjust)
 
 fun lex-char()
   pstring("\'")
   val c = charchar()
   pstring("\'")
-  LexChar(c.string)
+  LexChar(c.string.head-char.unjust)
 
 fun lex-emptychar()
   pstring("\'")
@@ -393,9 +393,9 @@ fun stripParens(s: list<char>)
 fun newQName(s: list<char>) 
   val (rname, rsmod) = s.reverse.span(fn(c) { c != '/' })
   match rsmod // TODO: First case needs condition on rname == Nil
-    Cons('/', Cons('/', rmod)) -> newQualified(rmod.reverse.string, "/")
-    Cons('/', rmod) -> newQualified(rmod.reverse.string, rname.reverse.string)
-    _ -> s.string.newName
+    Cons('/', Cons('/', rmod)) -> new-qualified(rmod.reverse.string, "/")
+    Cons('/', rmod) -> new-qualified(rmod.reverse.string, rname.reverse.string)
+    _ -> s.string.new-name
 
 fun fromCharEsc(c)
   match c
@@ -500,10 +500,10 @@ type lex-part
 fun lexer(sourceName: string, lineNo: int, input: string)
   lexing(Source(sourceName, input), lineNo, input)
 
-fun lex(source: source, lineNo: int, input: string): div list<lexeme>
+fun lex(source: source, lineNo: int, input: string): pure list<lexeme>
   match lexing(source, lineNo, input)
-    ParseOk(u, _) -> u.map(fn(x) Lexeme(rangeNull, x))
-    _ -> Cons(Lexeme(rangeNull, LexError("Unexpected end of input")), Nil)
+    ParseOk(u, _) -> u.map(fn(x) Lexeme(range/null, x))
+    _ -> Cons(Lexeme(range/null, LexError("Unexpected end of input")), Nil)
 
 fun lexEHandler(initialState:lex-state, action: () -> <lexE| e> a): e a
   var state := initialState
@@ -512,7 +512,7 @@ fun lexEHandler(initialState:lex-state, action: () -> <lexE| e> a): e a
       state
   action()
 
-fun lexing(source: source, lineNo: int, input: string): <div> parse-error<list<lex>>
+fun lexing(source: source, lineNo: int, input: string): pure parse-error<list<lex>>
   // with parse(input.slice)
   with parseGreedy(input.slice)
   var initPos := Pos(source, 0, lineNo, 1)

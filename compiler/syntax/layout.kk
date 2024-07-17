@@ -6,7 +6,7 @@ import compiler/common/name
 import std/os/file
 import std/os/path
 import std/core/undiv
-
+import std/core/unsafe
 
 fun testFile(fname: string)
   val f = read-text-file(("test/" ++ fname).path)
@@ -30,10 +30,10 @@ fun isLexError(x)
     _ -> False
 
 fun removeWhite(lexemes: list<lexeme>): list<lexeme>
-  lexemes.filter(fn(x) !lexemeIsWhite(x))
+  lexemes.filter(fn(x) !is-white(x))
 
 fun removeWhitespace(lexemes: list<lexeme>): list<lexeme>
-  lexemes.filter(fn(x) !lexemeIsWhitespace(x))
+  lexemes.filter(fn(x) !is-whitespace(x))
 
 fun endLine(r)
   r.end.line
@@ -72,7 +72,7 @@ fun associateComments(lexs: list<lexeme>): list<lexeme>
   match lexs
     // Special comments
     Cons(Lexeme(r1, LexComment(c1)), ls) | (c1.starts-with("//.").bool 
-      && ! (c1.slice.substr(3, c1.count).string.trim-right.list.any(fn(c) -> c == ' '))) -> 
+      && ! (c1.slice.subslice(3, c1.count).string.trim-right.list.any(fn(c) -> c == ' '))) -> 
         Cons(Lexeme(r1, LexSpecial(c1.trim-right)), ls.associateComments)
     // Comment association
     Cons(Lexeme(r1, LexComment(comment)), Cons(Lexeme(r2,LexKeyword(k, _)), ls)) | (k.isDocKeyword 
@@ -112,7 +112,7 @@ fun check(prevLine: int, commentRng: range, l: list<lexeme>): list<lexeme>
 
 // Check for comments in indentation
 fun checkComments(lexs: list<lexeme>): list<lexeme>
-  check(0, rangeNull, lexs)
+  check(0, range/null, lexs)
 
 value struct layout
   open: lexeme
@@ -120,7 +120,7 @@ value struct layout
 
 fun indentLayout(lexs: list<lexeme>): list<lexeme>
   match lexs
-    Nil -> Cons(Lexeme(rangeNull, LexInsSemi), Nil)
+    Nil -> Cons(Lexeme(range/null, LexInsSemi), Nil)
     Cons(l, _) -> 
       val start = Lexeme(l.range.before, LexWhite("")) // ignored
       unsafe-total
@@ -135,7 +135,7 @@ fun brace(layout: layout, layouts: list<layout>, prev: lexeme, lexemes: list<lex
         val rCurly = layout.insertRCurly(prev)
         prev.insertSemi ++ rCurly ++ brace(ly, lys, Lexeme(prev.range.after, LexInsRCurly), [])
     // ignore error lexemes
-    Cons(l, ls) | l.lex.isError -> Cons(l, brace(layout, layouts, prev, ls))
+    Cons(l, ls) | l.lex.is-error -> Cons(l, brace(layout, layouts, prev, ls))
     Cons(lexeme, ls) -> 
       val Layout(Lexeme(_, layoutLex), layoutCol) = layout
       val Lexeme(prevRng, prevLex) = prev
@@ -170,7 +170,7 @@ fun insertRCurly(Layout(Lexeme(layoutRng, layoutLex), layoutCol), Lexeme(prevRng
     Cons(
       Lexeme(prevRng.after, 
         LexError(
-          "layout: an open brace '{' (at " ++ layoutRng.showRange(True) ++ 
+          "layout: an open brace '{' (at " ++ layoutRng.show-range("".path, True) ++ 
           ", layout column " ++ layoutCol.show  ++ ") is matched by an implicit closing brace"
         )), 
       Cons(Lexeme(prevRng.after, LexInsRCurly), Nil)

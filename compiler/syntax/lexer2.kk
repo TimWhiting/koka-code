@@ -25,48 +25,48 @@ inline fun dash()
 
 val spacesRegex = "^[ ]+".regex()
 inline fun space()
-  takePattern(spacesRegex)
+  takePattern(spacesRegex).string
 
 inline fun tab()
   token("\t")
 
 val graphicRegex = "^[\x21-\x7E]".regex()
 inline fun graphic()
-  takePattern(graphicRegex)
+  takePattern(graphicRegex).string
 
 val symbolRegex = r"^[\$%&*+~!/\\^~=.:\-?<>|]".regex()
 inline fun symbol()
-  takePattern(symbolRegex)
+  takePattern(symbolRegex).string
 
 val specialRegex = "^[()[\\]{};,]".regex()
 inline fun special()
-  takePattern(specialRegex)
+  takePattern(specialRegex).string
 
 val anglebarRegex = "^[<>]".regex()
 inline fun anglebar()
-  takePattern(anglebarRegex)
+  takePattern(anglebarRegex).string
 
 val charExcRegex = r#"^[nrt\\\'\"]"#.regex();
 inline fun char-esc()
-  takePattern(charExcRegex)
+  takePattern(charExcRegex).string
 
 // Regular expressions
 
 val newlineRegex = "^\r?\n".regex()
 fun newline()
-  takePattern(newlineRegex)
+  takePattern(newlineRegex).string
 
 // More utf8
 val utf8Regex = "^([\xC2-\xDF][\x80-\xBF]|\xE0[\xA0-\xBF][\x80-\xBF]|[\xE1-\xEC][\x80-\xBF][\x80-\xBF])".regex();
 fun utf8()
-  takePattern(utf8Regex)
+  takePattern(utf8Regex).string
 
 fun linechar()
   [graphic, space, tab, utf8].ors
 
 val graphicComment = "^[\x21-\x29\x2B-\x2E\x30-\x7E]".regex()
 inline fun graphic-comment()
-  takePattern(graphicComment)
+  takePattern(graphicComment).string
 
 fun commentchar()
   [graphic-comment, space, tab, newline, utf8].ors
@@ -84,13 +84,13 @@ fun hexesc3()
   takePattern(hexDigitRegex6)
 
 fun hex-esc()
-  [hexesc1, hexesc2, hexesc3].ors
+  [hexesc1, hexesc2, hexesc3].ors.string
 
 fun escape()
   token("\\") ++ [hex-esc, char-esc].ors
 
 inline fun graphic-string()
-  takePattern(graphicCharStringRegex)
+  takePattern(graphicCharStringRegex).string
 
 fun stringchar()
   [graphic-string, space, utf8].ors
@@ -105,11 +105,11 @@ inline fun graphic-char()
   takePattern(graphicCharRegex)
 
 inline fun charchar()
-  [{takePattern(graphicCharCharRegex)}, space, utf8].ors
+  [{takePattern(graphicCharCharRegex).string}, space, utf8].ors
 
 val graphicStringRawRegex = "^[^\"]".regex()
 fun graphic-stringraw()
-  takePattern(graphicStringRawRegex)
+  takePattern(graphicStringRawRegex).string
 
 fun stringraw()
   [graphic-stringraw, space, tab, newline, utf8].ors
@@ -134,39 +134,39 @@ fun modulepath()
   takePattern(modulePathRegex)
 
 fun qvarid()
-  modulepath() ++ lowerid()
+  modulepath().string ++ lowerid().string
 
 fun qconid()
-  modulepath() ++ upperid()
+  modulepath().string ++ upperid().string
 
 fun psymbols()
   [{many1(symbol).join}, forward-slash].ors
 
 fun qidop()
-  modulepath() ++ open-paren() ++ psymbols() ++ close-paren()
+  modulepath().string ++ open-paren() ++ psymbols() ++ close-paren()
 
 fun idop()
   open-paren() ++ psymbols() ++ close-paren()
 
 val hexLeadRegex = r"^0[xX]".regex();
 fun hexadecimal()
-  takePattern(leadingRegex) ++ takePattern(hexLeadRegex) ++ takePattern(integerRegex)
+  takePattern(leadingRegex).string ++ takePattern(hexLeadRegex).string ++ takePattern(integerRegex).string
 
 val leadingHexDotRegex = r"^\.[0-9a-fA-F_]+([eEpP][+-]?[0-9a-fA-F_]+)?".regex() 
 val wholeHexFloatRegex = r"^[0-9a-fA-F_]+((\.[0-9a-fA-F_]+)|([eEpP][+-]?[0-9a-fA-F_]+)|(\.[0-9a-fA-F_]+[eEpP][+-]?[0-9a-fA-F_]+)".regex() 
 val integerRegex = r"^[0-9a-fA-F_]+".regex() 
 fun integer()
-  takePattern(leadingRegex) ++ takePattern(integerRegex)
+  takePattern(leadingRegex).string ++ takePattern(integerRegex).string
 
 val leadingRegex = r"^[+-]?".regex()
 fun exp()
-  takePattern(leadingRegex) ++ integer()
+  takePattern(leadingRegex).string ++ integer()
   
 fun decfloat()
-  takePattern(leadingRegex) ++ (fn() takePattern(wholeHexFloatRegex)).or({takePattern(leadingHexDotRegex)})
+  takePattern(leadingRegex).string ++ (fn() takePattern(wholeHexFloatRegex).string).or({takePattern(leadingHexDotRegex).string})
 
 fun hexfloat()
-  takePattern(leadingRegex) ++ hexadecimal() ++ (fn() takePattern(wholeHexFloatRegex)).or({takePattern(leadingHexDotRegex)})
+  takePattern(leadingRegex).string ++ hexadecimal() ++ (fn() takePattern(wholeHexFloatRegex).string).or({takePattern(leadingHexDotRegex).string})
 
 // Start on tokenizing
 fun lex-space()
@@ -210,19 +210,19 @@ fun lex-qidop()
 
 fun lex-lowerid()
   with atomic
-  val l = lowerid()
+  val l = lowerid().string
   if l.isReserved then
     LexKeyword(l, "")
   else if l.list.isMalformed then
     LexError(messageMalformed)
   else
-    LexId(l.newName)
+    LexId(l.new-name)
 
 fun lex-conid()
-  LexCons(conid().newName)
+  LexCons(conid().string.new-name)
 
 fun lex-wildcard()
-  LexWildCard(takePattern(wildCardRegex).newName)
+  LexWildCard(takePattern(wildCardRegex).string.new-name)
 
 fun lex-special()
   LexSpecial(special())
@@ -243,7 +243,7 @@ fun lex-integer()
   LexInt(d.parse-int.default(-1), d)
 
 fun lex-or()
-  LexOp(token("||").newName)
+  LexOp(token("||").new-name)
 
 fun lex-anglebar()
   with atomic
@@ -253,11 +253,11 @@ fun lex-anglebar()
   reset(i)
   match x
     "|" -> LexKeyword(x, "")
-    _ -> LexOp(x.newName)
+    _ -> LexOp(x.new-name)
 
 fun lex-idop()
   with atomic
-  LexIdOp(idop().list.stripParens.string.newName)
+  LexIdOp(idop().list.stripParens.string.new-name)
 
 fun lex-symbols()
   with atomic
@@ -265,9 +265,9 @@ fun lex-symbols()
   if s.isReserved then
     LexKeyword(s, "")
   else if s.isPrefixOp then
-    LexPrefix(s.newName)
+    LexPrefix(s.new-name)
   else
-    LexOp(s.newName)
+    LexOp(s.new-name)
 
 fun lex-stringbegin()
   with atomic
@@ -297,7 +297,7 @@ fun lex-rstringbegin()
 val notNewlineRegex = "^[^\\n]+".regex()
 fun lex-linecomment()
   with atomic
-  val start = token("//") ++ takePattern(notNewlineRegex)
+  val start = token("//") ++ takePattern(notNewlineRegex).string
   LexComment(start ++ newline())
 
 fun lex-charesc()
@@ -305,21 +305,21 @@ fun lex-charesc()
   text("\'\\")
   val c = char-esc()
   text("'")
-  LexChar(c)
+  LexChar(c.head-char.unjust)
 
 fun lex-hexesc()
   with atomic
   text("'\\")
   val c = hex-esc()
   text("'")
-  LexChar(c.list.drop(3).head('*').fromCharEsc.string)
+  LexChar(c.list.drop(3).head('*').fromCharEsc.string.head-char.unjust)
 
 fun lex-char()
   with atomic
   text("'")
   val c = charchar()
   text("'")
-  LexChar(c)
+  LexChar(c.head-char.unjust)
 
 fun lex-emptychar()
   with atomic
@@ -353,9 +353,9 @@ fun stripParens(s: list<char>)
 fun newQName(s: list<char>) 
   val (rname, rsmod) = s.reverse.span(fn(c) { c != '/' })
   match rsmod // TODO: First case needs condition on rname == Nil
-    Cons('/', Cons('/', rmod)) -> newQualified(rmod.reverse.string, "/")
-    Cons('/', rmod) -> newQualified(rmod.reverse.string, rname.reverse.string)
-    _ -> s.string.newName
+    Cons('/', Cons('/', rmod)) -> new-qualified(rmod.reverse.string, "/")
+    Cons('/', rmod) -> new-qualified(rmod.reverse.string, rname.reverse.string)
+    _ -> s.string.new-name
 
 fun fromCharEsc(c)
   match c
@@ -448,7 +448,7 @@ fun lexer(sourceName: string, lineNo: int, input: string)
 fun lex(source: source, lineNo: int, input: string): <console,div,exn> list<lexeme>
   match lexing(source, lineNo, input)
     Right(u) -> u
-    _ -> Cons(Lexeme(rangeNull, LexError("Unexpected end of input")), Nil)
+    _ -> Cons(Lexeme(range/null, LexError("Unexpected end of input")), Nil)
 
 fun lexing(source: source, lineNo: int, input: string)
   // with parse(input.slice)
@@ -478,7 +478,7 @@ fun lexing(source: source, lineNo: int, input: string)
               result := Cons(Lexeme(Range(start, pos), e), result)
             Left(e) ->
               cont := False
-              throw("Lexing error: \n\n" ++ e.show(fn(s:string) s, input))
+              throw("Lexing error: \n\n" ++ e.perr/show(input, indent="  ", ?show=fn(s:string) s))
         Right ->
           cont := False
     result.reverse

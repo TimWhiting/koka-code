@@ -101,14 +101,14 @@ fun setRel(r: rel, f: () -> divEff a): divEff a
 fun runDiv(dname: name, args: list<tName>, f: () -> divEff a): <comp-flags, pure> list<call>
   var calls: list<call> := []
   with handler
-    val rel = Rel(dname, args.map(fn(a) namesEmpty + a.getName), args.map(fn(a) namesEmpty))
+    val rel = Rel(dname, args.map(fn(a) names/empty + a.get-name), args.map(fn(a) names/empty))
     fun addCall(n, c)
       calls := Cons(c, calls)
   f()
   calls
 
 fun at(xs: list<nameSet>, i: int): nameSet
-  xs[i].default(namesEmpty)
+  xs[i].default(names/empty)
 
 fun isRecursiveCall(n: name): divEff bool
   val Rel(rname) = rel
@@ -144,26 +144,26 @@ fun divExpr(e: expr): divEff ()
   match e
     Lam(_, _, expr) -> expr.divExpr
     // Ignore .open effect calls
-    App(App(TypeApp(Var(openName)), [f]), args) | openName.getName == nameEffectOpen ->
+    App(App(TypeApp(Var(openName)), [f]), args) | openName.get-name == nameEffectOpen ->
       App(f, args).divExpr
-    App(TypeApp(App(TypeApp(Var(openName)), [f]), targs), args) | openName.getName == nameEffectOpen ->
+    App(TypeApp(App(TypeApp(Var(openName)), [f]), targs), args) | openName.get-name == nameEffectOpen ->
       App(TypeApp(f, targs), args).divExpr
     // applications
     App(TypeApp(v as Var), args) ->
       App(v, args).divExpr
     App(Var(tname), args) ->
-      val isRec = isRecursiveCall(tname.getName)
+      val isRec = isRecursiveCall(tname.get-name)
       if isRec then
-        val call = args.map-indexed(fn(i, a) argumentSize(tname.getName, i, a))
-        addCall(tname.getName, call)
+        val call = args.map-indexed(fn(i, a) argumentSize(tname.get-name, i, a))
+        addCall(tname.get-name, call)
       else
         ()
       args.map(divExpr)
       ()
     Var(tname) -> // recursive call may appear as argument, say id(recfun)(x)
-      val isRec = isRecursiveCall(tname.getName)
+      val isRec = isRecursiveCall(tname.get-name)
       if isRec then
-        addCall(tname.getName, [Unknown])
+        addCall(tname.get-name, [Unknown])
       else
         ()
     App(f, args) ->
@@ -183,9 +183,9 @@ fun divExpr(e: expr): divEff ()
 fun divBranch(exprs, Branch(pats, guards): branch): divEff ()
   fun extractName(e: expr)
     match e
-      Var(tname) -> Just(tname.getName)
-      App(TypeApp(Var(sameSize)), [Var(tname)]) | namesSameSize.any(fn(x) x == sameSize.getName) ->
-        Just(tname.getName)
+      Var(tname) -> Just(tname.get-name)
+      App(TypeApp(Var(sameSize)), [Var(tname)]) | namesSameSize.any(fn(x) x == sameSize.get-name) ->
+        Just(tname.get-name)
       _ -> Nothing
   fun divGuard(Guard(test, expr))
     test.divExpr
@@ -197,7 +197,7 @@ fun divBranch(exprs, Branch(pats, guards): branch): divEff ()
 fun divPattern(size: size, mbName: maybe<name>, p: pattern): divEff ()
   match (mbName, p)
     (Just(n), PatVar(pname, pat)) ->
-      with addRelation(size, n, pname.getName)
+      with addRelation(size, n, pname.get-name)
       divPattern(size, mbName, pat)
     (_, PatCon(_, pats, _, _, _, _, info)) ->
       pats.foreach(fn(p') divPattern(if info.typeSort.is-inductive then SLt else size, mbName, p'))
@@ -219,24 +219,24 @@ fun argumentSize(name: name, pos: int, arg: expr): divEff size
       _ -> sz
   match arg
     Var(tname, _) ->
-      lookupSize(name, pos, tname.getName)
+      lookupSize(name, pos, tname.get-name)
     // Ignore .open effect calls
-    App(App(TypeApp(Var(openName)), [f]), args) | openName.getName == nameEffectOpen ->
+    App(App(TypeApp(Var(openName)), [f]), args) | openName.get-name == nameEffectOpen ->
       argumentSize(name, pos, App(f, args))
-    App(TypeApp(App(TypeApp(Var(openName)), [f]), targs), args) | openName.getName == nameEffectOpen ->
+    App(TypeApp(App(TypeApp(Var(openName)), [f]), targs), args) | openName.get-name == nameEffectOpen ->
       argumentSize(name, pos, App(TypeApp(f, targs), args))
     // special 'unsafeDecreasing' call
-    App(TypeApp(Var(name'), [_]), [_]) | name'.getName == nameDecreasing ->
+    App(TypeApp(Var(name'), [_]), [_]) | name'.get-name == nameDecreasing ->
       SLt
     // special case substr1
-    App(Var(substrName), Cons(Var(sname), _)) | substrName.getName == nameSubStr1 ->
-      val sz = lookupSize(name, pos, sname.getName)
+    App(Var(substrName), Cons(Var(sname), _)) | substrName.get-name == nameSubStr1 ->
+      val sz = lookupSize(name, pos, sname.get-name)
       reduceSize(sz)
     // these two cases state that the call to a function f where f < name is itself < name
     App(Var(tname)) ->
-      lookupSize(name, pos, tname.getName)
+      lookupSize(name, pos, tname.get-name)
     App(TypeApp(Var(tname))) ->
-      lookupSize(name, pos, tname.getName)
+      lookupSize(name, pos, tname.get-name)
     _ -> Unknown
 
   

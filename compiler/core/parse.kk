@@ -678,8 +678,8 @@ fun pTId(): <ast,eenv,comp-flags,synonyms> ktype
 
 fun pKind()
   choices("kind", [
-    {val params = parensCommas(pKind).fst; pKeyword("->"); val res = pKind(); params.foldr(res, kindFun)},
-    {val k = pKatom(); choices("kind arrow", [{pKeyword("->"); val res = pKind(); kindFun(k, res)}, {k}])}
+    {val params = parensCommas(pKind).fst; pKeyword("->"); val res = pKind(); params.foldr(res, kind-fun)},
+    {val k = pKatom(); choices("kind arrow", [{pKeyword("->"); val res = pKind(); kind-fun(k, res)}, {k}])}
   ])
 
 fun pKatom()

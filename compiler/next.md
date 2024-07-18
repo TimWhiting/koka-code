@@ -1,5 +1,8 @@
 # TODO
 
+## Fully up to date
+// src/lib/* 07/17/24 updated
+
 ## Syntax errors
 
 ## Changes

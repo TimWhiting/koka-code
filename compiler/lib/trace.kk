@@ -21,10 +21,11 @@ fun trace-eq(s: string, a: a, ?show: (a) -> string, ?kk-file-line: string): a
 
 fun ctrace(c: color, message: string, a: a, ?kk-file-line: string): a
   with unsafe-total
-  with ansiPrinter
-  ansiWithConsole(colorSettings(fcolor=Blue))
+  with ansi-printer
+  ansi-with-color(Blue)
     (kk-file-line ++ ": ").write()
-  message.ansiWithColor(c)
+  ansi-with-color(c)
+    message.write-ln()
   a
 
 // fun example-trace()

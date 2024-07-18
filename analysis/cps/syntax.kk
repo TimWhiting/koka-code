@@ -1,5 +1,6 @@
-import sexpr
+import parsers/regex/sexpr
 import std/data/linearset
+import std/core/unsafe
 
 type program
   Program(defs: list<def>, free: vars = defs.map(free).foldl(noFreeVars, fn(a, b) a + b), label:int=getLabel())
@@ -31,7 +32,7 @@ alias formals = (list<sexpr>, maybe<sexpr>)
 pub fun free(b: binding): vars
   b.snd.free - b.fst
 
-pub fun (-)(l: vars, v: formals): e vars
+pub fun vars/(-)(l: vars, v: formals): e vars
   l - v.fst - v.snd
 
 type body
@@ -70,7 +71,7 @@ fun toExp(p: program): exp
   match p.defs
     [] -> Void()
     [DefImplicit(value)] -> value
-    _ -> LetRec(p.defs.map(fn(d) (d.name, value(d))), Body([], [Ref(p.defs.last(DefImplicit(Void())).name)]))
+    _ -> LetRec(p.defs.map(fn(d) (d.name, value(d))), Body([], [Ref(p.defs.last.default(DefImplicit(Void())).name)]))
 
 fun isAtomic(e)
   e.isPure && e.mustHalt
@@ -155,10 +156,10 @@ fun expansion(e: sexpr): exp
     SCons(car, cdr) -> consExp(car.expansion, cdr.expansion)
     _ -> QuoteLit(e)
 
-fun show(p: program): div string
+fun prog/show(p: program): div string
   p.defs.map(fn(d) d.show).join("\n")
 
-fun show(d: def): div string
+fun def/show(d: def): div string
   match d
     DefImplicit(value) ->
       value.show
@@ -167,22 +168,22 @@ fun show(d: def): div string
     DefFun(name, formals, body) ->
       "(define (" ++ name.show ++ " " ++ formals.show ++ ") " ++ body.show ++ ")"
 
-fun show(b: body): div string
+fun body/show(b: body): div string
   match b
     Body(defs, exps) ->
       defs.map(fn(d) d.show).join("\n") ++ "\n" ++ exps.map(fn(e) e.show).join("\n")
 
-fun show(f: formals): div string
+fun formals/show(f: formals): div string
   match f
     (formals, ms) ->
       "(" ++ formals.map(show).join(" ") ++ ms.map(fn(m) " . " ++ m.show).default("") ++ ")"
 
-fun show(b: binding): div string
+fun binding/show(b: binding): div string
   match b
     (name, value) ->
       "(" ++ name.show ++ " " ++ value.show ++ ")"
 
-fun show(c: clause): div string
+fun clause/show(c: clause): div string
   match c
     SelfClause(test) ->
       test.show
@@ -193,7 +194,7 @@ fun show(c: clause): div string
     ElseClause(exps) ->
       "(else " ++ exps.map(show).join(" ") ++ ")"
 
-fun show(e: exp): div string
+fun exp/show(e: exp): div string
   match e
     SelfLit(lit) ->
       lit.show
@@ -216,7 +217,7 @@ fun show(e: exp): div string
     Values(vals) ->
       "(values " ++ vals.map(show).join(" ") ++ ")"
     LetValues(bindings, body) ->
-      "(let-values (" ++ bindings.show-list(fn(x) x.show) ++ ") " ++ body.show ++ ")"
+      "(let-values (" ++ bindings.show ++ ") " ++ body.show ++ ")"
     Begin(body) ->
       "(begin " ++ body.show ++ ")"
     And(exps) ->

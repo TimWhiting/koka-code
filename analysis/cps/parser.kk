@@ -1,10 +1,10 @@
-import sexpr
-import syntax
+import parsers/regex/sexpr
 import std/data/linearset
 import std/os/path
 import std/os/file
 import std/os/dir
 import std/os/process
+import syntax
 
 fun parseBindings(bds: sexpr): pure list<binding>
   // trace("Bindings " ++ bds.show)

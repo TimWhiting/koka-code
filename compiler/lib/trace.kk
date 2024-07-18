@@ -1,20 +1,31 @@
 import std/core/unsafe
 import compiler/lib/printer
 
-fun trace(s: string, a: a): a
+fun color/trace(s: string, a: a, ?kk-file-line: string): a
   ctrace(DarkGray, s, a)
 
-fun ctrace(c: color, message: string, a: a): a
+fun unit/trace(s: string, ?kk-file-line: string): ()
+  trace(s, ())
+
+fun trace-id(s: string, ?kk-file-line: string): string
+  trace(s, s)
+  
+fun unit/trace-show(a: a, ?show: a -> e string, ?kk-file-line: string): e ()
+  color/trace(a.show, ())
+
+fun id/trace-show(a: a, ?show: a -> e string, ?kk-file-line: string): e a
+  color/trace(a.show, a)
+
+fun trace-eq(s: string, a: a, ?show: (a) -> string, ?kk-file-line: string): a
+  trace(s ++ " = " ++ a.show, a)
+
+fun ctrace(c: color, message: string, a: a, ?kk-file-line: string): a
   with unsafe-total
   with ansiPrinter
+  ansiWithConsole(colorSettings(fcolor=Blue))
+    (kk-file-line ++ ": ").write()
   message.ansiWithColor(c)
   a
-
-fun traceId(s: string): string
-  trace(s, s)
-
-fun traceEq(s: string, a: a, showa: (a) -> string): a
-  trace(s ++ " = " ++ a.showa, a)
 
 // fun example-trace()
 //   ctrace(Red, "Hello, world!", 0)

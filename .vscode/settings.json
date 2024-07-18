@@ -1,5 +1,6 @@
 {
   "koka.languageServer.compilerArguments": [
-    "-i../koka-community/std"
+    "-i../koka-community/std",
+    "-i../koka-community/parsing"
   ]
 }

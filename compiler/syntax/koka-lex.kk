@@ -212,14 +212,14 @@ inline fun alexAndPred(p1: alexAccPred<e>, p2: alexAccPred<e>, user__: maybe<ale
   p1(user__, in1, len, in2) && p2(user__, in1, len, in2)
 
 // alexPrevCharIsPred :: Char -> AlexAccPred _
-inline fun alexPrevCharIs(c: char, _, input__: alexInput, _, _): pure bool
+inline fun alexPrevCharIs(c: char, _, input__: alexInput, _, _): <pure> bool
   c == alexInputPrevChar(input__)
 
-inline fun alexPrevCharMatches(f: (char) -> pure bool, _, input__: alexInput, _, _): pure bool
+inline fun alexPrevCharMatches(f: (char) -> pure bool, _, input__: alexInput, _, _): <pure> bool
   f(alexInputPrevChar(input__))
 
 // alexPrevCharIsOneOfPred :: Array Char Bool -> AlexAccPred _
-inline fun alexPrevCharIsOneOf(arr: list<char>, _, input__: alexInput, _, _): pure bool
+inline fun alexPrevCharIsOneOf(arr: list<char>, _, input__: alexInput, _, _): <pure> bool
   val prev = alexInputPrevChar(input__)
   arr.any(fn(c) c == prev)
 

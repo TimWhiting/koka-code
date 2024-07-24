@@ -9,6 +9,23 @@ import newstd/data/sort
 import std/core/unsafe
 import std/core/undiv
 
+// The flavour of a type variable. Types in a "Type.Assumption" (Gamma) and inferred types in "Core.Core"
+// are always of the 'Bound' flavour. 'Meta' and 'Skolem' type variables only ever occur during type inference.
+// Kind and Type variables come in three flavours: 'Unifiable'
+// variables can be unified, 'Skolem's are non-unifiable (fresh)
+// variables, and 'Bound' variables are bound by a quantifier.
+type flavour
+  Bound
+  Skolem
+  Meta // used for pretty printing
+
+fun flavour/(==)(f1: flavour, f2: flavour): bool
+  match (f1, f2)
+    (Meta, Meta) -> True
+    (Skolem, Skolem) -> True
+    (Bound, Bound) -> True
+    _ -> False
+
 pub type ktype
   TForAll(vars: list<typeVar>, pred: list<pred>, r: ktype) // rho
   TFun(args: list<(name, ktype)>, e: ktype, t: ktype) // keffect

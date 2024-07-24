@@ -5,6 +5,7 @@
 // terms of the Apache License, Version 2.0. A copy of the License can be
 // found in the LICENSE file at the root of this distribution.
 //----------------------------------------------------------------------------
+// Updated as of 7/23/24 Commit: e25043b
 
 import compiler/common/color-scheme
 import compiler/common/range
@@ -71,8 +72,8 @@ fun lower/cmp(Name(m1, _, l1, _, n1, _): name, Name(m2, _, l2, _, n2, _): name):
   match cmp(m1.to-lower, m2.to-lower)
     Eq -> match cmp(l1.to-lower, l2.to-lower)
       Eq -> cmp(n1.to-lower, n2.to-lower)
-      x -> x
-    x -> x
+      lg -> lg
+    lg -> lg
 
 fun string/cmp-lower(s1: string, s2: string): order
   slice/cmp-lower(s1.slice,s2.slice)
@@ -82,7 +83,7 @@ fun slice/cmp-lower(s1: sslice, s2: sslice): order
     (Just((c1, r1)), Just((c2, r2))) -> 
       match c1.to-lower.cmp(c2.to-lower)
         Eq -> slice/cmp-lower(r1.pretend-decreasing, r2)
-        x -> x
+        lg -> lg
     (Just, _) -> Gt
     (_, Just) -> Lt
     (_, _) -> Eq
@@ -104,9 +105,9 @@ pub fun name/cmp(n1: name, n2: name): order
     Eq -> match n1.hashLocalQual.cmp(n2.hashLocalQual)
       Eq -> match n1.hashStem.cmp(n2.hashStem)
         Eq -> n1.lower/cmp(n2)
-        x -> x
-      x -> x
-    x -> x
+        lg -> lg
+      lg -> lg
+    lg -> lg
 
 // Effects compare by name first, then by module name for efficiency at runtime
 fun label-name/cmp(n1: name, n2: name): order
@@ -116,11 +117,11 @@ fun label-name/cmp(n1: name, n2: name): order
         Eq -> match n1.nameLocalQual.cmp-lower(n2.nameLocalQual)
           Eq -> match n1.hashModule.int/cmp(n2.hashModule)
             Eq -> n1.nameModule.cmp-lower(n2.nameModule)
-            x -> x
-          x -> x
-        x -> x
-      x -> x
-    x -> x
+            lg -> lg
+          lg -> lg
+        lg -> lg
+      lg -> lg
+    lg -> lg
 
 fun is-id-char(c: char): bool
   c.is-alpha || c.is-digit || c == '_' || c == '-' || c == '@'
@@ -140,11 +141,11 @@ fun is-symbol-id(s: string): bool
 fun wrap-id(s: string): string
   if is-symbol-id(s) then "(" ++ s ++ ")" else s
 
-fun name/showName(Name(m, _, l, _, n, _): name, explicitLocal: bool): string
+fun name/show-name(Name(m, _, l, _, n, _): name, explicitLocalQualifier: bool): string
   val ln = l.join(n.wrap-id)
   if m == "" then ln 
   elif ln == "" then m
-  else m ++ (if explicitLocal && l != "" then "/#" else "/") ++ ln
+  else m ++ (if explicitLocalQualifier && l != "" then "/#" else "/") ++ ln
 
 fun show-fully-explicit(Name(m, _, l, _, n, _): name): string
   val ln = l.join(n.wrap-id)
@@ -167,10 +168,10 @@ fun pretty(n: name): doc
 fun pretty-name-ex(Name(m, _, l, _, n, _): name, lsep: string, cs: colorScheme): doc // explicit /# if needed
   val ln = join(l, n.wrap-id)
   if m == "" then ln.text
-  else (
-   (m.text |.| (if ln.is-empty then pprint/empty elif l.is-empty then "/".text else lsep.text))
+  else 
+   (m.text |.| (if ln.is-empty then pprint/empty elif l.is-empty then "/".text else lsep.text)).color(cs.colorModule)
            |.| ln.text
-  ).color(cs.colorModule)
+  
 
 fun pretty-name(nm: name, cs: colorScheme): <exn> doc // not explicit /#
   if nm.is-implicit-param-name then "?".text |.| nm.from-implicit-param-name.requalify-locally.pretty-name-ex("/", cs)
@@ -179,8 +180,8 @@ fun pretty-name(nm: name, cs: colorScheme): <exn> doc // not explicit /#
 fun pretty-core-name(nm: name, cs: colorScheme): doc // explicit /# if needed
   nm.pretty-name-ex("/#", cs)
 
-fun show-tupled(Name(m, _, n, _): name): string
-  "(" ++ m.show ++ "," ++ n.show ++ ")"
+fun show-tupled(Name(m, _, l, _, n, _): name): string
+  "(" ++ m ++ "," ++ l ++ "," ++ n ++ ")"
 
 fun tupled/read(s: string): exn name
   val s' = s.slice.drop(1).extend(-1).string // Drop ()
@@ -291,8 +292,8 @@ fun missing-qualifier(current-mod: name, n: name, qname: name): string
 
 val name/nil = "".new-name
 
-fun is-nil(Name(_, _, n, _)): bool
-  n == ""
+fun is-nil(Name(m, _, l, _, n, _)): bool
+  n == "" && m == ""
 
 fun qualify(a: name, b: name): name
   match (a, b)

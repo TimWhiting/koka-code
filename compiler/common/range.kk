@@ -5,6 +5,7 @@
 // terms of the Apache License, Version 2.0. A copy of the License can be
 // found in the LICENSE file at the root of this distribution.
 //----------------------------------------------------------------------------
+// Updated as of 7/23/24: Commit 5edd7ce -- missing utfDecode, readInput, extractLiterate
 
 import std/os/path
 
@@ -92,33 +93,36 @@ fun pos-move8(Pos(s, o, l, c), ch: char): pos
 val tab-size = 2 // Always 2 in koka
 
 // source range
-value struct range (pub start: pos, pub end: pos)
+value struct range (pub start: pos, pub end: pos, pub hidden: bool)
 
 fun range/(==)(r1: range, r2: range): bool
-  r1.start == r2.start && r1.end == r2.end
+  r1.start == r2.start && r1.end == r2.end && r1.hidden == r2.hidden
+
+fun show-compact-range(r: range)
+  "[" ++ r.start.show-pos(0) ++ "," ++ r.end.show-pos(0) ++ "]"
 
 fun show-range(r: range, cwd: path, endToo: bool)
-  if r.start.line > big-line then 
-    "" 
-  else 
-    var range := r.start.show-pos(0)
-    if endToo then 
-      range := "(" ++ r.start.show-pos(0) ++ "-" ++ r.end.show-pos(0) ++ ")"     
-    r.start.source.name ++ range
+  val path = 
+        if r.start.line > big-line then ""
+        else  
+          r.start.source.name // TODO: Relative to Path cwd
+  if endToo then 
+    path ++ "(" ++ r.start.show-pos(0) ++ "-" ++ r.end.show-pos(0) ++ ")"
+  else path ++ r.start.show
 
 fun range/cmp(r1: range, r2: range): order
   match r1.start.cmp(r2.start)
     Eq -> r1.end.cmp(r2.end)
     o -> o
 
-fun range/length(r: range): int
-  r.end.off - r.start.off
-
 // Does r2 start after r1
 fun range/is-after(r1: range, r2: range): bool
   r1.end <= r2.start
 
 val range/null = make-range(pos/null, pos/null)
+
+fun range/is-null(r: range)
+  r.start.off < 0 || r.end.off < 0
 
 fun range/show(r: range): string
   r.show-full-range("".path)
@@ -127,22 +131,26 @@ fun show-full-range(r: range, cwd: path): string
   r.show-range(cwd, True)
 
 fun make-range(p1: pos, p2: pos): range
-  Range(min(p1, p2), max(p1, p2))
+  Range(min(p1, p2), max(p1, p2), False)
+
+fun make-source-range(p: string, l1: int, c1: int, l2: int, c2: int)
+  val src = Source(p, "")
+  make-range(Pos(src, -1, l1, c1), Pos(src, -1, l2, c2))
+
+fun range/length(r: range): int
+  r.end.off - r.start.off
 
 fun source(r: range): source
   r.start.source
 
 fun combine(r1: range, r2: range): range
-  Range(min(r1.start, r2.start), max(r1.end, r2.end))
+  Range(min(r1.start, r2.start), max(r1.end, r2.end), r1.hidden || r2.hidden)
 
 fun range-list/combine(rs: list<range>): range
   rs.foldl(range/null, combine)
 
-fun range/before(r: range)
-  Range(r.start, r.start)
-
-fun range/after(r: range)
-  Range(r.end, r.end)
+fun range/hide(r: range)
+  Range(r.start, r.end, True)
 
 fun pos/min(p1: pos, p2: pos): pos
   if p1.line <= 0 then // for combining nullRanges sensibly
@@ -162,7 +170,37 @@ fun pos/max(p1: pos, p2: pos): pos
 
 fun extend(r: range, off: int): range
   val e = r.end
-  Range(r.start, e(col = e.col + off))
+  Range(r.start, e(col = e.col + off), r.hidden)
+
+// Create a range for the final character in the range
+fun end-of-range(r: range): range
+  if r.end.off - r.start.off <= 1 then r
+  else Range(r.end, r.end, r.hidden)
+
+fun range/contains(r: range, p: pos): bool
+  r.start <= p && r.end >= p
+
+fun range/is-before(r: range, p: pos): bool
+  r.end < p
+
+fun range/starts-at(r: range, p: pos): bool
+  r.start == p
+
+fun range/just-before(r: range): range
+  if r.start.off < 0 then r
+  else
+    match r.start
+      Pos(src, off, l, c) -> 
+        val newst = Pos(src, off - 1, l, c - 1)
+        Range(newst, newst, r.hidden)
+
+fun range/just-after(r: range): range
+  if r.end.off < 0 then r
+  else
+    match r.end
+      Pos(src, off, l, c) -> 
+        val newst = Pos(src, off + 1, l, c + 1)
+        Range(newst, newst, r.hidden)
 
 fun default/range(m: maybe<range>): range
   match m

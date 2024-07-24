@@ -1,12 +1,13 @@
 # TODO
+Work on Syntax, Parsing, and Formatter
 
 ## Fully up to date
-// src/lib/* 07/17/24 updated
+// src/lib/* 07/23/24 updated
+// src/common/* 07/23/24 updated - other than parse, and some missing functions in range and file
 
 ## Syntax errors
 
 ## Changes
-- [ ] check all in common/
 - [ ] check all in core/
 - [ ] check all in syntax/
 - [ ] check all in lib/ (start with finishing printer)

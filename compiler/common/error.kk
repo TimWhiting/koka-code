@@ -5,6 +5,7 @@
 // terms of the Apache License, Version 2.0. A copy of the License can be
 // found in the LICENSE file at the root of this distribution.
 //---------------------------------------------------------------------------
+// Updated as of 7/23/24: Commit aa9474d
 
 import compiler/common/range
 import compiler/common/message
@@ -69,7 +70,7 @@ fun err-sev/cmp(e1: error-severity, e2: error-severity): order
         _ -> Gt
     
 fun is-warning(e: error-msg): bool
-  (<=)(e.severity, SevWarning, ?cmp=cmp)
+  e.severity <= SevWarning
 
 fun info-message-kind(ekind: error-kind, rng: range, d: doc): error-msg
   Error-msg(rng, d, SevInfo, ekind)

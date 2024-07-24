@@ -5,6 +5,7 @@
 // terms of the Apache License, Version 2.0. A copy of the License can be
 // found in the LICENSE file at the root of this distribution.
 //---------------------------------------------------------------------------
+// Updated as of 7/23/24: Commit b603946
 
 import compiler/lib/printer
 import std/core/undiv
@@ -57,6 +58,16 @@ struct colorScheme
   colorNameQual: color = ColorDefault
   colorImplicitParameter: color = Gray
   colorImplicitExpr: color = colorSource
+
+fun cs/(==)(c1: colorScheme, c2: colorScheme): bool
+  c1.colorInterpreter == c2.colorInterpreter && c1.colorType == c2.colorType && c1.colorParameter == c2.colorParameter && c1.colorKind == c2.colorKind && c1.colorMarker == c2.colorMarker 
+  && c1.colorError == c2.colorError && c1.colorWarning == c2.colorWarning && c1.colorSource == c2.colorSource && c1.colorCommand == c2.colorCommand && c1.colorKeyword == c2.colorKeyword 
+  && c1.colorEffect == c2.colorEffect && c1.colorRange == c2.colorRange && c1.colorSep == c2.colorSep 
+  && c1.colorComment == c2.colorComment && c1.colorReserved == c2.colorReserved && c1.colorReservedOp == c2.colorReservedOp && c1.colorSpecial == c2.colorSpecial 
+  && c1.colorString == c2.colorString && c1.colorNumber == c2.colorNumber && c1.colorModule == c2.colorModule && c1.colorCons == c2.colorCons 
+  && c1.colorTypeCon == c2.colorTypeCon && c1.colorTypeVar == c2.colorTypeVar && c1.colorTypeKeyword == c2.colorTypeKeyword && c1.colorTypeKeywordOp == c2.colorTypeKeywordOp 
+  && c1.colorTypeSpecial == c2.colorTypeSpecial && c1.colorTypeParam == c2.colorTypeParam 
+  && c1.colorNameQual == c2.colorNameQual && c1.colorImplicitParameter == c2.colorImplicitParameter && c1.colorImplicitExpr == c2.colorImplicitExpr
 
 val lightColorScheme = ColorScheme(
   colorNumber = DarkGray,

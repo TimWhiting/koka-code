@@ -5,11 +5,13 @@
 // terms of the Apache License, Version 2.0. A copy of the License can be
 // found in the LICENSE file at the root of this distribution.
 //----------------------------------------------------------------------------
+// Updated as of 7/23/24 
 
 import compiler/common/name
 import compiler/common/syntax
 import compiler/common/failure
 import std/core/unsafe
+// Updated as of 7/23/24: Commit #0013124
 
 //---------------------------------
 // Special

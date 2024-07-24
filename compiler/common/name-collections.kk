@@ -5,6 +5,7 @@
 // terms of the Apache License, Version 2.0. A copy of the License can be
 // found in the LICENSE file at the root of this distribution.
 //----------------------------------------------------------------------------
+// Updated as of 7/23/24: Commits e914563 (NameMap) b8074c2 (NameSet) 3229cca QNameMap
 
 import std/data/linearmap
 import std/data/linearset

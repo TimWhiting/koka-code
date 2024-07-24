@@ -80,7 +80,7 @@ fun show-line(line: int)
 fun chars/pos-moves-8(p: pos, cs: list<char>): pos
   cs.foldl(p, pos-move8)
 
-fun sslice/pos-moves8(cs: sslice, p: pos): pos
+fun sslice/pos-moves8(p: pos, cs: sslice): pos
   cs.string.list.foldl(p, pos-move8)
 
 fun pos-move8(Pos(s, o, l, c), ch: char): pos

@@ -95,14 +95,14 @@ rec effect process
 fun scheduler(f)
   val q: ref<global, dequeue<() -> <div,st<global>|e> ()>> = ref(emptyQueue())
 
-  fun spawn(f)
+  fun spawn(f1)
     with handler
       raw ctl yield()
         q := (!q).pushBack(fn() rcontext.resume(()))
       raw ctl fork(g)
         q := (!q).pushBack(fn() rcontext.resume(()))
         spawn(g)
-    f()
+    f1()
 
   fun driver(): <pure,st<global>|e> ()
     val res = (!q).popFront()

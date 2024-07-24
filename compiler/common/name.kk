@@ -154,7 +154,7 @@ fun show-fully-explicit(Name(m, _, l, _, n, _): name): string
   else m ++ "/#" ++ ln
 
 fun show-explicit(n: name): string
-  n.showName(True)
+  n.show-name(True)
 
 fun show-plain(n: name): string 
   join(n.nameModule, join(n.nameLocalQual, n.nameStem))
@@ -292,7 +292,7 @@ fun missing-qualifier(current-mod: name, n: name, qname: name): string
 
 val name/nil = "".new-name
 
-fun is-nil(Name(m, _, l, _, n, _)): bool
+fun is-nil(Name(m, _, _, _, n, _)): bool
   n == "" && m == ""
 
 fun qualify(a: name, b: name): name

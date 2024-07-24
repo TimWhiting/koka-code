@@ -2,18 +2,20 @@ import compiler/common/range
 import compiler/syntax/lexeme
 import compiler/common/name
 
-struct state
-     pos: pos
-     startPos: pos
-     states: list<int>
-     retained: list<sslice>
-     previous: char
-     current: sslice
-     previousLex: lex
-     rawEnd: string;
+pub struct state
+  pos: pos
+  startPos: pos
+  states: list<int>
+  retained: list<sslice>
+  previous: char
+  current: sslice
+  previousLex: lex
+  rawEnd: string;
 
-alias action = sslice -> pure (state -> pure (state -> pure (maybe<lex>, state)));
+pub alias action = sslice -> pure (state -> pure (state -> pure (maybe<lex>, state)));
 
+fun pos/before(p: pos)
+  p(col=max(1, p.col - 1))
 
 fun strip-parens(s: sslice)
   match s.string.list.reverse
@@ -31,10 +33,10 @@ fun head(s: list<a>): exn a
 fun token(lex: (sslice -> pure lex)): action
   fn(bs: sslice) fn(st0: state) fn(st1: state) (Just(lex(bs)), st1)
 
-fun string(lex: (string -> pure lex)): action
+fun lex/string(lex: (string -> pure lex)): action
   token(fn(bs: sslice) lex(bs.string))
 
-fun next(state: int, action: action): action
+fun lex/next(state: int, action: action): action
   fn(bs: sslice) fn(st0: state) fn(st1: state)
      val (x, State(p, sp, sts, ret, prev, cur, pL, rE)) = action(bs)(st0)(st1)
      (x, State(p, sp, Cons(state, sts), ret, prev, cur, pL, rE))
@@ -57,13 +59,19 @@ fun more(f: (sslice -> pure sslice)): action
 fun less(n: int, action: action)
   fn(bs: sslice) fn(st0: state) fn(State(_, sp, sts, ret, prev, _, pL, rE): state)
     val bs2 = st0.current.take(n)
-    val pos2 = bs2.pos-moves8(st0.pos)
+    val pos2 = st0.pos.pos-moves8(bs2)
     val st2 = State(pos2, sp, sts, ret, prev, st0.current.drop(n), pL, rE)
     action(bs2)(st0)(st2)
 
 fun withmore(action: action)
   fn(bs: sslice) fn(st0: state) fn(State(p, sp, sts, ret, prev, cur, pL, rE): state)
     action(Cons(bs, ret).reverse.map(string).join("").slice)(st0)(State(p, sp, sts, [], prev, cur, pL, rE))
+
+fun raw-delim(f: action): action
+  fn(bs: sslice) fn(st0: state) fn(st1: state)
+    val s = bs.string
+    val delim = "\"" ++ "#".repeat(s.count - 1)
+    f(bs)(st0)(st1(rawEnd=delim))
 
 fun with-raw-delim(f: (string, string) -> pure action): action
   fn(bs: sslice) fn(st0: state) fn(st1: state)

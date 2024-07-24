@@ -169,23 +169,23 @@ pub fun lexeme/show(l: lexeme): <> string
 
 pub fun lex/show(l: lex): <> string
   match l
-    LexInt(_, s) -> "int " ++ s.show
-    LexFloat(_, s) -> "float " ++ s.show
-    LexChar(c) -> "char " ++ c.show
-    LexString(s) -> "string \"" ++ s ++ "\""
-    LexId(n) -> "identifier \"" ++ n.show ++ "\""
-    LexOp(n) -> "operator \"" ++ n.show ++ "\""
-    LexPrefix(n) -> "prefix operator \"" ++ n.show ++ "\""
-    LexIdOp(n) -> "identifier (operator) \"" ++ n.show ++ "\""
-    LexWildCard(n) -> "wildcard \"" ++ n.show ++ "\""
-    LexModule(n, _) -> "module \"" ++ n.show ++ "\""
-    LexKeyword(k, d) -> "keyword \"" ++ k.show ++ "\"" ++ (if d.is-empty then "" else " (" ++ d ++ ")")
-    LexSpecial(s) -> "special \"" ++ s ++ "\""
-    LexComment(s) -> "comment \"" ++ s.show ++ "\""
-    LexWhite(x) -> "white" ++ x.show ++ ""
+    LexInt(_, s) -> "int:" ++ s
+    LexFloat(_, s) -> "float:" ++ s.show
+    LexChar(c) -> "char:" ++ c.show
+    LexString(s) -> "string:" ++ s ++ ":"
+    LexId(n) -> "identifier:" ++ n.show ++ ":"
+    LexOp(n) -> "operator:" ++ n.show ++ ":"
+    LexPrefix(n) -> "prefix operator:" ++ n.show ++ ":"
+    LexIdOp(n) -> "identifier (operator):" ++ n.show ++ ":"
+    LexWildCard(n) -> "wildcard:" ++ n.show ++ ":"
+    LexModule(n, _) -> "module:" ++ n.show ++ ":"
+    LexKeyword(k, d) -> "keyword:" ++ k ++ ":" ++ (if d.is-empty then "" else " (" ++ d ++ ")")
+    LexSpecial(s) -> "special:" ++ s ++ ":"
+    LexComment(s) -> "comment:" ++ s ++ ":"
+    LexWhite(x) -> "white:" ++ x.show 
     LexInsLCurly -> "start of statements ('{')"
     LexInsRCurly -> "end of statements ('}')"
     LexInsSemi -> "end of statement (';')"
-    LexError(s) -> "error: " ++ s ++ ""
-    LexCons(n) -> "constructor \"" ++ n.show ++ "\""
-    LexTypeId(n, s) -> "typedid " ++ n.show ++ ":" ++ s
+    LexError(s) -> "error:" ++ s ++ ""
+    LexCons(n) -> "constructor:" ++ n.show ++ ":"
+    LexTypeId(n, s) -> "typedid:" ++ n.show ++ ":" ++ s

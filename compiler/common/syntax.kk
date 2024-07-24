@@ -195,7 +195,7 @@ fun datakind/show(k: dataKind): string
     CoInductive -> "cotype"
     Retractive -> "rectype"
 
-value type dataDef
+type dataDef
   DataDefValue(repr: valueRepr) // value type
   DataDefNormal // reference type
   DataDefEffect(is-linear: bool, is-named: bool) // effect types
@@ -248,6 +248,9 @@ value struct valueRepr
   scanCount: int // count of scannable fields 
   alignment: int // minimal alignment
 
+fun valuerepr/(==)(v1: valueRepr, v2: valueRepr): bool
+  v1.rawSize == v2.rawSize && v1.scanCount == v2.scanCount && v1.alignment == v2.alignment
+
 fun valuerepr/show(v: valueRepr): string
   "{" ++ v.rawSize.show ++ ", " ++ v.scanCount.show ++ ", " ++ v.alignment.show ++ "}"
 
@@ -288,7 +291,7 @@ fun def-fun(pinfos: list<paramInfo>)
 
 fun defsort/show(s: defSort): string
   match s
-    DefFun(p, f) -> "fun"
+    DefFun -> "fun"
     DefVal -> "val"
     DefVar -> "var"
 
@@ -387,7 +390,7 @@ fun fipa/cmp(f1: fipAlloc, f2: fipAlloc)
   match (f1, f2)
     (AllocAtMost(n1), AllocAtMost(n2)) -> n1.cmp(n2)
     (_, AllocAtMost) -> Gt
-    (AllocAtMost(n), AllocFinitely) -> Lt
+    (AllocAtMost, AllocFinitely) -> Lt
     (AllocFinitely, AllocFinitely) -> Eq
     (AllocUnlimited, AllocFinitely) -> Gt
     (AllocUnlimited, AllocUnlimited) -> Eq
@@ -415,7 +418,7 @@ fun fipt/is-tail(f: fipT): bool
     Fbip(_, t) -> t
     NoFip(t) -> t
 
-fun alloc(f: fipT): fipAlloc
+fun fipt/alloc(f: fipT): fipAlloc
   match f
     Fip(a) -> a
     Fbip(a) -> a

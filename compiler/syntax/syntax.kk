@@ -141,7 +141,7 @@ fun dg/show(d: defGroup<t>, ?show: (t) -> <div|e1> string): <div|e1> string
 
 alias defs<t> = list<def<t>>;
 
-struct valueBinder<t, e>
+struct valueBinder<t,e>
   name: name
   binderType: t // Always present for constructors
   expr: e // always present for definitions as 'Expr t'
@@ -340,26 +340,23 @@ fun uk/show(u: userKind): string
 
 // Range
 
-fun kut/range(tp: kUserType<k>, rK: (k) -> range): range
+fun kut/range(tp: kUserType<k>, ?range: (k) -> range): range
   match tp
-    TpQuan(range=range) -> range
-    TpQual(preds, tp) -> Range(preds.head.default(tp).pretend-decreasing.range(rK).start, tp.range(rK).end)
-    TpFun(range=range) -> range
-    TpApp(range=range) -> range
-    TpVar(range=range) -> range
-    TpCon(range=range) -> range
-    TpParens(range=range) -> range
-    TpAnn(userTp, kind) -> Range(userTp.range(rK).start, kind.rK.end)
+    TpQuan(range=r) -> r
+    TpQual(preds, tp) -> Range(preds.head.default(tp).pretend-decreasing.range.start, tp.range.end, False)
+    TpFun(range=r) -> r
+    TpApp(range=r) -> r
+    TpVar(range=r) -> r
+    TpCon(range=r) -> r
+    TpParens(range=r) -> r
+    TpAnn(userTp, kind) -> Range(userTp.range.start, kind.range.end, False)
 
 fun uk/range(uk: userKind): range
   match uk
     KindCon(range=range) -> range
-    KindArrow(k1, k2) -> Range(k1.range.start, k2.range.end)
+    KindArrow(k1, k2) -> Range(k1.range.start, k2.range.end, k1.range.hidden || k2.range.hidden)
     KindParens(range=range) -> range
     KindNone -> range/null
-
-fun ut/range(utp: userType): range
-  utp.range(range)
 
 fun uhb/range(uhb: userHandlerBranch): range
   uhb.branchPatRange.combine(uhb.branchExpr.range)

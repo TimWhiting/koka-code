@@ -1,5 +1,5 @@
 import compiler/syntax/lexeme
-import compiler/syntax/lexer2
+import compiler/syntax/lexer
 import compiler/syntax/syntax
 import compiler/common/range
 import compiler/common/name
@@ -8,20 +8,23 @@ import std/os/path
 import std/core/undiv
 import std/core/unsafe
 
-fun testFile(fname: string)
+fun main()
+  val f = read-text-file("compiler/syntax/lexer.kk".path)
+  test(f).trace-show
+
+fun test-file(fname: string)
   val f = read-text-file(("test/" ++ fname).path)
-  testEx(fname, f)
+  testEx(fname, f).trace-show
 
 fun test(xs: string)
   testEx("", xs)
 
 fun testEx(fname: string, input: string)
-  val tokens = lex(Source(fname, input), 1, input)
+  val tokens = lexing(Source(fname, input), 1, input)
   layout(True, tokens).map(show).unlines.println
 
 fun layout(semiInsert: bool, lexemes: list<lexeme>): list<lexeme>
   fun semi(v: list<lexeme>, f: (list<lexeme>) -> list<lexeme>) if semiInsert then f(v) else v
-  lexemes.map(show).join("\n").trace
   lexemes.semi(checkComments).combineLineComments.removeWhitespace.associateComments.removeWhite.semi(indentLayout)
 
 fun isLexError(x)
@@ -50,12 +53,11 @@ fun endCol(r)
 fun isAdjacent(comment: string, r1: range, r2: range): bool
   if comment.ends-with("\n").bool then r1.end.line == r2.start.line else r1.end.line == r2.start.line - 1
 
-noinline fun isAttr(l: lexeme)
+noinline fun isAttr(l: lexeme) // Compiler bug
     match l
       Lexeme(_, LexKeyword(_)) -> True
       Lexeme(_, LexId(_)) -> True
       _ -> False
-
 
 fun isDocKeyword(lex: string)
   ["fun","val","ctl","final","raw"
@@ -136,27 +138,31 @@ fun brace(layout: layout, layouts: list<layout>, prev: lexeme, lexemes: list<lex
         prev.insertSemi ++ rCurly ++ brace(ly, lys, Lexeme(prev.range.after, LexInsRCurly), [])
     // ignore error lexemes
     Cons(l, ls) | l.lex.is-error -> Cons(l, brace(layout, layouts, prev, ls))
-    Cons(lexeme, ls) -> 
+    Cons(lexeme as Lexeme(rng, lex), ls) -> 
       val Layout(Lexeme(_, layoutLex), layoutCol) = layout
       val Lexeme(prevRng, prevLex) = prev
-      val Lexeme(rng, lex) = lexeme
       val newline = prevRng.endLine < rng.startLine
       val indent = rng.startCol
       val nextIndent = match ls
         Cons(Lexeme(r, _), _) -> r.startCol
         _ -> 1
+      // insert {
       if newline && indent > layoutCol && !(prevLex.isExprContinuation(lex)) then
         brace(layout, layouts, prev, prev.insertLCurly ++ lexemes)
+      // insert }
       elif newline && indent < layoutCol && !(lex.isCloseBrace && layoutLex == LexSpecial("{")) then
         brace(layout, layouts, prev, layout.insertRCurly(prev) ++ lexemes)
+      // push new layout
       elif lex.isOpenBrace then
         val v = if (nextIndent > layoutCol) then [] else [Lexeme(rng, LexError("layout: line must be indented more than the enclosing layout context (column " ++ layoutCol.show ++ ")"))]
         [lexeme] ++ v ++ brace(Layout(lexeme, nextIndent), Cons(layout, layouts), lexeme, ls)
+      // pop layout
       elif lex.isCloseBrace then
         val rest = match layouts
           Nil -> Cons(Lexeme(rng.before, LexError("unmatched closing brace '}'")), brace(layout, [], lexeme, ls))
           Cons(ly, lys) -> brace(ly, lys, lexeme, ls)
         prev.insertSemi ++ Cons(lexeme, rest)
+      // semicolon insertion
       elif newline && indent == layoutCol && !(prevLex.isExprContinuation(lex)) then
         prev.insertSemi ++ [lexeme] ++ brace(layout, layouts, lexeme, ls)
       else
@@ -166,15 +172,14 @@ fun insertLCurly(Lexeme(prevRng, _))
   [Lexeme(prevRng.after, LexInsLCurly)]
 
 fun insertRCurly(Layout(Lexeme(layoutRng, layoutLex), layoutCol), Lexeme(prevRng, _)): list<lexeme>
-  if layoutLex == LexInsLCurly then [] else
-    Cons(
-      Lexeme(prevRng.after, 
-        LexError(
-          "layout: an open brace '{' (at " ++ layoutRng.show-range("".path, True) ++ 
-          ", layout column " ++ layoutCol.show  ++ ") is matched by an implicit closing brace"
-        )), 
-      Cons(Lexeme(prevRng.after, LexInsRCurly), Nil)
-    )
+  val start = 
+        if layoutLex == LexInsLCurly then [] 
+        else [Lexeme(prevRng.after, 
+          LexError(
+            "layout: an open brace '{' (at " ++ layoutRng.show-range("".path, True) ++ 
+            ", layout column " ++ layoutCol.show  ++ ") is matched by an implicit closing brace"
+          ))]
+  start ++ Cons(Lexeme(prevRng.after, LexInsRCurly), Nil)
 
 fun insertSemi(Lexeme(prevRng, prevLex))
   if prevLex.isSemi then [] else [Lexeme(prevRng.after, LexInsSemi)]

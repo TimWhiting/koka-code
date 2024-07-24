@@ -11,7 +11,9 @@ val typeVarRegex = "^[a-z][0-9]*$".regex();
 pub fun isTypeVar(n: name): bool
   !typeVarRegex.exec(n.nameStem).is-empty
 
-pub struct lexeme ( pub range: range, pub lex: lex )
+pub value struct lexeme
+  range: range
+  lex: lex
 
 pub type lex
   LexInt(i: int, s: string)
@@ -182,7 +184,7 @@ pub fun lex/show(l: lex): <> string
     LexKeyword(k, d) -> "keyword:" ++ k ++ ":" ++ (if d.is-empty then "" else " (" ++ d ++ ")")
     LexSpecial(s) -> "special:" ++ s ++ ":"
     LexComment(s) -> "comment:" ++ s ++ ":"
-    LexWhite(x) -> "white:" ++ x.show 
+    LexWhite(x) -> "white:" ++ x.show
     LexInsLCurly -> "start of statements ('{')"
     LexInsRCurly -> "end of statements ('}')"
     LexInsSemi -> "end of statement (';')"

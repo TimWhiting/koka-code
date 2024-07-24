@@ -9,11 +9,17 @@
 
 import std/os/path
 
-value struct source (pub name: string, pub contents: string)
+pub value struct source 
+  name: string
+  contents: string
 
 val source/null = Source("", "")
 
-struct pos (pub source: source, pub off: int, pub line: int, pub col: int)
+pub struct pos
+  source: source
+  off: int
+  line: int
+  col: int
 
 val pos/null = Pos(source/null, -1, 0, 0)
 
@@ -93,7 +99,10 @@ fun pos-move8(Pos(s, o, l, c), ch: char): pos
 val tab-size = 2 // Always 2 in koka
 
 // source range
-value struct range (pub start: pos, pub end: pos, pub hidden: bool)
+struct range
+  start: pos
+  end: pos
+  hidden: bool
 
 fun range/(==)(r1: range, r2: range): bool
   r1.start == r2.start && r1.end == r2.end && r1.hidden == r2.hidden
@@ -201,6 +210,14 @@ fun range/just-after(r: range): range
       Pos(src, off, l, c) -> 
         val newst = Pos(src, off + 1, l, c + 1)
         Range(newst, newst, r.hidden)
+
+// From Layout.hs
+fun range/after(r: range): range
+  Range(r.end, r.end, r.hidden)
+
+// From Layout.hs
+fun range/before(r: range): range
+  Range(r.start, r.start, r.hidden)
 
 fun default/range(m: maybe<range>): range
   match m

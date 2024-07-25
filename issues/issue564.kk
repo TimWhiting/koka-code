@@ -93,7 +93,7 @@ rec effect process
    ctl fork(g: () -> <process, div, exn, st<global>> ()): ()
 
 fun scheduler(f)
-  val q: ref<global, dequeue<() -> <div,st<global>|e> ()>> = ref(emptyQueue())
+  val q: forall<e::E> ref<global, dequeue<() -> <div,st<global>|e> ()>> = ref(emptyQueue())
 
   fun spawn(f1)
     with handler

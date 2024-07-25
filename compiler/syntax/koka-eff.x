@@ -5,26 +5,19 @@ import compiler/syntax/lexeme
 import std/num/float64
 import std/core-extras
 
-alias alexInput = sslice
-alias alexUser = ()
-alias action = () -> <pure,koka-lex> ()
-
 effect koka-lex
-  fun pop-state(): int
-  fun push-state(i: int): ()
-  fun start-slice(): ()
-  fun pop-slice(): string
-  fun extend-slice(f: (sslice) -> sslice): ()
-  fun next-char(): maybe<(char, sslice)>
-  fun get-previous(): char
-  fun get-slice(): sslice
-  fun get-delim(): int
-  fun push-rawdelim(): ()
-  fun pop-rawdelim(): ()
-  fun emit(l: lex): ()
-  fun get-state(): int
+  fun start-chunked(): ()
+  fun end-chunked(): string
+  fun add-chunk(s: sslice): ()
+  fun get-rawdelim(): int
+  fun set-rawdelim(i: int): ()
+  fun do-emit(l: lex, start: alex-pos, end: alex-pos): ()
+
+fun emit(l: lex): <alex,koka-lex> ()
+  do-emit(l, get-start(), get-end())
 
 }
+
 
 %encoding "utf8"
 %effects "koka-lex"
@@ -113,9 +106,9 @@ program :-
 -- white space
 <0> $space+               { fn() { emit(LexWhite(get-string()))} }
 <0> @newline              { fn() { emit(LexWhite("\n")) } }
-<0> "/*" $symbol*         { fn() { push-state(comment) } }
-<0> "//" $symbol*         { fn() { push-state(linecom) } }
-<0> @newline\# $symbol*   { fn() { push-state(linedir) } }
+<0> "/*" $symbol*         { fn() { push-state(comment); start-chunked(); } }
+<0> "//" $symbol*         { fn() { push-state(linecom); start-chunked(); } }
+<0> @newline\# $symbol*   { fn() { push-state(linedir); start-chunked(); } }
 
 
 -- qualified identifiers
@@ -157,8 +150,8 @@ program :-
 
 
 -- characters
-<0> \"                    { fn() { push-state(stringlit); } } -- "
-<0> r\#*\"                { fn() { push-state(stringraw); push-rawdelim(); } } -- "
+<0> \"                    { fn() { push-state(stringlit); start-chunked(); } } -- "
+<0> r\#*\"                { fn() { push-state(stringraw); start-chunked(); push-rawdelim(); } } -- "
 
 <0> \'\\$charesc\'        { fn() { emit(LexChar(get-slice().sslice/drop(2).next.unjust.tuple2/fst.char/from-char-esc)) }}
 <0> \'\\@hexesc\'         { fn() { emit(LexChar(get-slice().sslice/drop(3).extend(-1).char/from-hex-esc)) }}
@@ -176,28 +169,29 @@ program :-
 <stringlit> @stringchar   { fn() { extend-slice(id) } }
 <stringlit> \\$charesc    { fn() { extend-slice(sslice/from-char-esc) } }
 <stringlit> \\@hexesc     { fn() { extend-slice(sslice/from-hex-esc) } }
-<stringlit> \"            { fn() { val s = pop-slice(); emit(LexString(s)) } } -- " 
-<stringlit> @newline      { fn() { pop-slice(); emit(LexError("string literal ended by a new line")) } }
-<stringlit> .             { fn() { val s = pop-slice(); emit(LexError("illegal character in string: " ++ s.show)) } }
+<stringlit> \"            { fn() { pop-state(); val s = end-chunked(); emit(LexString(s)) } } -- " 
+<stringlit> @newline      { fn() { pop-state(); end-chunked(); emit(LexError("string literal ended by a new line")) } }
+<stringlit> .             { fn() { pop-state(); val s = end-chunked(); emit(LexError("illegal character in string: " ++ s.show)) } }
 
 <stringraw> @utf8unsafe   { fn() { unsafe-char("raw string") } }
 <stringraw> @stringraw    { fn() { extend-slice(id) } }
 <stringraw> \"\#*         { fn() {
                             val delim = get-slice().count
-                            val curdelim = get-delim()
+                            val curdelim = get-rawdelim()
                             if delim == curdelim then
-                              emit(LexString(pop-slice()))
+                              emit(LexString(end-chunked()))
                               pop-state()
                               pop-rawdelim()
                             elif delim > curdelim then // too many terminating hashes
                               emit(LexError("raw string: too many '#' terminators in raw string (expecting " ++ show(delim - 1) ++ ")"))
+                              end-chunked()
                               pop-state()
                               pop-rawdelim()
                             else // continue
                               extend-slice(id)
                           }}
 <stringraw> .             { fn() {
-  emit(LexError("illegal character in raw string: " ++ pop-slice().show))
+  emit(LexError("illegal character in raw string: " ++ end-chunked().show))
   pop-state()
   pop-rawdelim()
  }}
@@ -208,43 +202,47 @@ program :-
 
 <comment> "*/"            { fn() {
   val st = pop-state()
+  // TODO? end-chunked()
   if st == comment then extend-slice(id)
-  else emit(LexComment(pop-slice().list.filter(fn(c) c != '\r').string))
+  else 
+    emit(LexComment(end-chunked().list.filter(fn(c) c != '\r').string))
+    pop-state()
+    ()
 }}
-<comment> "/*"            { fn() { push-state(comment) } }
+<comment> "/*"            { fn() { push-state(comment); start-chunked(); } }
 <comment> @utf8unsafe     { fn() { unsafe-char("comment") } }
 <comment> @commentchar    { fn() { extend-slice(id) } }
 <comment> [\/\*]          { fn() { extend-slice(id) } }
-<comment> .               { fn() { pop-state(); emit(LexError("illegal character in comment: " ++ pop-slice().show)) } }
+<comment> .               { fn() { pop-state(); emit(LexError("illegal character in comment: " ++ end-chunked().show)) } }
 
 --------------------------
 -- line comments
 
 <linecom> @utf8unsafe     { fn() { unsafe-char("line comment") } }
 <linecom> @linechar       { fn() { extend-slice(id) } }
-<linecom> @newline        { fn() { pop-state(); emit(LexComment(pop-slice().list.filter(fn(c) c !='\r').string)) } }
-<linecom> .               { fn() { pop-state(); emit(LexError("illegal character in line comment: " ++ pop-slice().show)) } }
+<linecom> @newline        { fn() { pop-state(); emit(LexComment(end-chunked().list.filter(fn(c) c !='\r').string)) } }
+<linecom> .               { fn() { pop-state(); emit(LexError("illegal character in line comment: " ++ end-chunked().show)) } }
 
 --------------------------
 -- line directives (ignored for now)
 
 <linedir> @utf8unsafe     { fn() { unsafe-char("line directive") } }
 <linedir> @linechar       { fn() { extend-slice(id) } }
-<linedir> @newline        { fn() { pop-state(); emit(LexComment(pop-slice().list.filter(fn(c) c !='\r').string)) } }
-<linedir> .               { fn() { pop-state(); emit(LexError("illegal character in line directive: " ++ pop-slice().show)) } }
+<linedir> @newline        { fn() { pop-state(); emit(LexComment(end-chunked().list.filter(fn(c) c !='\r').string)) } }
+<linedir> .               { fn() { pop-state(); emit(LexError("illegal character in line directive: " ++ end-chunked().show)) } }
 
 -- TODO: Add helper functions
 
 {
 
-fun alexGetByte(s: alexInput): koka-lex maybe<(char, sslice)>
-  next-char()
+fun extend-slice(f: sslice -> sslice)
+  add-chunk(f(get-slice()))
 
-fun alexInputPrevChar(s: alexInput): koka-lex char
-  get-previous()
+fun pop-rawdelim()
+  set-rawdelim(0)
 
-fun get-string()
-  get-slice().string
+fun push-rawdelim()
+  set-rawdelim(get-slice().count)
 
 fun get-name()
   get-string().new-name
@@ -254,7 +252,7 @@ fun get-qname()
 
 fun unsafe-char(kind: string)
   LexError("unsafe character in " ++ kind ++ ": " ++ get-string())
-  pop-slice()
+  end-chunked()
   pop-state()
   ()
 

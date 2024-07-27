@@ -4,6 +4,7 @@ import compiler/common/range
 import compiler/syntax/lexeme
 import std/num/float64
 import std/core-extras
+import std/data/word-set
 
 effect koka-lex
   fun start-chunked(): ()
@@ -286,7 +287,7 @@ fun alex_scan_tkn(s: int, acc: alexAcc): <pure,alex> alexAcc
               _ ->
                 accept-char() 
                 alex_scan_tkn(new_s, new-acc)
-/// LINE 236 "../../koka-code/compiler/syntax/koka-eff.x"
+/// LINE 237 "../../koka-code/compiler/syntax/koka-eff.x"
 fun extend-slice(f: sslice -> sslice)
   add-chunk(f(get-slice()))
 
@@ -333,51 +334,55 @@ val special-names = [ "{", "}"
     , ";", ","
 ]
 
-val reserved-names =  ["infix", "infixr", "infixl", "prefix", "postfix"
-    , "type", "alias"
-    , "struct", "enum", "con"
-    , "val", "fun", "fn", "extern", "var"
-    , "ctl", "final", "raw"
-    , "if", "then", "else", "elif"
-    , "return", "match", "with", "in"
-    , "forall", "exists", "some"
-    , "pub", "abstract"
-    , "module", "import", "as"
+val reserved-names = 
+      delay({
+        string-pool().add-all(
+        ["infix", "infixr", "infixl", "prefix", "postfix"
+              , "type", "alias"
+              , "struct", "enum", "con"
+              , "val", "fun", "fn", "extern", "var"
+              , "ctl", "final", "raw"
+              , "if", "then", "else", "elif"
+              , "return", "match", "with", "in"
+              , "forall", "exists", "some"
+              , "pub", "abstract"
+              , "module", "import", "as"
 
-    // effect handlers
-    , "handler", "handle"
-    , "effect", "receffect"
-    , "named"
-    , "mask"
-    , "override"   
+              // effect handlers
+              , "handler", "handle"
+              , "effect", "receffect"
+              , "named"
+              , "mask"
+              , "override"   
 
-    // deprecated
-    , "private", "public"  // use pub
-    , "rawctl", "brk"      // use raw ctl, and final ctl
+              // deprecated
+              , "private", "public"  // use pub
+              , "rawctl", "brk"      // use raw ctl, and final ctl
 
-    // alternative names for backwards paper compatability
-    , "control", "rcontrol", "except"
-    , "ambient", "context" // use effcet
-    , "inject"       // use mask
-    , "use", "using" // use with instead
-    , "function"     // use fun
-    , "instance"     // use named
+              // alternative names for backwards paper compatability
+              , "control", "rcontrol", "except"
+              , "ambient", "context" // use effcet
+              , "inject"       // use mask
+              , "use", "using" // use with instead
+              , "function"     // use fun
+              , "instance"     // use named
 
-    // future reserved
-    , "interface"
-    , "unsafe"
+              // future reserved
+              , "interface"
+              , "unsafe"
 
-    // operators
-    , "="
-    , "."
-    , ":"
-    , "->"
-    , "<-"
-    , ":="
-    , "|"]
+              // operators
+              , "="
+              , "."
+              , ":"
+              , "->"
+              , "<-"
+              , ":="
+              , "|"])
+    })
 
 fun is-reserved(name: string)
-  reserved-names.any(fn(n) -> n == name) // TODO: Set
+  reserved-names.force.is-interned(name)
 
 fun is-prefix-op(name: string)
   name == "!" || name == "~"

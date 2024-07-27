@@ -32,9 +32,9 @@ fun go(st0: state)
     AlexSkip -> throw("Skip")
     AlexError -> throw("Error")
 
-fun test()
+fun main()
   var done := False
-  var s := read-text-file("compiler/syntax/lexer.kk".path)
-  val source = Source("compiler/syntax/lexer.kk", s)
+  var s := read-text-file("compiler/core/core.kk".path)
+  val source = Source("compiler/core/core.kk", s)
   lexing(source, 1, s)
   ()

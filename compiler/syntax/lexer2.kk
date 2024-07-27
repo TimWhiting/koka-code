@@ -6,7 +6,7 @@ import std/os/path
 
 fun lex(str: string, pos: pos)
   val src = pos.source
-  var lexemes := ctx _
+  var lexemes := []
   var slices := []
   var raw-delim := 0
   with handler
@@ -30,9 +30,9 @@ fun lex(str: string, pos: pos)
     fun do-emit(l, lstart, lend)
       val Alex-pos(off, line, col) = lstart
       val Alex-pos(eoff, eline, ecol) = lend
-      lexemes := lexemes ++ ctx Cons(Lexeme(make-range(Pos(src, off, line, col), Pos(src, eoff, eline, ecol)), l), _)
+      lexemes := Cons(Lexeme(make-range(Pos(src, off, line, col), Pos(src, eoff, eline, ecol)), l), lexemes)
   alex-scan(str.slice, 0)
-  lexemes ++. Nil
+  lexemes.reverse
 
 fun lexer(path: string, line: int, input: string): <pure> list<lexeme>
   lexing(Source(path, input), line, input)
@@ -43,6 +43,7 @@ fun lexing(source: source, line: int, input: string)
 
 fun main()
   var done := False
-  var s := read-text-file("compiler/syntax/lexer2.kk".path)
-  val source = Source("compiler/syntax/lexer2.kk", s)
-  lexing(source, 1, s).trace-show
+  var s := read-text-file("compiler/core/core.kk".path)
+  val source = Source("compiler/core/core.kk", s)
+  lexing(source, 1, s)
+  ()

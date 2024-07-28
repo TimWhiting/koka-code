@@ -4,6 +4,7 @@ import compiler/common/range
 import compiler/syntax/lexeme
 import std/num/float64
 import std/core-extras
+import std/core/undiv
 import std/data/word-set
 
 effect koka-lex
@@ -131,9 +132,9 @@ program :-
 <0> $special              { fn() { emit(LexSpecial(get-string())) } }
 
 -- literals
-<0> @decfloat             { fn() { val s = get-string(); emit(LexFloat(s.parse-float64.unjust, s)) } }
-<0> @hexfloat             { fn() { val s = get-string(); emit(LexFloat(s.parse-float64.unjust, s)) } }
-<0> @integer              { fn() { val s = get-string(); emit(LexInt(s.parse-int.unjust, s)) } }
+<0> @decfloat             { fn() { val s = get-string(); emit(LexFloat(s.parse-float64.expect(msg="when parsing " ++ s), s)) } }
+<0> @hexfloat             { fn() { val s = get-string(); emit(LexFloat(s.parse-float64.expect(msg="when parsing " ++ s), s)) } }
+<0> @integer              { fn() { val s = get-string(); emit(LexInt(s.parse-int.expect(msg="when parsing " ++ s), s)) } }
 
 
 -- type operators
@@ -154,9 +155,9 @@ program :-
 <0> \"                    { fn() { push-state(stringlit); start-chunked(); } } -- "
 <0> r\#*\"                { fn() { push-state(stringraw); start-chunked(); push-rawdelim(); } } -- "
 
-<0> \'\\$charesc\'        { fn() { emit(LexChar(get-slice().sslice/drop(2).next.unjust.tuple2/fst.char/from-char-esc)) }}
+<0> \'\\$charesc\'        { fn() { emit(LexChar(get-slice().sslice/drop(2).next.expect.tuple2/fst.char/from-char-esc)) }}
 <0> \'\\@hexesc\'         { fn() { emit(LexChar(get-slice().sslice/drop(3).extend(-1).char/from-hex-esc)) }}
-<0> \'@charchar\'         { fn() { emit(LexChar(get-slice().sslice/drop(1).next.unjust.tuple2/fst)) }}
+<0> \'@charchar\'         { fn() { emit(LexChar(get-slice().sslice/drop(1).next.expect.tuple2/fst)) }}
 <0> \'.\'                 { fn() { emit(LexError("illegal character literal: " ++ get-slice().sslice/drop(1).next.map(tuple2/fst).default(' ').show)) }}
 
 -- catch errors
@@ -282,10 +283,7 @@ val special-names = [ "{", "}"
     , ";", ","
 ]
 
-val reserved-names = 
-      delay({
-        string-pool().add-all(
-        ["infix", "infixr", "infixl", "prefix", "postfix"
+val reserved-names = ["infix", "infixr", "infixl", "prefix", "postfix"
               , "type", "alias"
               , "struct", "enum", "con"
               , "val", "fun", "fn", "extern", "var"
@@ -326,11 +324,60 @@ val reserved-names =
               , "->"
               , "<-"
               , ":="
-              , "|"])
-    })
+              , "|"]
 
 fun is-reserved(name: string)
-  reserved-names.force.is-interned(name)
+  reserved-names.any(fn(n) n == name)
+
+// val reserved-names = 
+//       delay({
+//         string-pool().add-all(
+//         ["infix", "infixr", "infixl", "prefix", "postfix"
+//               , "type", "alias"
+//               , "struct", "enum", "con"
+//               , "val", "fun", "fn", "extern", "var"
+//               , "ctl", "final", "raw"
+//               , "if", "then", "else", "elif"
+//               , "return", "match", "with", "in"
+//               , "forall", "exists", "some"
+//               , "pub", "abstract"
+//               , "module", "import", "as"
+
+//               // effect handlers
+//               , "handler", "handle"
+//               , "effect", "receffect"
+//               , "named"
+//               , "mask"
+//               , "override"   
+
+//               // deprecated
+//               , "private", "public"  // use pub
+//               , "rawctl", "brk"      // use raw ctl, and final ctl
+
+//               // alternative names for backwards paper compatability
+//               , "control", "rcontrol", "except"
+//               , "ambient", "context" // use effcet
+//               , "inject"       // use mask
+//               , "use", "using" // use with instead
+//               , "function"     // use fun
+//               , "instance"     // use named
+
+//               // future reserved
+//               , "interface"
+//               , "unsafe"
+
+//               // operators
+//               , "="
+//               , "."
+//               , ":"
+//               , "->"
+//               , "<-"
+//               , ":="
+//               , "|"])
+//     })
+
+// fun is-reserved(name: string)
+//   reserved-names.force.is-interned(name)
 
 fun is-prefix-op(name: string)
   name == "!" || name == "~"

@@ -20,10 +20,10 @@
       "name": "(lldb) Launch Macos",
       "type": "cppdbg",
       "request": "launch",
-      "program": "${workspaceRoot}/.koka/v3.1.3-vscode/clang-debug-3e31e4/issues_scheduler__main",
+      "program": "${workspaceRoot}/.koka/v3.1.2-vscode/clang-debug/compiler_syntax_lexer2__main",
       "args": [],
       "stopAtEntry": false,
-      "cwd": "${workspaceRoot}/.koka/v3.1.3-vscode/clang-debug-3e31e4",
+      "cwd": "${workspaceRoot}/.koka/v3.1.2-vscode/clang-debug",
       "environment": [],
       "externalConsole": true,
       "MIMode": "lldb"

@@ -5,6 +5,7 @@ import compiler/syntax/lexeme
 import compiler/syntax/lex-help
 import std/num/float64
 import std/core-extras
+import std/core/undiv
 import std/data/word-set
 
 alias alexInput = state

@@ -3,8 +3,9 @@ import compiler/syntax/lex2
 import compiler/common/range
 import std/os/file
 import std/os/path
+import std/core-extras
 
-fun lex(str: string, pos: pos)
+fun lex(str: string, pos: pos): pure list<lexeme>
   val src = pos.source
   var lexemes := []
   var slices := []
@@ -21,8 +22,12 @@ fun lex(str: string, pos: pos)
     fun add-chunk(f)
       match slices
         Cons(s, rst) -> 
+          // trace("Cons")
           slices := Cons(s ++ f.string, rst)
-        Nil -> throw("add-chunk when no chunked input")
+          // trace("End Cons")
+        Nil -> 
+          // trace("Nil")
+          throw("add-chunk when no chunked input")
     fun get-rawdelim()
       raw-delim
     fun set-rawdelim(i)
@@ -34,16 +39,24 @@ fun lex(str: string, pos: pos)
   alex-scan(str.slice, 0)
   lexemes.reverse
 
-fun lexer(path: string, line: int, input: string): <pure> list<lexeme>
+fun lexer(path: string, line: int, input: string): pure list<lexeme>
   lexing(Source(path, input), line, input)
 
-fun lexing(source: source, line: int, input: string)
+fun lexing(source: source, line: int, input: string): pure list<lexeme>
   val init-pos = Pos(source, 0, 0, 1)
   lex(input, init-pos)
 
 fun main()
-  var done := False
-  var s := read-text-file("compiler/core/core.kk".path)
-  val source = Source("compiler/core/core.kk", s)
-  lexing(source, 1, s)
-  ()
+  foreach([
+    "compiler/syntax/lex2",
+    "compiler/syntax/lex-help",
+    "compiler/syntax/koka-lex",
+    "compiler/syntax/lexer",
+    "compiler/syntax/lexer2",
+    "compiler/syntax/lexeme",
+    "compiler/core/core",
+    ]) fn(f)
+    val s = read-text-file((f ++ ".kk").path)
+    val source = Source(f ++ ".kk", s)
+    lexing(source, 1, s)
+    ()

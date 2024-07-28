@@ -4,6 +4,7 @@ import compiler/common/range
 import compiler/syntax/lexeme
 import std/num/float64
 import std/core-extras
+import std/core/undiv
 import std/data/word-set
 
 effect koka-lex
@@ -59,9 +60,9 @@ val alex_action_8: action = fn() {
 val alex_action_9: action = fn() { emit(LexCons(get-name())) }
 val alex_action_10: action = fn() { emit(LexWildCard(get-name())) }
 val alex_action_11: action = fn() { emit(LexSpecial(get-string())) }
-val alex_action_12: action = fn() { val s = get-string(); emit(LexFloat(s.parse-float64.unjust, s)) }
-val alex_action_13: action = fn() { val s = get-string(); emit(LexFloat(s.parse-float64.unjust, s)) }
-val alex_action_14: action = fn() { val s = get-string(); emit(LexInt(s.parse-int.unjust, s)) }
+val alex_action_12: action = fn() { val s = get-string(); emit(LexFloat(s.parse-float64.expect(msg="when parsing " ++ s), s)) }
+val alex_action_13: action = fn() { val s = get-string(); emit(LexFloat(s.parse-float64.expect(msg="when parsing " ++ s), s)) }
+val alex_action_14: action = fn() { val s = get-string(); emit(LexInt(s.parse-int.expect(msg="when parsing " ++ s), s)) }
 val alex_action_15: action = fn() { emit(LexOp(get-name())) }
 val alex_action_16: action = fn() { emit(LexIdOp(get-slice().strip-parens.new-name)) }
 val alex_action_17: action = fn() {
@@ -72,9 +73,9 @@ val alex_action_17: action = fn() {
    }
 val alex_action_18: action = fn() { push-state(stringlit); start-chunked(); }
 val alex_action_19: action = fn() { push-state(stringraw); start-chunked(); push-rawdelim(); }
-val alex_action_20: action = fn() { emit(LexChar(get-slice().sslice/drop(2).next.unjust.tuple2/fst.char/from-char-esc)) }
+val alex_action_20: action = fn() { emit(LexChar(get-slice().sslice/drop(2).next.expect.tuple2/fst.char/from-char-esc)) }
 val alex_action_21: action = fn() { emit(LexChar(get-slice().sslice/drop(3).extend(-1).char/from-hex-esc)) }
-val alex_action_22: action = fn() { emit(LexChar(get-slice().sslice/drop(1).next.unjust.tuple2/fst)) }
+val alex_action_22: action = fn() { emit(LexChar(get-slice().sslice/drop(1).next.expect.tuple2/fst)) }
 val alex_action_23: action = fn() { emit(LexError("illegal character literal: " ++ get-slice().sslice/drop(1).next.map(tuple2/fst).default(' ').show)) }
 val alex_action_24: action = fn() { emit(LexError("tab characters: configure your editor to use spaces instead (soft tab)")) }
 val alex_action_25: action = fn() { emit(LexError("illegal character: " ++ get-slice().show ++ (if (get-string() =="\t") then " (replace tabs with spaces)" else ""))) }
@@ -139,30 +140,47 @@ val alex_action_50: action = fn() { pop-state(); emit(LexError("illegal characte
 // -----------------------------------------------------------------------------
 // Main lexing routines
 
+// import std/core-extras
+// import std/core/undiv
+
 effect alex
-  ctl alex-error(): ()
-  ctl skip-input(): ()
-  fun recognize-token(): action-info
-  fun push-state(i: int): ()
-  fun pop-state(): int
-  fun get-state(): int
-  ctl next-char(): maybe<char>
-  fun prev-char(): char
-  fun accept-char(): ()
-  fun current-alex-info(): action-info
+  // Lexer state
+  fun push-state(i: int): () // Push a new state onto the stack
+  fun pop-state(): int // Pop the current state off the stack
+  fun get-state(): int // Gets the current state of the stack
+  // Lexer input movement
+  fun next-char(): maybe<char> // Gets the next character in the input
+  fun prev-char(): char // Gets the previous character in the input
+  fun consume-char(): () // Consumes the current character, adding it to the accepted input
+  // Lexer accepting finished tokens and info
+  fun set-accept(s: int): () // Sets the latest potential accepting state, while still seeking for states that accept more input
+  fun recognize-token(): alexAccRes // Recognizes that the last accepting state is the longest accepting token, and prepares to start the next token
+  fun action-info(): action-info // Get the info about the last token recognized (start, end, and slice) for the action
 
 pub value struct alex-pos
   offset: int
   column: int
   line: int
 
-fun pos-move(Alex-pos(o, l, c), ch: char): alex-pos
+// alias alex-eff = <pure, alex>
+// alias handled-alex-eff = <pure>
+// val alex-actions: vector<action> = [].vector
+// val alex-accept: vector<alexAcc> = [].vector
+// val alex-base : vector<int> = [].vector
+// val alex-check : vector<int> = [].vector
+// val alex-table : vector<int> = [].vector
+// val alex-deflt : vector<int> = [].vector
+
+alias alex-eff = <pure,alex,koka-lex>
+alias handled-alex-eff = <pure,koka-lex>
+
+fun pos-move(Alex-pos(o, l, c): alex-pos, char: char): alex-pos
   val o1 = if o < 0 then o else o+1
-  match ch
+  match char
     '\n' -> Alex-pos(o1, l + 1, 1)
     _    -> Alex-pos(o1, l, c + 1)
 
-alias action = () -> <pure,alex,koka-lex> ();
+alias action = () -> alex-eff ();
 
 struct action-info
   token: sslice
@@ -170,107 +188,140 @@ struct action-info
   end: alex-pos
 
 fun get-slice()
-  current-alex-info().token
+  action-info().token
 
 fun get-string()
   get-slice().string
 
 fun get-start()
-  current-alex-info().start
+  action-info().start
 
 fun get-end()
-  current-alex-info().end
-
-fun alex-scan(input: sslice, sc: int, restart:bool=False): <pure,koka-lex> ()
-  var states := [sc]
-  var seek := input
-  var current := input
-  var acc := input.truncate
-  var prev := ' '
-  var curr := ' '
-  var start := Alex-pos(0,1,1)
-  var end := Alex-pos(0,1,1)
-  var current-info := Action-info(acc, start, end)
-  fun current-state()
-    match states
-      Cons(s) -> s
-  with handler
-    fun get-state()
-      current-state()
-    fun push-state(i)
-      states := Cons(i, states)
-    fun pop-state()
-      match states
-        Cons(s, ss) -> 
-          states := ss
-          s
-        _ -> throw("No states to pop.")
-    fun recognize-token()
-      current-info := Action-info(acc, start, end)
-      seek := current
-      start := end
-      acc := current.truncate()
-      current-info
-    ctl alex-error()
-      match seek.next()
-        Nothing -> ()  // EOF
-        Just ->
-          if restart then
-            current := seek
-            acc := current.truncate()
-            resume(())
-          else
-            throw("Alex Error at: " ++ current.subslice(0, 50).string.show)
-    ctl skip-input()
-      current := seek
-      acc := current.truncate()
-      resume(())
-    fun next-char()
-      match seek.next()
-        Just((c, slice')) -> 
-          prev := curr
-          curr := c
-          seek := slice'
-          Just(c)
-        Nothing -> Nothing
-    fun accept-char()
-      acc := acc.extend(1)
-      current := seek
-      end := end.pos-move(curr)
-    fun prev-char()
-      prev
-    fun current-alex-info()
-      current-info
-  alex-scan-tkns()
+  action-info().end
 
 value type alexAcc
   AlexAccNone
-  AlexAcc(i: int)
+  AlexAcc(a: int)
   AlexAccSkip
 
-fun alex-scan-tkns(): <pure,alex,koka-lex> ()
-  match alex_scan_tkn(get-state(), AlexAccNone)
-    AlexAccNone -> 
-      alex-error()
-    AlexAccSkip -> 
-      skip-input()
-      alex-scan-tkns()
-    AlexAcc(a) -> 
-      recognize-token()
+ref type alexAccRes
+  AlexAccResNone
+  AlexAccRes(action: int, input: sslice, acc: sslice, end: alex-pos)
+  AlexAccResSkip(input: sslice, acc: sslice)
+
+ref struct alexScanState
+  states: list<int> 
+  seek: sslice // The seeked position in the input
+  // on an error, we want to keep the input *before* the
+  // character that failed, not after.
+  current: sslice // Trails the seeked position by one
+  acc: sslice // The slice representing the current 'accepted' portion of the input
+  prev: char // Previous character
+  curr: char // Current character
+  start: alex-pos // File position of the start of the current token
+  end: alex-pos // File position of the end of the current token
+  last-accept: alexAccRes // The last accepting state encountered
+  action-info: action-info // The action info
+
+// Consumes the current character, adding it to the accepted input for this token
+fun alex-consume-char(a: alexScanState)
+  match a
+    AlexScanState(states, seek, current, acc, prev, curr, start, end, last-accept, action-info) ->
+      AlexScanState(states, seek, current, acc.extend(1), prev, curr, start, end.pos-move(curr), last-accept, action-info)
+      
+// Moves the current to the seeked position, and moves the seeked position to the next character
+fun alex-next(a: alexScanState): (maybe<(alexScanState,char)>)
+  match a
+    AlexScanState(states, seek, _, acc, _, curr, start, end, last-accept, action-info) ->
+      match seek.next()
+        Just((c, slice')) ->
+          Just((AlexScanState(states, slice', seek, acc, curr, c, start, end, last-accept, action-info), c))
+        Nothing ->  Nothing
+
+fun do-alex-accept(a: alexScanState, s: int) // Sets the accepting state
+  match a
+    AlexScanState(states, seek, current, acc, prev, curr, start, end, last-accept, action-info) ->
+      match alex-accept.unsafe-idx(s.ssize_t)
+        AlexAccNone -> 
+          AlexScanState(states, seek, current, acc, prev, curr, start, end, last-accept, action-info) // Just use the previous accepting state
+        AlexAcc(act) -> 
+          // New accepting state with this accumlated input and end, and the action associated with it
+          AlexScanState(states, seek, current, acc, prev, curr, start, end, AlexAccRes(act, seek, acc, end), action-info)
+        AlexAccSkip -> 
+          // An accepting state that skips over this input
+          AlexScanState(states, seek, current, acc, prev, curr, start, end, AlexAccResSkip(seek, acc), action-info)
+
+// Recognizes the last accepting state as the longest accepting token
+fun recognize(a: alexScanState, restart: bool)
+  match a
+    AlexScanState(states, seek, current, acc, prev, curr, start, end, last-accept, action-info) ->
+      match last-accept
+        AlexAccResNone ->  
+          match seek.next() // Check if we are at the end of the input
+            Nothing -> 
+              // EOF
+              AlexScanState(states, seek, current, acc, prev, curr, start, end, last-accept, action-info)
+            Just ->
+              if restart then // Try skipping the first character, and start again
+                AlexScanState(states, seek, seek, seek.truncate(), ' ', ' ', end, end, AlexAccResNone, action-info)
+              else
+                throw("Alex Error at: " ++ seek.subslice(0, 50).string.show)
+        AlexAccRes(_, resnext, resacc, resend) ->
+          // trace("Recognized " ++ resacc.show)
+          AlexScanState(states, resnext, resnext, resnext.truncate(), ' ', ' ', end, end, AlexAccResNone, Action-info(resacc, start, resend))
+        AlexAccResSkip(resnext) ->
+          AlexScanState(states, resnext, resnext, resnext.truncate(), ' ', ' ', end, end, AlexAccResNone, action-info)
+
+fun alex-scan(input: sslice, sc: int, restart:bool=False): handled-alex-eff ()
+  var state := AlexScanState([sc], input, input, input.truncate, ' ', ' ' , Alex-pos(0,1,1), Alex-pos(0,1,1), AlexAccResNone, Action-info(input.truncate, Alex-pos(0,1,1), Alex-pos(0,1,1)))
+  with handler
+    fun get-state()
+      match state.states // Get the current lexer state (i.e. the state to start the next token in)
+        Cons(s) -> s
+    fun push-state(i)
+      state := state(states=Cons(i, state.states)) // Push a new state onto the stack
+    fun pop-state() // Pop the current state off the stack
+      match state.states
+        Cons(s, ss) -> 
+          state := state(states=ss)
+          s
+        _ -> throw("No states to pop.")
+    fun next-char() 
+      val mc = state.alex-next()
+      match mc
+        Nothing -> Nothing
+        Just((s, c)) -> 
+          state := s
+          Just(c)
+    fun consume-char() 
+      state := state.alex-consume-char()
+    fun prev-char() // Gets the previous character
+      state.prev
+    fun action-info() // Gets the info for the action
+      state.action-info
+    fun set-accept(s) // Sets the accepting state
+      state := state.do-alex-accept(s)
+    fun recognize-token() 
+      val la = state.last-accept
+      state := state.recognize(restart) 
+      la
+  alex-scan-tokens(sc)
+
+inline fun do-recognize-token(): alex-eff ()
+  val la = recognize-token() // Changes last accept, so we get it prior
+  match la
+    AlexAccRes(a) ->
       alex-actions.unsafe-idx(a.ssize_t)()
-      alex-scan-tkns()
+    _ -> ()
 
 // Push the input through the DFA, remembering the most recent accepting
 // state it encountered.
-fun alex_scan_tkn(s: int, acc: alexAcc): <pure,alex> alexAcc
-  val new-acc =
-        match alex-accept.unsafe-idx(s.ssize_t)
-          AlexAccNone -> acc
-          AlexAcc(a) -> AlexAcc(a)
-          AlexAccSkip -> AlexAccSkip
+fun alex-scan-tokens(s: int): alex-eff ()
+  set-accept(s)
   val mc = next-char()
-  match mc 
-    Nothing -> new-acc
+  match mc
+    Nothing -> 
+      do-recognize-token()
     Just(c) ->
       match c.int
         ord_c ->
@@ -281,13 +332,13 @@ fun alex_scan_tkn(s: int, acc: alexAcc): <pure,alex> alexAcc
                           then alex-table.unsafe-idx(offset.ssize_t)
                           else alex-deflt.unsafe-idx(s.ssize_t)
           match new_s
-              -1 -> new-acc
-                  // on an error, we want to keep the input *before* the
-                  // character that failed, not after.
+              -1 -> 
+                do-recognize-token()
+                alex-scan-tokens(get-state())
               _ ->
-                accept-char() 
-                alex_scan_tkn(new_s, new-acc)
-/// LINE 237 "../../koka-code/compiler/syntax/koka-eff.x"
+                consume-char()
+                alex-scan-tokens(new_s)
+/// LINE 238 "../../koka-code/compiler/syntax/koka-eff.x"
 fun extend-slice(f: sslice -> sslice)
   add-chunk(f(get-slice()))
 
@@ -334,10 +385,7 @@ val special-names = [ "{", "}"
     , ";", ","
 ]
 
-val reserved-names = 
-      delay({
-        string-pool().add-all(
-        ["infix", "infixr", "infixl", "prefix", "postfix"
+val reserved-names = ["infix", "infixr", "infixl", "prefix", "postfix"
               , "type", "alias"
               , "struct", "enum", "con"
               , "val", "fun", "fn", "extern", "var"
@@ -378,11 +426,60 @@ val reserved-names =
               , "->"
               , "<-"
               , ":="
-              , "|"])
-    })
+              , "|"]
 
 fun is-reserved(name: string)
-  reserved-names.force.is-interned(name)
+  reserved-names.any(fn(n) n == name)
+
+// val reserved-names = 
+//       delay({
+//         string-pool().add-all(
+//         ["infix", "infixr", "infixl", "prefix", "postfix"
+//               , "type", "alias"
+//               , "struct", "enum", "con"
+//               , "val", "fun", "fn", "extern", "var"
+//               , "ctl", "final", "raw"
+//               , "if", "then", "else", "elif"
+//               , "return", "match", "with", "in"
+//               , "forall", "exists", "some"
+//               , "pub", "abstract"
+//               , "module", "import", "as"
+
+//               // effect handlers
+//               , "handler", "handle"
+//               , "effect", "receffect"
+//               , "named"
+//               , "mask"
+//               , "override"   
+
+//               // deprecated
+//               , "private", "public"  // use pub
+//               , "rawctl", "brk"      // use raw ctl, and final ctl
+
+//               // alternative names for backwards paper compatability
+//               , "control", "rcontrol", "except"
+//               , "ambient", "context" // use effcet
+//               , "inject"       // use mask
+//               , "use", "using" // use with instead
+//               , "function"     // use fun
+//               , "instance"     // use named
+
+//               // future reserved
+//               , "interface"
+//               , "unsafe"
+
+//               // operators
+//               , "="
+//               , "."
+//               , ":"
+//               , "->"
+//               , "<-"
+//               , ":="
+//               , "|"])
+//     })
+
+// fun is-reserved(name: string)
+//   reserved-names.force.is-interned(name)
 
 fun is-prefix-op(name: string)
   name == "!" || name == "~"

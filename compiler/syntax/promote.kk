@@ -13,7 +13,7 @@ fun promoteType(tp: userType): div userType
     quantify(QSome, someVars.map(toTypeBinder), quantify(QForall, forallVars.map(toTypeBinder), tp))
 
 fun promoteFree(bound: list<userTypeBinder>, tps: list<userType>): div list<userTypeBinder>
-  (tps.free-type-vars(free-type-vars) - (namesEmpty + bound.map(name))).list.map(toTypeBinder)
+  (tps.free-type-vars(free-type-vars) - (names/empty + bound.map(name))).list.map(toTypeBinder)
 
 fun promote(somePars:list<userTypeBinder>, forallPars: list<userTypeBinder>, preds: list<userType>, mbResTp: maybe<(maybe<userType>, userType)>, uexpr: userExpr): pure userExpr
   fun resType(expr': userExpr)
@@ -24,8 +24,8 @@ fun promote(somePars:list<userTypeBinder>, forallPars: list<userTypeBinder>, pre
       _ -> match mbResTp
         Just((mbteff, tres)) -> 
           ([
-            (nameNil, match mbteff {Nothing -> Right(expr'.range); Just(teff) -> Left(teff)}),
-            (nameNil, Left(tres))], expr')
+            (nil, match mbteff {Nothing -> Right(expr'.range); Just(teff) -> Left(teff)}),
+            (nil, Left(tres))], expr')
   fun argresTypes(expr': userExpr)
     match expr'
       Parens(e, n, r) -> 
@@ -52,7 +52,7 @@ fun promote(somePars:list<userTypeBinder>, forallPars: list<userTypeBinder>, pre
   if argresTps.all(fn(a) a.snd.is-right) then uexpr
   else
     // promote quantified variables of TpCon to TpVar
-    val quantified = namesEmpty + somePars.map(name) + forallPars.map(name)
+    val quantified = names/empty + somePars.map(name) + forallPars.map(name)
     val argresTypes1 = argresTps.map(fn(a) promoteTpVars(a, quantified))
     // create full type by inserting some types if no parameter was annotated
     val (namess, argresTypes2) = list(1, argresTypes1.length).zip(argresTypes1).map(insertSome).unzip
@@ -74,27 +74,27 @@ fun insertSome((i, (name, eitherTp)): (int, (name, either<userType, range>)))
   match eitherTp
     Left(t) -> ([], (name, t))
     Right(r) ->
-      val tn = i.new-implicit-type-var-name
+      val tn = i.new-implicit-typevar-name
       ([tn], (name, TpVar(tn, r)))
 
 fun isSomeVar(n: name)
-  n.isWildcard
+  n.is-wildcard
 
 fun qualify(tp: userType, preds: list<userType>): userType
   TpQual(preds, tp)
 
 fun quantify(q: userQuantifier, tbinders: list<userTypeBinder>, tp: userType): userType
-  tbinders.foldr(tp, fn(tb, t) TpQuan(q, tb, t, Range(tb.range.start, t.range.end)))
+  tbinders.foldr(tp, fn(tb, t) TpQuan(q, tb, t, combine(tb.range, t.range)))
 
 fun toTypeBinder(n: name): userTypeBinder
-  TypeBinder(n, KindNone, rangeNull, rangeNull)
+  TypeBinder(n, KindNone, null, null)
 
-fun promoteTpVars(x: (name, either<userType, range>), vars: nameSet): div (name, either<userType, range>)
+fun name/promoteTpVars(x: (name, either<userType, range>), vars: nameSet): div (name, either<userType, range>)
   match x.snd
     Right(_) -> x
     Left(u) -> (x.fst, Left(u.promoteTpVars(vars)))
 
-fun promoteTpVars(tp: userType, vars: nameSet): div userType
+fun ut/promoteTpVars(tp: userType, vars: nameSet): div userType
   match tp
     TpQuan(quant, tb, t, rng) -> TpQuan(quant, tb, t.promoteTpVars(vars - tb.name), rng)
     TpQual(preds, t) -> TpQual(preds.map(fn(p) p.promoteTpVars(vars)), t.promoteTpVars(vars))

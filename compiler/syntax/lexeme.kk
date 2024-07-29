@@ -32,7 +32,7 @@ pub type lex
   LexWhite(s: string)
   // Special for highlighting
   LexModule(alias_: name, full: name)
-  LexTypeId(n: name, s: string)
+  LexTypedId(n: name, s: string)
   LexInsLCurly
   LexInsRCurly
   LexInsSemi
@@ -102,7 +102,7 @@ pub fun lex/(==)(l1: lex, l2: lex): bool
     (LexComment(s1), LexComment(s2)) -> s1 == s2
     (LexWhite(s1), LexWhite(s2)) -> s1 == s2
     (LexModule(a1, f1), LexModule(a2, f2)) -> a1 == a2 && f1 == f2
-    (LexTypeId(n1, s1), LexTypeId(n2, s2)) -> n1 == n2 && s1 == s2
+    (LexTypedId(n1, s1), LexTypedId(n2, s2)) -> n1 == n2 && s1 == s2
     (LexInsLCurly, LexInsLCurly) -> True
     (LexInsRCurly, LexInsRCurly) -> True
     (LexInsSemi, LexInsSemi) -> True
@@ -164,7 +164,7 @@ pub fun from-enum(l: lex): <> int
     LexInsSemi -> 15
     LexError(_) -> 16
     LexCons(_) -> 17
-    LexTypeId(_, _) -> 18
+    LexTypedId(_, _) -> 18
 
 pub fun lexeme/show(l: lexeme): <> string
   l.range.show-full-range("".path) ++ ": " ++ l.lex.show
@@ -190,4 +190,4 @@ pub fun lex/show(l: lex): <> string
     LexInsSemi -> "end of statement (';')"
     LexError(s) -> "error:" ++ s ++ ""
     LexCons(n) -> "constructor:" ++ n.show ++ ":"
-    LexTypeId(n, s) -> "typedid:" ++ n.show ++ ":" ++ s
+    LexTypedId(n, s) -> "typedid:" ++ n.show ++ ":" ++ s

@@ -1,5 +1,5 @@
 import compiler/syntax/lexeme
-import compiler/syntax/lex2
+import compiler/syntax/lex
 import compiler/common/range
 import std/os/file
 import std/os/path
@@ -47,14 +47,11 @@ fun lexing(source: source, line: int, input: string): pure list<lexeme>
 
 fun test-lex()
   val files =  [
-    "compiler/syntax/lex2",
     "compiler/syntax/lex-help",
-    "compiler/syntax/koka-lex",
+    "compiler/syntax/lex",
     "compiler/syntax/lexer",
-    "compiler/syntax/lexer2",
     "compiler/syntax/lexeme",
-    "compiler/core/core",
-    "/Users/timwhiting/koka-code/compiler/syntax/lexer2"]
+    "compiler/core/core"]
   
   files.foreach fn(f)
     with handler

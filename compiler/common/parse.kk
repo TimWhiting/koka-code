@@ -7,13 +7,13 @@
 //----------------------------------------------------------------------------
 
 import compiler/syntax/layout
-import compiler/syntax/lexer2
+import compiler/syntax/lexer
 import compiler/syntax/lexeme
 import compiler/syntax/syntax
-import syntax
-import name
-import name-prim
-import range
+import compiler/common/syntax
+import compiler/common/name
+import compiler/common/name-prim
+import compiler/common/range
 
 effect astError
   final ctl astError(e: string, r: range): a
@@ -46,18 +46,18 @@ fun peek(): ast lexeme
   val p = ppeek()
   match p
     Just(l) -> l
-    Nothing -> astError("unexpected end of file", rangeNull)
+    Nothing -> astError("unexpected end of file", null)
 
 fun next(): ast lexeme
   val p = pnext()
   match p
     Just(l) -> l
-    Nothing -> astError("unexpected end of file", rangeNull)
+    Nothing -> astError("unexpected end of file", null)
 
 alias ast = <astParse, astError, pure, fsys>
 fun lexParse(insSemi: bool, preprocess: list<lexeme> -> pure list<lexeme>, p: () -> <console,ast|e> a, sourceName: string, input: string): <console,astError,fsys,pure|e> a
   val src = Source(sourceName, input)
-  val lexes = lex(src, 1, input)
+  val lexes = lexing(src, 1, input)
   with parseLexemes(src, preprocess(layout(insSemi, lexes)))
   p()
   
@@ -88,7 +88,7 @@ fun parseLexemes(src: source, lexemes0: list<lexeme>, p: () -> <console,ast|e> a
             Cons((h, msg, i), tl) ->
               history := Cons((h ++ ctx Cons(l, _), msg, i + 1), tl)
             Nil -> 
-              astError("unexpected top of context", rangeNull)
+              astError("unexpected top of context", null)
           Just(l)
         Nil -> Nothing
     fun reset(msg)
@@ -103,7 +103,7 @@ fun parseLexemes(src: source, lexemes0: list<lexeme>, p: () -> <console,ast|e> a
             if debug then
               trace("Resetting " ++ str ++ "\n" ++ history.map(fn(x) "\tWhen parsing " ++ x.snd).join("\n") ++ " at " ++ lexemes.head.map(show).default("eof") ++ "\nputting back:\n\t" ++ (h ++. Nil).map(show).join("\n\t"))
         Nil ->
-          astError("mismatched reset", rangeNull)
+          astError("mismatched reset", null)
     fun delimit(msg)
       history := Cons((ctx _, msg, 0), history)
     fun undelimit(msg)
@@ -276,13 +276,13 @@ fun parens(p)
   val l = pLparen()
   val x = p()
   val r = pRparen()
-  (x, Range(l.start, r.end))
+  (x, combine(l, r))
 
 fun angles(p)
   val l = pLangle()
   val x = p()
   val r = pRangle()
-  (x, Range(l.start, r.end))
+  (x, combine(l, r))
 
 fun parensCommas(p)
   parens
@@ -359,7 +359,7 @@ fun pTTuple(): <ast> (name, range)
   val rng1 = pLparen()
   val cs = pmany("comma", pComma)
   val rng2 = pRparen()
-  (nameTuple(cs.length + 1).unqualify, rng1.combine(rng2))
+  (name-tuple(cs.length + 1).unqualify, rng1.combine(rng2))
 
 fun pImportAlias()
   val (name1, rng1) = pModulePath()
@@ -430,11 +430,11 @@ fun pFunId()
     {
       val rng1 = pSpecialId("[")
       val rng2 = pSpecialId("]")
-      (nameIndex, Range(rng1.start, rng2.end))
+      (nameIndex, combine(rng1, rng2))
     },
     {
       val (s, rng) = pStringLit()
-      (newName(s), rng)
+      (new-name(s), rng)
     }
     ])
 
@@ -447,7 +447,7 @@ fun pIdOp()
 fun pConId()
   choices("Constructor", [
     { ensureUnqualified("constructor", pQConId) },
-    { val (s, rng) = pStringLit(); (newName(s), rng)}
+    { val (s, rng) = pStringLit(); (new-name(s), rng)}
   ])
 
 fun pOp()
@@ -455,14 +455,14 @@ fun pOp()
 
 fun pTypeId()
   val (name, rng) = pQTypeId()
-  if name.isQualified then
+  if name.is-qualified then
     astError("expected unqualified type name", rng)
   else
     (name, rng)
 
 fun ensureUnqualified(str, p)
   val (n, r) = p()
-  if n.isQualified then 
+  if n.is-qualified then 
     astError("expected unqualified " ++ str, r)
   else
     (n, r)
@@ -475,7 +475,7 @@ fun pQTypeId()
   else astError("type name (and not type variable)", range)
 
 fun pTypeIdCtx()
-  ("ctx".newName, pKeyword("ctx"))
+  ("ctx".new-name, pKeyword("ctx"))
 
 fun pQOp()
   token("operator") fn(a)
@@ -494,7 +494,7 @@ fun pQVarId()
   token("variable id") fn(a)
     match a
       Lexeme(rng, LexId(id)) -> 
-        Just((id.showPlain.newName, rng))
+        Just((id.show-plain.new-name, rng))
       _ -> Nothing
 
 fun pQIdOp()
@@ -515,14 +515,14 @@ fun pModulePath(): <ast> (name, range)
   token("module path") fn(x)
     match x 
       Lexeme(rng, LexId(id)) -> 
-        Just((id.showPlain.newName, rng))
+        Just((id.show-plain.new-name, rng))
       _ -> Nothing
 
 fun pWildcard()
   token("wildcard") fn(a)
     match a
       Lexeme(rng, LexWildCard(id)) -> 
-        Just((if id.showPlain == "_" then uniqueRangeName(rng, "_w") else id, rng))
+        Just((if id.show-plain == "_" then uniqueRangeName(rng, "_w") else id, rng))
       _ -> Nothing
 
 fun pInteger()
@@ -549,23 +549,22 @@ fun pStringLit()
       Lexeme(rng, LexString(s)) -> Just((s, rng))
       _ -> Nothing
 
-fun pSpecialId(s: string)
+fun default/pSpecialId(s: string)
   token(s) fn(x)
     match x.lex
-      LexId(id) | id.showPlain == s -> Just(x.range)
+      LexId(id) | id.show-plain == s -> Just(x.range)
       _ -> Nothing
-
 
 fun pSpecialId(s: string, alternates: list<string>)
   token(s) fn(x)
     match x.lex
-      LexId(id) | id.showPlain == s -> Just(x.range)
-      LexId(id) | alternates.any(fn(v) v == id.showPlain) -> 
-        addWarning("using deprecated keyword " ++ id.showPlain ++ ", use " ++ s ++ " instead", x.range)
+      LexId(id) | id.show-plain == s -> Just(x.range)
+      LexId(id) | alternates.any(fn(v) v == id.show-plain) -> 
+        addWarning("using deprecated keyword " ++ id.show-plain ++ ", use " ++ s ++ " instead", x.range)
         Just(x.range)
       _ -> Nothing
 
-inline fun pSpecial(s: string): <ast> range
+inline fun default/pSpecial(s: string): <ast> range
   pSpecial(s, [])
 
 fun pSpecial(s: string, alternates: list<string>): <ast> range
@@ -580,16 +579,16 @@ fun pSpecial(s: string, alternates: list<string>): <ast> range
 fun pSpecialOp(s)
   token(s) fn(x)
     match x.lex
-      LexOp(s') | s == s'.showPlain -> Just(x.range)
+      LexOp(s') | s == s'.show-plain -> Just(x.range)
       _ -> Nothing
 
 fun pSpecialConId(s)
   token(s) fn(x)
     match x.lex
-      LexCons(s') | s == s'.showPlain -> Just(x.range)
+      LexCons(s') | s == s'.show-plain -> Just(x.range)
       _ -> Nothing
 
-inline fun pKeyword(s: string): <ast> range
+inline fun default/pKeyword(s: string): <ast> range
   pKeywordBase(s, []).range
 
 inline fun pKeyword(s: string, alts: list<string>): <ast> range
@@ -604,13 +603,13 @@ fun pKeywordBase(s: string, alternates: list<string>): <ast> lexeme
         Just(x)
       _ -> Nothing
 
-fun pDocKeyword(s: string): <ast> (range, string)
+fun default/pDocKeyword(s: string): <ast> (range, string)
   pDocKeyword(s, [])
 
 fun pDocKeyword(s: string, alternates: list<string>): <ast> (range, string)
   match pKeywordBase(s, alternates)
     Lexeme(rng, LexKeyword(_, doc)) -> (rng, doc)
-    _ -> astError("expected " ++ s, rangeNull)
+    _ -> astError("expected " ++ s, null)
 
 fun uniqueRangeHiddenName(pre: string, rng: range): name
   val pos = rng.start
@@ -618,10 +617,10 @@ fun uniqueRangeHiddenName(pre: string, rng: range): name
 
 fun uniqueRangeName(rng: range, pre: string): name
   val pos = rng.start
-  newName(pre ++ "-l" ++ pos.line.show ++ "-c" ++ pos.col.show)
+  new-name(pre ++ "-l" ++ pos.line.show ++ "-c" ++ pos.col.show)
 
 fun adjustRange(ue: userExpr, r: range): userExpr
-  Parens(ue, nameNil, r)
+  Parens(ue, nil, r)
 
 fun adjustTpRange(r: range, ut: userType): userType
   TpParens(ut, r)

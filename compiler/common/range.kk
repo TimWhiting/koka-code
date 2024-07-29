@@ -219,7 +219,7 @@ fun range/after(r: range): range
 fun range/before(r: range): range
   Range(r.start, r.start, r.hidden)
 
-fun default/range(m: maybe<range>): range
+fun range/default(m: maybe<range>): range
   match m
     Just(r) -> r
     Nothing -> null

@@ -233,7 +233,7 @@ fun pDefSort()
       val fipT = try("fip", pFip)
       val (_, doc) = pDocKeyword("fun")
       choices("specialization", [{pSpecialOp("**"); ()}, {pSpecialOp("*"); ()}, {()}])
-      (defFunEx([], fipT), inl, isRec, doc)
+      (def-fun-ex([], fipT), inl, isRec, doc)
     },
     {(DefVal, inl, False, pDocKeyword("val").snd)}
   ])

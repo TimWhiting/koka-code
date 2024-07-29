@@ -1,21 +1,23 @@
-import std/text/parse
 import std/os/path
 import std/os/file
 import newstd/data/sort
 import compiler/syntax/lexeme
 import compiler/syntax/syntax
+import compiler/syntax/promote
 import compiler/common/syntax
 import compiler/common/name
 import compiler/common/name-prim
 import compiler/common/range
-import compiler/syntax/promote
 import compiler/common/parse
 
-fun parseProgramFromFile(semiInsert: bool, fname: path)
-  val r = read-text-file(fname)
-  parseProgramFromString(semiInsert, r, fname)
+fun test()
+  parseProgramFromFile(True, "compiler/syntax/parse.kk".path)
 
-fun parseProgramFromString(semiInsert: bool, input: string, fname: path)
+fun parseProgramFromFile(fname: path, semiInsert: bool = True)
+  val r = read-text-file(fname)
+  parseProgramFromString(r, fname, semiInsert)
+
+fun parseProgramFromString(input: string, fname: path, semiInsert: bool = True)
   lexParse(semiInsert, fn(x) x, parseProgram, fname.string, input)
 
 fun interactive(f: () -> <ast> a): <ast> a
@@ -37,7 +39,7 @@ fun pModule()
     pBody(vis, name, rng, doc)
   match res
     Just(r) -> r
-    Nothing -> pBody(Public, sourceInfo.name.path.basename.pathToModuleName, rangeNull, "")
+    Nothing -> pBody(Public, sourceInfo.name.path.basename.pathToModuleName, null, "")
 
 fun pBody(vis: visibility, name: name, rng: range, doc: string): <ast> userProgram
   pmany("semicolons", pSemicolon)
@@ -48,7 +50,7 @@ fun pBody(vis: visibility, name: name, rng: range, doc: string): <ast> userProgr
     (imps, fixs, tdefs)
   pmany("semicolons", pSemicolon)
   val (defs, typeDefs, externals) = splitTopDefs(topDefss.concat)
-  val prelude = if name.show.starts-with("std/core").is-just then [] else [Kimport(nameSystemCore, nameSystemCore, rangeNull, Private)]
+  val prelude = if name.show.starts-with("std/core").is-just then [] else [Kimport(nameSystemCore, nameSystemCore, null, Private)]
   Program(sourceInfo, name, rng, [TypeDefRec(typeDefs)], [DefRec(defs)], prelude ++ imports, externals, fixDefss.concat, doc)
 
 value type topDef
@@ -82,7 +84,7 @@ fun pImportDecl(): <ast> kimport
   val (vis, vrng) = pVisibility(Private)
   pKeyword("import")
   val (asname, name, rng) = pImportAlias()
-  Kimport(asname, name, Range(vrng.start, rng.end), vis)
+  Kimport(asname, name, combine(vrng, rng), vis)
 
 fun pVisibility(vis=Private)
   choicesnb("visibility", [{
@@ -93,7 +95,7 @@ fun pVisibility(vis=Private)
     val rng = pKeyword("private")
     addWarning("using private is deprecated, only use pub to make declarations public", rng)
     (Private, rng)
-  },{(vis, rangeNull)}])
+  },{(vis, null)}])
 
 fun typeFromPars(rng:range, pars: list<valueBinder<userType, maybe<userExpr>>>, teff: userType, tres: userType): div userType
   promoteType(TpFun(pars.map(fn(p) (p.name, p.binderType)), teff, tres, rng))
@@ -101,7 +103,7 @@ fun typeFromPars(rng:range, pars: list<valueBinder<userType, maybe<userExpr>>>, 
 fun genArgs(pars: list<valueBinder<userType, maybe<userExpr>>>): list<(maybe<(name, range)>, userExpr)>
   pars.map(fn(p) (Nothing, Var(p.name, False, p.range.before)))
 
-fun genParArgs(tp)
+fun genParArgs(tp: userType)
   match tp
     TpQuan(QSome) -> astError("external types cannot contain unspecified ('_') types", tp.range)
     TpQuan(QExists) -> astError("external types cannot contain existential types", tp.range)
@@ -116,9 +118,8 @@ fun genFunParArgs(pars: list<(name, userType)>)
   pars.map-indexed(fn(i, p) p.genParArg(i)).unzip 
 
 fun genParArg((name:name, _:userType), idx: int)
-  val fullName = if name == nameNil then new-hidden-name("arg" ++ idx.show) else name
-  val rng = rangeNull
-  (ValueBinder(fullName, Nothing, Nothing, rng, rng), (Nothing, Var(fullName, False, rng)))
+  val fullName = if name == nil then new-hidden-name("arg" ++ idx.show) else name
+  (ValueBinder(fullName, Nothing, Nothing, null, null), (Nothing, Var(fullName, False, null)))
 
 fun pExternDecl(dvis: visibility): <ast> list<topDef>
   choicesnb("externDecl", [{
@@ -157,9 +158,9 @@ fun pExternDecl(dvis: visibility): <ast> list<topDef>
     else
       val externName = newHiddenExternalName(name)
       val ext = External(externName, tp, pinfos, nameRng.before, fullRng.before, exprs, Private, fip, doc)
-      val body = annotate(Lam(pars, App(Var(externName, False, rangeNull), args, fullRng), fullRng))
+      val body = annotate(Lam(pars, App(Var(externName, False, null), args, fullRng), fullRng))
       val binder = ValueBinder(name, (), body, nameRng, fullRng)
-      val extfun = Def(binder, fullRng, vis, defFunEx(pinfos, fip), InlineNever, doc)
+      val extfun = Def(binder, fullRng, vis, def-fun-ex(pinfos, fip), InlineNever, doc)
       [DefExtern(ext), DefValue(extfun)]
   }
   ])
@@ -188,7 +189,7 @@ fun externalIncludes(target: target, rng: range, (key, fname): (string, string))
   else [(key, fpath.show)]
 
 fun preadFile(fpath: path)
-  catch({read-text-file(fpath)}, fn(e) astError("Unable to read external file at path: " ++ fpath.show ++ ": got error " ++ e.message, rangeNull))
+  catch({read-text-file(fpath)}, fn(e) astError("Unable to read external file at path: " ++ fpath.show ++ ": got error " ++ e.message, null))
 
 fun pExternalImportEntry() 
   val target = pExternalTarget()
@@ -286,7 +287,7 @@ fun pDataTypeDecl(dvis: visibility)
   val (tpars, k, prng) = pTypeKindParams()
   val name = tbind(k)
   val resTp = TpApp(name.tpCon, tpars.map(tpVar), name.range.combine(tpars.last.map(range).default(name.range)))
-  val (cs, crng) = maybe("", {semiBraces("", {pConstructor(defvis, tpars, resTp)})}).default(([], rangeNull))
+  val (cs, crng) = maybe("", {semiBraces("", {pConstructor(defvis, tpars, resTp)})}).default(([], null))
   val (constrs, creatorss) = cs.unzip
   val range = combine([vrng, trng, name.range, prng, crng])
   (DataType(name, tpars, constrs, range, vis, typeSort, ddef, isExtend, doc), creatorss.concat)
@@ -310,7 +311,7 @@ fun pStructDecl(dvis': visibility)
   val n = tbind(KindNone)
   val resTp = TpApp(n.tpCon, tpars.map(tpVar), n.range.combine(tpars.last.map(range).default(n.range)))
   val (pars, prng) = pConPars(defvis)
-  val (tid, rng) = (n.name, n.nameRange)
+  val (tid, rng) = (n.name, n.name-range)
   val conId = tid.toConstructorName
   val (usercon, creators) = makeUserCon(conId, tpars, resTp, [], pars, rng, rng.combine(prng), defvis, doc)
   (DataType(n, tpars, [usercon], combine([vrng, trng, rng, prng]), vis, Inductive, ddef, False, doc), creators)
@@ -347,12 +348,12 @@ fun pTypeKindParams()
   choicesnb("", [
     {val (tpars, rng) = angles(pTBinders); val kind = pKindAnnot(); (tpars, kind, rng.combine(kind.range))},
     {val kind = pKindAnnot(); ([], kind, kind.range)},
-    {([], KindNone, rangeNull)}
+    {([], KindNone, null)}
   ])
 
 fun pConstructor(dvis: visibility, foralls: list<userTypeBinder>, resTp: userType)
   val (vis, vrng) = pVisibility(dvis)
-  val (rng0, doc) = optionMaybe("", {pDocKeyword("con")}).default((rangeNull, ""))
+  val (rng0, doc) = optionMaybe("", {pDocKeyword("con")}).default((null, ""))
   val (constr, rng) = pConstructorId()
   val exists0 = pTypeParams()
   val (pars, prng) = pConPars(vis)
@@ -360,10 +361,10 @@ fun pConstructor(dvis: visibility, foralls: list<userTypeBinder>, resTp: userTyp
 
 fun makeUserCon(const: name, foralls: list<userTypeBinder>, resTp: userType, exists0: list<userTypeBinder>, pars: list<(visibility, valueBinder<userType, maybe<userExpr>>)>, nameRng: range, rng: range, vis: visibility, doc: string)
   val conParams = pars.map(fn((v, p)) (v, p(expr=Nothing)))
-  val cName = const.newCreatorName
+  val cName = const.new-creator-name
   val params = pars.map(fn((_, p)) p(binderType=if p.expr.is-just then makeOptional(p.binderType) else p.binderType))
   val lParams = params.map(fn(ValueBinder(name', _, expr, nameRng', rng')) ValueBinder(name', Nothing, expr, nameRng', rng') )
-  val arguments = params.map(fn(p) (Nothing, Var(p.name, False, p.nameRange)))
+  val arguments = params.map(fn(p) (Nothing, Var(p.name, False, p.name-range)))
   val tpParams = params.map(fn(p) (p.name, p.binderType))
   val tpFull = quantify(QForall, foralls, TpFun(tpParams, makeTpTotal(nameRng), resTp, rng))
   val body = Ann(Lam(lParams, App(Var(const, False, nameRng), arguments, rng), rng), tpFull, rng)
@@ -372,7 +373,7 @@ fun makeUserCon(const: name, foralls: list<userTypeBinder>, resTp: userType, exi
   (UserCon(const, exists0, conParams, Nothing, nameRng, rng, vis, doc), if pars.any(fn(p) p.snd.expr.is-just) then [creator] else [])
 
 fun pConPars(dvis: visibility)
-  choicesnb("", [{semiBraces("", {pConBinder(dvis)})}, {parensCommas({pConBinder(dvis)})}, {([], rangeNull)}])
+  choicesnb("", [{semiBraces("", {pConBinder(dvis)})}, {parensCommas({pConBinder(dvis)})}, {([], null)}])
 
 fun pConBinder(dvis: visibility)
   val (vis, vrng) = pVisibility(dvis)
@@ -383,7 +384,7 @@ fun pConBinder(dvis: visibility)
 alias param = (visibility, valueBinder<userType, maybe<userExpr>>);
 
 fun bindExprToVal(opname: name, oprange: range, expr: userExpr)
-  val fresh = "value".makeFreshHiddenName(opname, oprange)
+  val fresh = "value".make-fresh-hidden-name(opname, oprange)
   val freshVar = Var(fresh, False, oprange)
   val erange = expr.range
   val binder = Def(ValueBinder(fresh, (), expr, oprange, erange), oprange, Private, DefVal, InlineAuto, "")
@@ -433,7 +434,7 @@ fun pEffectDecl(dvis: visibility)
   val (vis, defVis, vrng) = choices("", [{val (v, vr) = pVisibility(dvis); (v, v, vr)}, {val vr = pKeyword("abstract"); (Public, Private, vr)}])
   val isInstance = optionMaybe("named", {pKeyword("named")}).is-just
   val isScoped = optionMaybe("scoped", {pKeyword("scoped")}).is-just
-  val (rng1, singleShot) = optionMaybe("linear", {val rng = pKeyword("linear"); (rng, True)}).default((rangeNull, False))
+  val (rng1, singleShot) = optionMaybe("linear", {val rng = pKeyword("linear"); (rng, True)}).default((null, False))
   val sort = optionMaybe("sort", {pSpecialId("rec"); Retractive}).default(Inductive)
   val (rng2, doc) = pDocKeyword("effect")
   val erng = rng1.combine(rng2)
@@ -469,101 +470,96 @@ fun pDocKeywordFun()
 fun pKeywordInject()
   pKeyword("mask", ["inject"])
 
-fun makeEffectDecl(decl: effectDecl): div list<topDef>
+fun makeEffectDecl(decl: effectDecl): pure list<topDef>
   val EffectDecl(vis, _, vrng, erng, doc, sort, singleShot, isInstance, isScoped, id, irng, tpars, effkind, _, mbInstanceUmb, operations) = decl
   val rng = vrng.combine(erng).combine(irng)
-  val krng = rangeNull // For generated code
-  val grng = krng
   val (tparsScoped, tparsNonScoped) = if isScoped then (tpars.take(1), tpars.drop(1)) else ([], tpars)
   val infKind = match effkind
-    KindNone -> tpars.map(kind).foldr(KindCon(if isInstance then nameKindStar elif singleShot then nameKindHandled1 else nameKindHandled, krng)) fn(e, acc)
+    KindNone -> tpars.map(kind).foldr(KindCon(if isInstance then nameKindStar elif singleShot then nameKindHandled1 else nameKindHandled, null)) fn(e, acc)
       KindArrow(e, acc)
     _ -> effkind
   val ename = TypeBinder(id, infKind, irng, irng)
-  val effTpH = TpApp(TpCon(ename.name, ename.range), tpars.map(tpVar), krng)
-  val effTp = if isInstance then effTpH else TpApp(TpCon(if singleShot then nameTpHandled1 else nameTpHandled, ename.range), [effTpH], krng)
+  val effTpH = TpApp(TpCon(ename.name, ename.range), tpars.map(tpVar), null)
+  val effTp = if isInstance then effTpH else TpApp(TpCon(if singleShot then nameTpHandled1 else nameTpHandled, ename.range), [effTpH], null)
   // declare the effect type (for resources, generate a hidden constructor to check the types)
   val docEffect = "`:" ++ id.show ++ "` effect"
   val docx = if doc != "" then doc else "// " ++ docEffect
   // Effect handler type
-  val hndName = id.toHandlerName
-  val kindStar = KindCon(nameKindStar, krng)
-  val kidnEffect = KindCon(nameKindEffect, krng)
-  val hndTpName = TypeBinder(hndName, KindNone, krng, krng)
-  val hndEffTp = TypeBinder("e".new-hidden-name, KindCon(nameKindEffect, krng), krng, krng)
-  val hndResTp = TypeBinder("r".new-hidden-name, kindStar, krng, krng)
-  val hndTp = TpApp(hndTpName.tpCon, (tparsNonScoped ++ [hndEffTp, hndResTp]).map(tpVar), grng)
+  val hndName = id.to-handler-name
+  val kindStar = KindCon(nameKindStar, null)
+  val kidnEffect = KindCon(nameKindEffect, null)
+  val hndTpName = TypeBinder(hndName, KindNone, null, null)
+  val hndEffTp = TypeBinder("e".new-hidden-name, KindCon(nameKindEffect, null), null, null)
+  val hndResTp = TypeBinder("r".new-hidden-name, kindStar, null, null)
+  val hndTp = TpApp(hndTpName.tpCon, (tparsNonScoped ++ [hndEffTp, hndResTp]).map(tpVar), null)
 
   val (effTpDecl, wrapAction) = 
     if isInstance then 
       val evTp = TpApp(TpCon(nameTpEv, rng), [TpApp(hndTpName.tpCon, tparsNonScoped.map(tpVar), rng)], rng)
-      val evName = "ev".newName
+      val evName = "ev".new-name
       val evFld = ValueBinder(evName, evTp, Nothing, irng, rng)
-      val evCon = UserCon(id.toConstructorName, [], [(Private, evFld)], Nothing, irng, rng, Private, "")
+      val evCon = UserCon(id.to-constructor-name, [], [(Private, evFld)], Nothing, irng, rng, Private, "")
       (DataType(ename, tpars, [evCon], rng, vis, Inductive, DataDefNormal, False, docx), 
         fn(action) Lam([ValueBinder(evName, Nothing, Nothing, irng, rng)], 
           App(action, [(Nothing, 
-            App(Var(id.toConstructorName, False, rng), [(Nothing, Var(evName, False, rng))], rng))], rng), rng))
+            App(Var(id.to-constructor-name, False, rng), [(Nothing, Var(evName, False, rng))], rng))], rng), rng))
     else
       // add a private constructor that refers to the handler type to get a proper recursion check
-      val hndfld = ValueBinder(nameNil, hndTp, Nothing, irng, irng)
-      val hndcon = UserCon(id.toConstructorName, [hndEffTp, hndResTp], [(Private, hndfld)], Nothing, irng, irng, Private, "")
+      val hndfld = ValueBinder(nil, hndTp, Nothing, irng, irng)
+      val hndcon = UserCon(id.to-constructor-name, [hndEffTp, hndResTp], [(Private, hndfld)], Nothing, irng, irng, Private, "")
       (DataType(ename, tpars, [hndcon], rng, vis, Inductive, DataDefNormal, False, docx), fn(action) action)
   
   // Effect tag
-  val tagName = id.toEffectTagName
-  val tagDef = Def(ValueBinder(tagName, (), Ann(App(Var(nameHTag, False, krng), 
-    [(Nothing, Literal(LitString(id.show ++ "." ++ irng.source.name.path.basename, krng)))], krng), 
-      quantify(QForall, tpars, TpApp(TpCon(nameTpHTag, krng), 
-        [TpApp(TpCon(hndName, krng), tparsNonScoped.map(tpVar), krng)], krng)), krng),
-       krng, krng), krng, vis, DefVal, InlineNever, "// runtime tag for the " ++ docEffect)
-  val scopeEff = TpApp(TpCon(nameTpScope, krng), tparsScoped.map(fn(tb) TpVar(tb.name, krng)), krng)
-  val extraEffects = (if isScoped && isInstance then [scopeEff] else []) ++ (if sort.is-retractive then [TpCon(nameTpDiv, krng)] else [])
+  val tagName = id.to-effect-tag-name
+  val tagDef = Def(ValueBinder(tagName, (), Ann(App(Var(nameHTag, False, null), 
+    [(Nothing, Literal(LitString(id.show ++ "." ++ irng.source.name.path.basename, null)))], null), 
+      quantify(QForall, tpars, TpApp(TpCon(nameTpHTag, null), 
+        [TpApp(TpCon(hndName, null), tparsNonScoped.map(tpVar), null)], null)), null),
+       null, null), null, vis, DefVal, InlineNever, "// runtime tag for the " ++ docEffect)
+  val scopeEff = TpApp(TpCon(nameTpScope, null), tparsScoped.map(fn(tb) TpVar(tb.name, null)), null)
+  val extraEffects = (if isScoped && isInstance then [scopeEff] else []) ++ (if sort.is-retractive then [TpCon(nameTpDiv, null)] else [])
   
 
   // parse the operations and return the constructor fields and function definitions
-  val orderedOperations = operations.sortBy(fn(op1:opDecl, op2:opDecl) (op1.name).compare(op2.name))
+  val orderedOperations = operations.sort-by(fn(op1:opDecl, op2:opDecl) (op1.name).name/name/cmp(op2.name))
   val opCount = operations.length
   val (opFields, opSelects, opDefs, opValDefs) = list(0, opCount - 1).zip(orderedOperations).map(fn(op) operationDecl(opCount, vis, tparsScoped, tparsNonScoped, docEffect, hndName, id, mbInstanceUmb, effTp, hndTpName.tpCon, ([hndEffTp, hndResTp]), extraEffects, op)).unzip4
   
   // Handle function
-  val hndCon = UserCon(hndName.toConstructorName, [], opFields.map(fn(f) (Public, f)), Nothing, krng, grng, vis, "")
-  val hndTpDecl = DataType(hndTpName, tparsNonScoped ++ [hndEffTp, hndResTp], [hndCon], grng, vis, sort, DataDefNormal, False, "// handler for the " ++ docEffect)
-  val handleRetTp = TypeBinder("b".new-hidden-name, kindStar, krng, krng)
-  val handleName = id.toHandleName
+  val hndCon = UserCon(hndName.to-constructor-name, [], opFields.map(fn(f) (Public, f)), Nothing, null, null, vis, "")
+  val hndTpDecl = DataType(hndTpName, tparsNonScoped ++ [hndEffTp, hndResTp], [hndCon], null, vis, sort, DataDefNormal, False, "// handler for the " ++ docEffect)
+  val handleRetTp = TypeBinder("b".new-hidden-name, kindStar, null, null)
+  val handleName = id.to-handle-name
   val handleEff = 
     if isInstance then 
-      if isScoped then krng.makeEffectExtend(scopeEff, hndEffTp.tpVar, userKindRange) 
+      if isScoped then makeEffectExtend(scopeEff, hndEffTp.tpVar) 
       else hndEffTp.tpVar 
-    else krng.makeEffectExtend(effTp, hndEffTp.tpVar, userKindRange)
-  val actionArgTp = if isInstance then [("hname".newName, effTp)] else []
-  val actionTp = TpFun(actionArgTp, handleEff, handleRetTp.tpVar, grng)
+    else makeEffectExtend(effTp, hndEffTp.tpVar)
+  val actionArgTp = if isInstance then [("hname".new-name, effTp)] else []
+  val actionTp = TpFun(actionArgTp, handleEff, handleRetTp.tpVar, null)
   val handleTp = quantify(QForall, tparsNonScoped ++ [handleRetTp, hndEffTp, hndResTp], TpFun(
-    [("cfc".newName, TpCon(nameTpInt32, krng)),
-    ("hnd".newName, TpApp(TpCon(hndName, grng), (tparsNonScoped ++ [hndEffTp, hndResTp]).map(tpVar), grng)),
-    ("ret".newName, TpFun([("res".newName, handleRetTp.tpVar)], hndEffTp.tpVar, hndResTp.tpVar, grng)),
-    ("action".newName, if isScoped then quantify(QForall, tparsScoped, actionTp) else actionTp)],
-    hndEffTp.tpVar, hndResTp.tpVar, grng
+    [("cfc".new-name, TpCon(nameTpInt32, null)),
+    ("hnd".new-name, TpApp(TpCon(hndName, null), (tparsNonScoped ++ [hndEffTp, hndResTp]).map(tpVar), null)),
+    ("ret".new-name, TpFun([("res".new-name, handleRetTp.tpVar)], hndEffTp.tpVar, hndResTp.tpVar, null)),
+    ("action".new-name, if isScoped then quantify(QForall, tparsScoped, actionTp) else actionTp)],
+    hndEffTp.tpVar, hndResTp.tpVar, null
   ))
   val params = [
-    ValueBinder("cfc".newName, Nothing, Nothing, krng, grng),
-    ValueBinder("hnd".newName, Nothing, Nothing, krng, grng),
-    ValueBinder("ret".newName, Nothing, Nothing, krng, grng),
-    ValueBinder("action".newName, Nothing, Nothing, krng, grng)]
+    ValueBinder("cfc".new-name, Nothing, Nothing, null, null),
+    ValueBinder("hnd".new-name, Nothing, Nothing, null, null),
+    ValueBinder("ret".new-name, Nothing, Nothing, null, null),
+    ValueBinder("action".new-name, Nothing, Nothing, null, null)]
   val arguments = [
-    (Nothing, Var(tagName, False, krng)),
-    (Nothing, Var("cfc".newName, False, krng)),
-    (Nothing, Var("hnd".newName, False, krng)),
-    (Nothing, Var("ret".newName, False, krng)),
-    (Nothing, wrapAction(Var(newName("action"), False, krng)))
+    (Nothing, Var(tagName, False, null)),
+    (Nothing, Var("cfc".new-name, False, null)),
+    (Nothing, Var("hnd".new-name, False, null)),
+    (Nothing, Var("ret".new-name, False, null)),
+    (Nothing, wrapAction(Var(new-name("action"), False, null)))
   ]
-  val handleInner = App(Var(if isInstance then nameNamedHandle else nameHandle, False, grng), arguments, grng)
-  val handleBody = Ann(Lam(params, handleInner, grng), handleTp, grng)
-  val handleDef = Def(ValueBinder(handleName, (), handleBody, irng, rng), grng, vis, DefFun([]), InlineNever, "// handler for the " ++ docEffect)
+  val handleInner = App(Var(if isInstance then nameNamedHandle else nameHandle, False, null), arguments, null)
+  val handleBody = Ann(Lam(params, handleInner, null), handleTp, null)
+  val handleDef = Def(ValueBinder(handleName, (), handleBody, irng, rng), null, vis, DefFun([]), InlineNever, "// handler for the " ++ docEffect)
   [DefType(effTpDecl), DefValue(tagDef), DefType(hndTpDecl), DefValue(handleDef)] ++ opSelects.map(DefValue) ++ opDefs.map(DefValue) ++ opValDefs.concat-maybe.map(DefValue)
-
-fun unzip4(l: list<(a, b, c, d)>): (list<a>, list<b>, list<c>, list<d>)
-  l.foldr(([], [], [], []), fn((a, b, c, d), (ass, bs, cs, ds)) (Cons(a,ass), Cons(b,bs), Cons(c,cs), Cons(d,ds)))
 
 fun pOpDecl(lin: bool, vis: visibility)
   choicesnb("op decl", [
@@ -581,8 +577,8 @@ fun pValOpDecl(vis: visibility): <ast> opDecl
   pKeyword(":")
   val (mbTeff, tRes) = pTResult()
   if mbTeff.is-just then
-    astError("an explicit effect in result type of an operation is not allowed (yet)", mbTeff.map(range).default(rng0))
-  OpDecl(doc, id.toValueOperationName, rng0, idrng, True, OpVal, [], [], idrng, mbTeff, tRes)
+    astError("an explicit effect in result type of an operation is not allowed (yet)", mbTeff.map(fn(t) t.range).default(rng0))
+  OpDecl(doc, id.to-value-operation-name, rng0, idrng, True, OpVal, [], [], idrng, mbTeff, tRes)
 
 fun pFunOpDecl(lin: bool, vis: visibility): <ast> opDecl
   val ((rng0, doc), sort) = choicesnb("op decl", [
@@ -603,14 +599,14 @@ fun pFunOpDecl(lin: bool, vis: visibility): <ast> opDecl
   pKeyword(":")
   val (mbTeff, tRes) = pTResult()
   if mbTeff.is-just then
-    astError("an explicit effect in result type of an operation is not allowed (yet)", mbTeff.map(range).default(rng0))
+    astError("an explicit effect in result type of an operation is not allowed (yet)", mbTeff.map(fn(t) t.range).default(rng0))
   OpDecl(doc, id, rng0, idrng, False, sort, exists0, pars, prng, mbTeff, tRes)
 
 fun pDeclParams(allowBorrow: bool, allowDefaults: bool)
   fun pParamBinder() 
     val pinfo = if allowBorrow then pParamInfo() else Own
     val (name, rng, tp) = pParamType()
-    val (opt, drng) = if allowDefaults then pDefaultExpr() else (Nothing, rangeNull)
+    val (opt, drng) = if allowDefaults then pDefaultExpr() else (Nothing, null)
     (ValueBinder(name, tp, opt, rng, combine([rng, tp.range(range), drng])), pinfo)
   val (ipars, rng) = parensCommas(pParamBinder)
   val (pars, pinfos) = ipars.unzip
@@ -620,79 +616,77 @@ fun operationDecl(opCount, vis, forallsScoped:list<userTypeBinder>, forallsNonSc
   val foralls = forallsScoped ++ forallsNonScoped
   val OpDecl(_doc, id, _kwrng, idrng, _lin, sort, exists0, pars, _prng, _mbTeff, tRes) = op
   val rng = idrng
-  val krng = rangeNull
-  val grng = krng
   val opEffTps = mbInstanceUmb.default([effTp])
-  val teff0 = (opEffTps ++ extraEffects).foldr(krng.makeEffectEmpty, fn(e, acc) krng.makeEffectExtend(e, acc, userKindRange))
-  val nameA = ".a".newName
-  val tpVarA = TpVar(nameA, krng)
+  val teff0 = (opEffTps ++ extraEffects).foldr(null.makeEffectEmpty, fn(e, acc) makeEffectExtend(e, acc))
+  val nameA = ".a".new-name
+  val tpVarA = TpVar(nameA, null)
   val isInstance = mbInstanceUmb.is-just
   val exists1 = if exists0.is-cons then exists0 else promoteFree(foralls, (pars.map(binderType) ++ [teff0, tRes]))
   fun notDiv(tp)
     match tp
       TpCon(name, _) -> !(name == nameTpDiv)
       _ -> True
-  val teff = if (forallsNonScoped ++ exists1).is-cons && isInstance && extraEffects.all(notDiv) then makeEffectExtend(krng, TpCon(nameTpDiv, krng), teff0, userKindRange) else teff0
+  val teff = if (forallsNonScoped ++ exists1).is-cons && isInstance && extraEffects.all(notDiv) then makeEffectExtend(TpCon(nameTpDiv, null), teff0) else teff0
   // create a constructor field for the operation as `clauseId : clauseN<a1,..,aN,b,e,r>`
-  val forallParams = forallsNonScoped.map(fn(par) TpVar(par.name, krng))
-  val tpParams = forallParams ++ exists1.map(fn(par) TpVar(par.name, krng))
+  val forallParams = forallsNonScoped.map(fn(par) TpVar(par.name, null))
+  val tpParams = forallParams ++ exists1.map(fn(par) TpVar(par.name, null))
   fun makeClauseFieldName(opSort:operationSort, name)
-    prepend(opSort.show ++ "-", if name.isValueOperationName then name.fromValueOperationsName else name)
+    prepend(opSort.show ++ "-", if name.is-value-operation-name then name.from-value-operations-name else name)
   val clauseId = makeClauseFieldName(sort, id)
-  val (clauseName, clauseParsTp) = if pars.length <= 2 then (nameTpClause(pars.length), pars.map(binderType)) else (nameTpClause(1), [TpApp(TpCon(nameTuple(pars.length), krng), pars.map(binderType), krng)])
-  val clauseRhoTp = TpApp(TpCon(clauseName, krng), clauseParsTp ++ Cons(tRes, Cons(TpApp(hndTp, forallsNonScoped.map(tpVar), krng), hndTpVars.map(tpVar))), krng)
+  val (clauseName, clauseParsTp) = if pars.length <= 2 then (name-tp-clause(pars.length), pars.map(binderType)) else (name-tp-clause(1), [TpApp(TpCon(name-tuple(pars.length), null), pars.map(binderType), null)])
+  val clauseRhoTp = TpApp(TpCon(clauseName, null), clauseParsTp ++ Cons(tRes, Cons(TpApp(hndTp, forallsNonScoped.map(tpVar), null), hndTpVars.map(tpVar))), null)
   val clauseTp = quantify(QForall, exists1 ++ forallsScoped, clauseRhoTp)
-  val conField = ValueBinder(clauseId, clauseTp, Nothing, krng, krng)
-  val selectId = id.toOpSelectorName
+  val conField = ValueBinder(clauseId, clauseTp, Nothing, null, null)
+  val selectId = id.to-op-selector-name
   fun createSelect()
-    val hndArg = "hnd".newName
-    val hndParam = ValueBinder(hndArg, Nothing, Nothing, krng, grng)
+    val hndArg = "hnd".new-name
+    val hndParam = ValueBinder(hndArg, Nothing, Nothing, null, null)
     val i = opIndex;
     val fieldCount = opCount
-    val patterns = list(0, i - 1).map(fn(_) (Nothing, PatWild(grng))) ++ 
-      [(Nothing, PatVar(ValueBinder(clauseId, Nothing, PatWild(grng), grng, grng)))] ++ 
-      list(i+1, fieldCount - 1).map(fn(_) (Nothing, PatWild(grng)))
-    val branch = Branch(PatCon(hndName.toConstructorName, patterns, grng, grng), [Guard(guardTrue, Var(clauseId, False, grng))])
-    val innerBody = Case(Var(hndArg, False, grng), [branch], grng)
-    val fullTp = quantify(QForall, foralls ++ exists1 ++ hndTpVars, TpFun([(hndArg, TpApp(hndTp, (forallsNonScoped ++ hndTpVars).map(tpVar), grng))], makeTpTotal(grng), clauseRhoTp, grng))
-    val body = Ann(Lam([hndParam], innerBody, grng), fullTp, grng)
+    val patterns = list(0, i - 1).map(fn(_) (Nothing, PatWild(null))) ++ 
+      [(Nothing, PatVar(ValueBinder(clauseId, Nothing, PatWild(null), null, null)))] ++ 
+      list(i+1, fieldCount - 1).map(fn(_) (Nothing, PatWild(null)))
+    val branch = Branch(PatCon(hndName.to-constructor-name, patterns, null, null), [Guard(guardTrue, Var(clauseId, False, null))])
+    val innerBody = Case(Var(hndArg, False, null), [branch], null)
+    val fullTp = quantify(QForall, foralls ++ exists1 ++ hndTpVars, TpFun([(hndArg, TpApp(hndTp, (forallsNonScoped ++ hndTpVars).map(tpVar), null))], makeTpTotal(null), clauseRhoTp, null))
+    val body = Ann(Lam([hndParam], innerBody, null), fullTp, null)
     val binder = ValueBinder(selectId, (), body, rng, rng)
-    Def(binder, krng, vis, DefFun([Borrow]), InlineAlways, ("// select `" ++ id.show ++ "` operation out of the " ++ docEffect ++ " handler"))
+    Def(binder, null, vis, DefFun([Borrow]), InlineAlways, ("// select `" ++ id.show ++ "` operation out of the " ++ docEffect ++ " handler"))
   // create an operation selector explicitly so we can hide the handler constructor
   val opSelect = createSelect()
   // create a typed perform wrapper: fun op(x1:a1,..,xN:aN) : <l> b { performN(evv-at(0),clause-op,x1,..,xN) }
   fun createOp()
     val nameRng = idrng
     val hasExists = exists1.is-cons
-    val perform = Var(namePerform(pars.length), False, krng)
-    val zeroIdx = App(Var(nameSSizeT, False, krng), [(Nothing, Literal(LitInt(0, krng)))], krng)
+    val perform = Var(name-perform(pars.length), False, null)
+    val zeroIdx = App(Var(nameSSizeT, False, null), [(Nothing, Literal(LitInt(0, null)))], null)
     val resourceName = "hname".new-hidden-name
-    val resourceBinder = ValueBinder(resourceName, effTp, Nothing, krng, grng)
+    val resourceBinder = ValueBinder(resourceName, effTp, Nothing, null, null)
     val params0 = pars.map(fn(par) par(binderType=if par.expr.is-just then par.binderType.makeOptional else par.binderType))
     val params = if isInstance then Cons(resourceBinder, params0) else params0
-    val arguments = params0.map(fn(par) (Nothing, Var(par.name, False, par.nameRange)))
+    val arguments = params0.map(fn(par) (Nothing, Var(par.name, False, par.name-range)))
     val lParams = params.map(fn(ValueBinder(name, _, expr, nameRng', rng')) ValueBinder(name, Nothing, expr, nameRng', rng') )
     val tplParams = params.map(fn(par) (par.name, par.binderType))
-    val tpFull = quantify(QForall, foralls ++ exists1, TpFun(tplParams, teff, tRes, grng))
+    val tpFull = quantify(QForall, foralls ++ exists1, TpFun(tplParams, teff, tRes, null))
     val inner = 
       if isInstance then 
-        Case(Var(resourceName, False, krng), 
-         [Branch(PatCon(effName.toConstructorName, [(Nothing, PatVar(ValueBinder("ev".newName, Nothing, PatWild(krng), krng, grng)))], krng, grng), 
-           [Guard(guardTrue, Var("ev".newName, False, krng))])], grng)
-      else App(Var(nameEvvAt, False, krng), [(Nothing, zeroIdx)], krng)
-    val innerBody = App(perform, [(Nothing, inner), (Nothing, Var(selectId, False, krng))] ++ arguments, grng)
+        Case(Var(resourceName, False, null), 
+         [Branch(PatCon(effName.to-constructor-name, [(Nothing, PatVar(ValueBinder("ev".new-name, Nothing, PatWild(null), null, null)))], null, null), 
+           [Guard(guardTrue, Var("ev".new-name, False, null))])], null)
+      else App(Var(nameEvvAt, False, null), [(Nothing, zeroIdx)], null)
+    val innerBody = App(perform, [(Nothing, inner), (Nothing, Var(selectId, False, null))] ++ arguments, null)
     val body = Ann(Lam(lParams, innerBody, rng), tpFull, rng)
     val binder = ValueBinder(id, (), body, nameRng, nameRng)
     Def(binder, idrng, vis, DefFun([]), InlineAlways, "// call `" ++ id.show ++ "` operation of the " ++ docEffect)
   val opDef = createOp()
 
-  if id.isValueOperationName then
+  if id.is-value-operation-name then
     // create a temporary value definition for type checking
-    val opName = id.fromValueOperationsName
-    val qualTpe = promoteType(TpApp(TpCon(nameTpValueOp, krng), [tRes], krng))
-    val phantom = App(Var(namePhantom, False, krng), [], krng)
-    val annot = Ann(phantom, qualTpe, krng)
-    return (conField, opSelect, opDef, Just(Def(ValueBinder(opName, (), annot, idrng, krng), krng, vis, DefVal, InlineNever, "// phantom definition for value operations")))
+    val opName = id.from-value-operations-name
+    val qualTpe = promoteType(TpApp(TpCon(nameTpValueOp, null), [tRes], null))
+    val phantom = App(Var(nameValueOp, False, null), [], null)
+    val annot = Ann(phantom, qualTpe, null)
+    return (conField, opSelect, opDef, Just(Def(ValueBinder(opName, (), annot, idrng, null), null, vis, DefVal, InlineNever, "// phantom definition for value operations")))
   (conField, opSelect, opDef, Nothing)
 
 fun pPureDecl(dvis: visibility)
@@ -729,7 +723,7 @@ fun pFunDecl(rng: range, doc: string, vis: visibility, inl: defInline, f: fipT)
   val FunDef(tpars, pars, pinfos, _, mbTres, preds, ann) = pFunDef(True)
   val body = pBodyExpr()
   val fnct = promote(spars, tpars, preds, mbTres, Lam(pars, body, rng.combine(body.range)))
-  Def(ValueBinder(name, (), ann(fnct), nameRng, nameRng), rng.combine(fnct.range), vis, defFunEx(pinfos, f), inl, doc)
+  Def(ValueBinder(name, (), ann(fnct), nameRng, nameRng), rng.combine(fnct.range), vis, def-fun-ex(pinfos, f), inl, doc)
 
 fun pFunDef(allowBorrow: bool)
   val tpars = pTypeParams()
@@ -752,7 +746,7 @@ fun pTypeParams()
 
 fun pParameters(allowBorrow: bool, allowDefaults: bool)
   val (results, rng) = parensCommas({pParameter(allowBorrow, allowDefaults)})
-  val (binders, pinfos, transforms) = results.unzip
+  val (binders, pinfos, transforms) = results.unzip3
   fun transform(e: userExpr): <ast> userExpr
     transforms.foldr(e, fn(f, e') f(e'))
   (binders, pinfos, transform, rng)
@@ -761,12 +755,12 @@ fun pParameter(allowBorrow: bool, allowDefaults: bool)
   val pinfo = if allowBorrow then pParamInfo() else Own
   val pat = pPatAtom()
   val tp = optionMaybe("", pTypeAnnotPar)
-  val (opt, drng) = if allowDefaults then pDefaultExpr() else (Nothing, rangeNull)
+  val (opt, drng) = if allowDefaults then pDefaultExpr() else (Nothing, range/range/null)
   val rng = match pat
     PatVar(binder) -> binder.expr.range
     _ -> pat.range
   fun binder(name: name, nameRng: range)
-    ValueBinder(name, tp, opt, nameRng, combine([rng, tp.map(range).default(rng), drng]))
+    ValueBinder(name, tp, opt, nameRng, combine([rng, tp.map(fn(t) t.range).default(rng), drng]))
   match pat
     PatVar(ValueBinder(name, Nothing, PatWild, nameRng, _)) -> (binder(name, nameRng), pinfo, fn(x) x)
     PatWild(nameRng) -> (binder("_wildcard".uniqueRangeHiddenName(nameRng), nameRng), pinfo, fn(x) x)
@@ -783,7 +777,7 @@ fun makeOptional(tp: userType)
   TpApp(TpCon(nameTpOptional, tp.range), [tp], tp.range)
 
 fun pDefaultExpr()
-  optionMaybe("default", {val krng = pKeyword("="); val e = pExpr(); (Just(e), krng.combine(e.range))}).default((Nothing, rangeNull))
+  optionMaybe("default", {val krng = pKeyword("="); val e = pExpr(); (Just(e), krng.combine(e.range))}).default((Nothing, null))
 
 fun anyStatVar(l: list<statement>): maybe<userDef>
   match l
@@ -796,7 +790,7 @@ fun combine(e1: statement, e2: userExpr)
     StatFun(f) -> f(e2)
     StatExpr(e) ->
       val r = e.range
-      Bind(Def(ValueBinder("_".newName, (), e, r, r), r, Private, DefVal, InlineAuto, ""), e2, r)
+      Bind(Def(ValueBinder("_".new-name, (), e, r, r), r, Private, DefVal, InlineAuto, ""), e2, r)
     StatVar(def') ->
       val ValueBinder(name, (), expr, nameRng, rng) = def'.binder
       App(Var(nameLocal, False, rng), 
@@ -807,7 +801,7 @@ fun combine(e1: statement, e2: userExpr)
 fun localScope(vdef: userDef, exp: userExpr): userExpr
   val erng = exp.range
   val drng = vdef.range
-  val nrng = vdef.binder.nameRange
+  val nrng = vdef.binder.name-range
   App(Var(nameRunLocal, False, nrng), [(Nothing, Lam([], exp, erng))], drng)
 
 fun pBlock(): <ast> userExpr
@@ -819,7 +813,7 @@ fun pBlock(): <ast> userExpr
   val localize = match stmts1.anyStatVar { Just(def) -> [StatFun(fn(e) localScope(def, e))]; Nothing -> []}
   val stats = localize ++ stmts1 ++ stmts2
   match stats.reverse
-    Cons(StatExpr(exp), rst) -> Parens(rst.foldr(exp, combine), nameNil, rng1.combine(rng2))
+    Cons(StatExpr(exp), rst) -> Parens(rst.foldr(exp, combine), nil, rng1.combine(rng2))
     [] -> Var(nameUnit, False, rng1.combine(rng2))
     _ -> astError("Last statement in a block must be an expression", rng1.combine(rng2))
 
@@ -834,7 +828,7 @@ value type statement
 fun pStatement()
   choicesnb("statement", [
    {
-    val funs = pmany1("", {pFunctionDecl(rangeNull, Private)})
+    val funs = pmany1("", {pFunctionDecl(null, Private)})
     StatFun(fn(body) Let(DefRec(funs), body, body.range.combine(funs.last.map(fn(f) f.range).default(body.range))))
    },
    {StatFun(pLocalValueDecl())},
@@ -846,16 +840,16 @@ fun pStatement()
    {StatExpr(choices("", [pBasicExpr, pReturnExpr]))} 
   ]) 
 
-fun pLocalValueDecl(): <ast> (userExpr -> userExpr)
+fun pLocalValueDecl(): <ast> (userExpr -> <ast> userExpr)
   val krng = pKeyword("val")
   val pat = pPattern()
   pKeyword("=")
   val e = pBlockExpr()
-  fun bindVar(binder:valueBinder<maybe<userType>, pattern<userType>>, mbTyp, rng)
+  fun bindVar(binder:valueBinder<maybe<userType>, pattern<userType>>, mbTyp: maybe<userType>, rng: range): <ast> (userExpr -> <ast> userExpr)
     val annExpr = match mbTyp
       Just(tp) -> Ann(e, tp.promoteType, rng)
       Nothing -> e
-    val vBinder = ValueBinder(binder.name, (), annExpr, binder.nameRange, binder.range)
+    val vBinder = ValueBinder(binder.name, (), annExpr, binder.name-range, binder.range)
     fn(b) Bind(Def(vBinder, rng, Private, DefVal, InlineAuto, ""), b, krng.combine(b.range))
   match pat.unParens
     PatVar(binder as ValueBinder(expr=PatWild)) -> bindVar(binder, binder.binderType, binder.range) 
@@ -882,12 +876,12 @@ fun pWithStat()
     }
   ])
 
-fun unParens(e: expr<t>): expr<t>
+fun expr/unParens(e: expr<t>): expr<t>
     match e
       Parens(p) -> p.unParens
       _ -> e
 
-fun unParens(e: pattern<t>): pattern<t>
+fun patt/unParens(e: pattern<t>): pattern<t>
     match e
       PatParens(p) -> p.unParens
       _ -> e
@@ -900,7 +894,7 @@ fun applyToContinuation(wrng: range, params: list<valueBinder<maybe<t>, maybe<ex
     App(f', args, _) -> App(f', (args ++ funarg), fullrange)
     atom -> App(atom, funarg, fullrange)
 
-fun pTypeAnnotation(): <ast> (userExpr -> userExpr)
+fun pTypeAnnotation(): <ast> (userExpr -> <ast> userExpr)
   maybe("", {
     val tp = pTypeAnnot()
     fn(x) Ann(x, tp, tp.range.combine(x.range))
@@ -966,9 +960,8 @@ fun pIfExpr()
       }
     ])
   Cons((tst, tExpr), eExprs).foldr(eExpr) fn((tst', tExpr'), eExpr')
-    val r = rangeNull
-    Case(tst', [Branch(PatCon(nameTrue, [], r, r), [Guard(guardTrue, tExpr')]),
-              Branch(PatCon(nameFalse, [], r, r), [Guard(guardTrue, eExpr')])], tst'.range.combine(eExpr'.range))
+    Case(tst', [Branch(PatCon(nameTrue, [], null, null), [Guard(guardTrue, tExpr')]),
+              Branch(PatCon(nameFalse, [], null, null), [Guard(guardTrue, eExpr')])], tst'.range.combine(eExpr'.range))
   
 fun pElif(): <ast> (userExpr, userExpr)
   val rng = pKeyword("elif")
@@ -1000,7 +993,7 @@ fun pMatchExpr()
   },pHandlerExpr])
 
 fun pHandlerExpr()
-  val (rng0, hsort) = optionMaybe("", {val rng = pKeyword("named"); (rng, HandlerInstance)}).default((rangeNull, HandlerNormal))
+  val (rng0, hsort) = optionMaybe("", {val rng = pKeyword("named"); (rng, HandlerInstance)}).default((null, HandlerNormal))
   choices("handle or handler", [
     {
       val rng1 = pKeyword("handle")
@@ -1121,7 +1114,7 @@ fun pOpClauses()
     {semiBraces("", pHandlerOpX)},
     pSingleOp,
     {val rng = pLparen(); astError("unexpected '(': local parameters are no longer supported, use a local 'var' instead", rng)},
-    {([], rangeNull)}
+    {([], null)}
   ])
 
 fun pHandlerOpX()
@@ -1139,11 +1132,11 @@ fun pHandlerOpX()
           val tp = optionMaybe("", pTypeAnnotPar)
           (name, prng, tp)
         },{
-          (newName("_"), rng, Nothing)
+          (new-name("_"), rng, Nothing)
         }])
       val (name, prng, tp) = x.fst
       val expr = pBodyExpr()
-      (ClauseInitially(Lam([ValueBinder(name, tp, Nothing, prng, rng.combine(tp.map(range).default(rng)))], expr, rng.combine(expr.range))), Nothing)
+      (ClauseInitially(Lam([ValueBinder(name, tp, Nothing, prng, rng.combine(tp.map(fn(t) t.range).default(rng)))], expr, rng.combine(expr.range))), Nothing)
     }, pHandlerOp
   ])
 
@@ -1165,14 +1158,14 @@ fun pHandlerOp(): <ast> (clause, maybe<(userExpr -> userExpr)>)
         }
       ])
       val expr = pBodyExpr()
-      (ClauseRet(Lam([ValueBinder(name, tp, Nothing, prng, prng.combine(tp.map(range).default(prng)))], expr, rng.combine(expr.range))), Nothing)
+      (ClauseRet(Lam([ValueBinder(name, tp, Nothing, prng, prng.combine(tp.map(fn(t) t.range).default(prng)))], expr, rng.combine(expr.range))), Nothing)
     },{
       pKeyword("val")
       val (name, nameRng) = pQIdentifier()
       pKeyword("=")
       val expr = pBlockExpr()
       val (binder, resumeExpr) = bindExprToVal(name, nameRng, expr)
-      (ClauseBranch(HandlerBranch(name.toValueOperationName, [], resumeExpr([]), OpVal, nameRng, nameRng)), Just(binder))
+      (ClauseBranch(HandlerBranch(name.to-value-operation-name, [], resumeExpr([]), OpVal, nameRng, nameRng)), Just(binder))
     },{
       val (opSort, (name, nameRng)) = choicesnb("opSort", [
         {pKeyword("fun"); (OpFun, pQIdentifier())}, {pKeyword("ctl", ["control"]); (OpControl, pQIdentifier())}, 
@@ -1194,17 +1187,17 @@ fun pHandlerOp(): <ast> (clause, maybe<(userExpr -> userExpr)>)
   ])
 
 fun pOpParams()
-  choices("", [{parensCommas(pOpParam)}, {([], rangeNull)}])
+  choices("", [{parensCommas(pOpParam)}, {([], null)}])
 
 fun pOpParam()
   val (name, rng) = pParamId()
   val tp = optionMaybe("", pTypeAnnot)
-  ValueBinder(name, tp, (), rng, rng.combine(tp.map(range).default(rng)))
+  ValueBinder(name, tp, (), rng, rng.combine(tp.map(fn(t) t.range).default(rng)))
 
 fun pHandlerPar()
   val (name, rng) = pIdentifier()
   val tp = optionMaybe("", pTypeAnnot)
-  ValueBinder(name, tp, (), rng, rng.combine(tp.map(range).default(rng)))
+  ValueBinder(name, tp, (), rng, rng.combine(tp.map(fn(t) t.range).default(rng)))
 
 fun pHandlerReturnDefault(r: range) // Default return clause: return(x) -> x
   val xname = "x".new-hidden-name
@@ -1251,7 +1244,7 @@ fun pOpExprX(allowTrailingLam: bool)
   choicesnb("", [
     {
       val ess = pmany1("", {val op = pOperatorVar(); val e2 = pPrefixExpr(allowTrailingLam); [op, e2]})
-      App(Var(nameOpExpr, True, rangeNull), Cons(e1, ess.concat).map(fn(e) (Nothing, e)), e1.range.combine(ess.last.map(fn(l) l.last.map(fn(m) m.range).default(e1.range)).default(e1.range)))
+      App(Var(nameOpExpr, True, null), Cons(e1, ess.concat).map(fn(e) (Nothing, e)), e1.range.combine(ess.last.map(fn(l) l.last.map(fn(m) m.range).default(e1.range)).default(e1.range)))
     }, {e1}
   ])
 
@@ -1351,7 +1344,7 @@ fun pLiteral()
     {val (i, tok) = pInteger(); LitInt(i, tok.range)},
     {val (f, tok) = pFloat(); LitFloat(f, tok.range)},
     {val (s, range) = pStringLit(); LitString(s, range)},
-    {val (c, range) = pCharLit(); LitChar(c, range)},
+    {val (c, range) = pCharLit(); LitChar(c.string, range)},
   ])
 
 fun pAExpr()
@@ -1365,8 +1358,8 @@ fun pTupleExpr()
   val rng = rng1.combine(rng2)
   match es
     Nil -> Var(nameUnit, False, rng)
-    [e] -> Parens(e, nameNil, rng)
-    _ -> App(Var(nameTuple(es.length), False, rng), es.map(fn(e) (Nothing, e)), rng)
+    [e] -> Parens(e, nil, rng)
+    _ -> App(Var(name-tuple(es.length), False, rng), es.map(fn(e) (Nothing, e)), rng)
 
 fun pListExpr(): <ast> userExpr
   val rng1 = pSpecial("[")
@@ -1428,7 +1421,7 @@ fun pPatAtom()
   choicesnb("pattern atom", [
     {
       val (name, rng) = pQConstructor()
-      val (ps, r) = choicesnb("", [{parensCommas(pNamedPattern)}, {([], rangeNull)}])
+      val (ps, r) = choicesnb("", [{parensCommas(pNamedPattern)}, {([], null)}])
       PatCon(name, ps, rng, rng.combine(r))
     },
     {
@@ -1445,7 +1438,7 @@ fun pPatAtom()
       val (ps, rng) = parensCommas(pNamedPattern);
       match ps
         [(_, p)] -> PatParens(p, rng)
-        _ -> PatCon(nameTuple(ps.length), ps, rng, rng)
+        _ -> PatCon(name-tuple(ps.length), ps, rng, rng)
     }
   ])
 
@@ -1539,7 +1532,7 @@ fun pQualifier(tp: userType)
 fun pPredicate()
   choices("predicate", [{pTypeApp(pTId())}])
 
-fun pTArrow()
+fun pTArrow(): <ast> userType
   val (tps, rng1) = pTAtom()
   choices("", [
     {pKeyword("->"); val (teff, tres) = pTResultTotal(); TpFun(tps, teff, tres, rng1.combine(tres.range))},
@@ -1551,12 +1544,12 @@ fun pTEffect(): <ast> userType
   val labels:list<userType> = pSepBy("", pTLabel, pComma)
   val (ext, brng) = pTExtend()
   val rng = pRangle()
-  labels.foldr(ext(rng), fn(x, acc) brng.makeEffectExtend(x, acc, range))
+  labels.foldr(ext(rng), fn(x, acc) makeEffectExtend(x, acc, brng))
 
 fun pTExtend()
   choices("", [
     {val brng = pBar(); val tp = choices("", [pTEffect, pTId]); (fn(x) tp, brng)},
-    {(makeEffectEmpty, rangeNull)}
+    {(makeEffectEmpty, null)}
   ])
 
 fun pTLabel()
@@ -1578,13 +1571,13 @@ fun pTAtomic()
 fun tuple(tps: list<(name, userType)>, r: range): userType
   match tps
     Cons(tp, Nil) -> tp.snd
-    _ -> TpApp(TpCon(nameTuple(tps.length), r), tps.map(snd), r)
+    _ -> TpApp(TpCon(name-tuple(tps.length), r), tps.map(snd), r)
 
 fun pTAtom()
   fun single(tp: userType)
-    ([(nameNil, tp)], tp.range)
+    ([(nil, tp)], tp.range)
   fun mkTuple(n: int, rng: range)
-    TpCon(nameTuple(n).unqualify, rng)
+    TpCon(name-tuple(n).unqualify, rng)
   choices("type atom", [
     {val tp1 = pTId(); val tp2 = pTypeApp(tp1); single(tp2)},
     {
@@ -1618,7 +1611,7 @@ fun pTypeApp(tp: userType)
   ])
 
 fun pParamType(): <ast> (name, range, userType)
-  val (id, rng) = choices("", [pVarId, pWildcard, {(nameNil, rangeNull)}])
+  val (id, rng) = choices("", [pVarId, pWildcard, {(nil, null)}])
   pKeyword(":")
   val tp = pParameterType(rng)
   (id, rng, tp)
@@ -1631,8 +1624,8 @@ fun pParamTypeX(): <ast> (name, range, userType)
       (id, rng, tp)
     },
     {
-      val tp = pParameterType(rangeNull)
-      (nameNil, tp.range, tp)
+      val tp = pParameterType(null)
+      (nil, tp.range, tp)
     }
   ])
 
@@ -1655,7 +1648,7 @@ fun pAnnTypeK()
 
 fun pTId()
   val (id, rng) = choices("Type", [pQVarId, pTypeIdCtx, pWildcard])
-  if id.isWildcard || id.isTypeVar then TpVar(id, rng) else TpCon(id, rng)
+  if id.is-wildcard || id.isTypeVar then TpVar(id, rng) else TpCon(id, rng)
 
 fun makeApp(expr: expr<t>, args: list<expr<t>>, rT: (t) -> range): expr<t>
   App(expr, args.map(fn(a) (Nothing, a)), expr.range.combine(args.last.map(range).default(expr.range)))
@@ -1669,8 +1662,8 @@ fun makeTpTotal(rng: range): kUserType<k>
 fun makeEffectEmpty(rng: range): kUserType<k>
   TpCon(nameEffectEmpty, rng)
 
-fun makeEffectExtend(rng: range, label: kUserType<k>, ext: kUserType<k>, rK: (k) -> range): kUserType<k>
-  TpApp(TpCon(nameEffectExtend, rng), [label, ext], label.range(rK).combine(ext.range(rK)))
+fun makeEffectExtend(label: kUserType<k>, ext: kUserType<k>, rng: range = null, ?range: (k) -> range): kUserType<k>
+  TpApp(TpCon(nameEffectExtend, rng), [label, ext], label.range.combine(ext.range))
 
 fun pTBinderDef()
   val (id, rng) = pTBinderId()

@@ -158,7 +158,7 @@ fun synAccessors(di: dataInfo, modName: name)
     val isPartial = branches.length < di.constrs.length || di.isOpen
     val caseExpr = Case(Var(arg, False, rng), branches.map(snd) ++ defaultBranch, rng)
     val expr = Ann(Lam([ValueBinder(arg, Nothing, Nothing, rng, rng)], caseExpr, rng), fullTp, rng)
-    DefNonRec(Def(ValueBinder(nm, (), expr, rng, rng), rng, vis, defFunEx([Borrow], noFip), InlineAlways, doc))
+    DefNonRec(Def(ValueBinder(nm, (), expr, rng, rng), rng, vis, def-fun-ex([Borrow], noFip), InlineAlways, doc))
   fields.map(synAccessor)
 
 fun synTester(di: dataInfo, ci: conInfo)
@@ -173,7 +173,7 @@ fun synTester(di: dataInfo, ci: conInfo)
     val caseExpr = Case(Var(arg, False, rc), [branch1, branch2], rc)
     val expr = Lam([ValueBinder(arg, Nothing, Nothing, rc, rc)], caseExpr, rc)
     val doc = "// Automatically generated. Tests for the `" ++ ci.name.nameStem ++ "` constructor of the `:" ++ di.name.nameStem ++ "` type.\n"
-    [DefNonRec(Def(ValueBinder(def-name, (), expr, rc, rc), rc, ci.vis, defFunEx([Borrow], Fip(AllocAtMost(0))), InlineAlways, doc))]
+    [DefNonRec(Def(ValueBinder(def-name, (), expr, rc, rc), rc, ci.vis, def-fun-ex([Borrow], Fip(AllocAtMost(0))), InlineAlways, doc))]
 
 fun synConstrTag(ci: conInfo)
   val nm = ci.name.unqualify.toOpenTagName

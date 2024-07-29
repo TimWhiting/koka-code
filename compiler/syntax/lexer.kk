@@ -1,40 +1,66 @@
-import compiler/syntax/koka-lex
 import compiler/syntax/lexeme
-import compiler/syntax/lex-help
+import compiler/syntax/lex2
 import compiler/common/range
 import std/os/file
 import std/os/path
+import std/core-extras
+import std/os/task
+import std/core/unsafe
 
-fun lexer(path: string, line: int, input: string): <pure> list<lexeme>
+fun lex(str: string, pos: pos): pure list<lexeme>
+  val src = pos.source
+  var lexemes := []
+  var slices := []
+  var raw-delim := 0
+  with handler
+    fun start-chunked()
+      slices := Cons("", slices)
+    fun end-chunked()
+      match slices
+        Cons(s, rst) -> 
+          slices := rst
+          s
+        Nil -> throw("end-chunked when no chunked input")
+    fun add-chunk(f)
+      match slices
+        Cons(s, rst) -> 
+          slices := Cons(s ++ f.string, rst)
+        Nil -> 
+          throw("add-chunk when no chunked input")
+    fun get-rawdelim()
+      raw-delim
+    fun set-rawdelim(i)
+      raw-delim := i
+    fun do-emit(l, lstart, lend)
+      val Alex-pos(off, line, col) = lstart
+      val Alex-pos(eoff, eline, ecol) = lend
+      lexemes := Cons(Lexeme(make-range(Pos(src, off, line, col), Pos(src, eoff, eline, ecol)), l), lexemes)
+  alex-scan(str.slice, 0)
+  lexemes.reverse
+
+fun lexer(path: string, line: int, input: string): pure list<lexeme>
   lexing(Source(path, input), line, input)
 
-fun lexing(source: source, line: int, input: string)
+fun lexing(source: source, line: int, input: string): pure list<lexeme>
   val init-pos = Pos(source, 0, 0, 1)
-  val state = State(init-pos, init-pos, [0], [], '\n', input.slice, LexWhite(""), "\"")
-  with val alextrace = False
-  go(state)
+  lex(input, init-pos)
 
-fun go(st0: state)
-  match alexScan(st0, st0.states.head.unjust)
-    AlexToken(st1,_,p) ->
-      val idx0 = st0.current.count
-      val idx1 = st1.current.count
-      val bs = st0.current.subslice(0, idx0 - idx1)
-      val p0 = st1.pos.pos-moves8(bs)
-      val (token,st2) = p(bs)(st0)(st1(pos=p0))
-      match token
-        Nothing -> go(st2)
-        Just(lex) -> 
-          val rng = make-range(st0.startPos, st2.pos.pos/before)
-          // trace(lex.show)
-          Cons(Lexeme(rng, lex), go(st2(startPos=st2.pos, previousLex=lex)))
-    AlexEOF -> []
-    AlexSkip -> throw("Skip")
-    AlexError -> throw("Error")
-
-fun main()
-  var done := False
-  var s := read-text-file("compiler/core/core.kk".path)
-  val source = Source("compiler/core/core.kk", s)
-  lexing(source, 1, s)
-  ()
+fun test-lex()
+  val files =  [
+    "compiler/syntax/lex2",
+    "compiler/syntax/lex-help",
+    "compiler/syntax/koka-lex",
+    "compiler/syntax/lexer",
+    "compiler/syntax/lexer2",
+    "compiler/syntax/lexeme",
+    "compiler/core/core",
+    "/Users/timwhiting/koka-code/compiler/syntax/lexer2"]
+  
+  files.foreach fn(f)
+    with handler
+      final ctl throw-exn(e)
+        ()
+    val s = read-text-file((f ++ ".kk").path)
+    val source = Source(f ++ ".kk", s)
+    lexing(source, 1, s)
+    ()

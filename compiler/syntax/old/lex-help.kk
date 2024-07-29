@@ -1,6 +1,6 @@
 import compiler/common/range
-import compiler/syntax/lexeme
 import compiler/common/name
+import compiler/syntax/lexeme
 import std/data/word-set
 
 pub struct state
@@ -91,56 +91,7 @@ val special-names = [ "{", "}"
     , ";", ","
 ]
 
-val reserved-names = ["infix", "infixr", "infixl", "prefix", "postfix"
-              , "type", "alias"
-              , "struct", "enum", "con"
-              , "val", "fun", "fn", "extern", "var"
-              , "ctl", "final", "raw"
-              , "if", "then", "else", "elif"
-              , "return", "match", "with", "in"
-              , "forall", "exists", "some"
-              , "pub", "abstract"
-              , "module", "import", "as"
-
-              // effect handlers
-              , "handler", "handle"
-              , "effect", "receffect"
-              , "named"
-              , "mask"
-              , "override"   
-
-              // deprecated
-              , "private", "public"  // use pub
-              , "rawctl", "brk"      // use raw ctl, and final ctl
-
-              // alternative names for backwards paper compatability
-              , "control", "rcontrol", "except"
-              , "ambient", "context" // use effcet
-              , "inject"       // use mask
-              , "use", "using" // use with instead
-              , "function"     // use fun
-              , "instance"     // use named
-
-              // future reserved
-              , "interface"
-              , "unsafe"
-
-              // operators
-              , "="
-              , "."
-              , ":"
-              , "->"
-              , "<-"
-              , ":="
-              , "|"]
-
-fun is-reserved(name: string)
-  reserved-names.any(fn(n) n == name)
-
-// val reserved-names = 
-//       delay({
-//         string-pool().add-all(
-//         ["infix", "infixr", "infixl", "prefix", "postfix"
+// val reserved-names = ["infix", "infixr", "infixl", "prefix", "postfix"
 //               , "type", "alias"
 //               , "struct", "enum", "con"
 //               , "val", "fun", "fn", "extern", "var"
@@ -181,11 +132,60 @@ fun is-reserved(name: string)
 //               , "->"
 //               , "<-"
 //               , ":="
-//               , "|"])
-//     })
+//               , "|"]
 
 // fun is-reserved(name: string)
-//   reserved-names.force.is-interned(name)
+//   reserved-names.any(fn(n) n == name)
+
+val reserved-names = 
+      delay({
+        string-pool().add-all(
+        ["infix", "infixr", "infixl", "prefix", "postfix"
+              , "type", "alias"
+              , "struct", "enum", "con"
+              , "val", "fun", "fn", "extern", "var"
+              , "ctl", "final", "raw"
+              , "if", "then", "else", "elif"
+              , "return", "match", "with", "in"
+              , "forall", "exists", "some"
+              , "pub", "abstract"
+              , "module", "import", "as"
+
+              // effect handlers
+              , "handler", "handle"
+              , "effect", "receffect"
+              , "named"
+              , "mask"
+              , "override"   
+
+              // deprecated
+              , "private", "public"  // use pub
+              , "rawctl", "brk"      // use raw ctl, and final ctl
+
+              // alternative names for backwards paper compatability
+              , "control", "rcontrol", "except"
+              , "ambient", "context" // use effcet
+              , "inject"       // use mask
+              , "use", "using" // use with instead
+              , "function"     // use fun
+              , "instance"     // use named
+
+              // future reserved
+              , "interface"
+              , "unsafe"
+
+              // operators
+              , "="
+              , "."
+              , ":"
+              , "->"
+              , "<-"
+              , ":="
+              , "|"])
+    })
+
+fun is-reserved(name: string)
+  reserved-names.force.is-interned(name)
 
 fun is-prefix-op(name: string)
   name == "!" || name == "~"

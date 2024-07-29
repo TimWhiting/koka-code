@@ -2,7 +2,7 @@
 import compiler/common/name
 import compiler/common/range
 import compiler/syntax/lexeme
-import compiler/syntax/lex-help
+import compiler/syntax/old/lex-help
 import std/num/float64
 import std/core-extras
 import std/data/word-set

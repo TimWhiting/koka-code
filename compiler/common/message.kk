@@ -39,15 +39,15 @@ fun docs-from-ranges(rngs: list<range>)
 
 fun doc-from-range(r: range)
   fun remove-indent(ls: list<string>)
-    val i = Cons(0, ls.map(fn(l) l.list.take-while(isSpace).length)).minimum
+    val i = Cons(0, ls.map(fn(l) l.list.take-while(is-space).length)).minimum
     ls.map(fn(l) l.list.drop(i).string)
   fun limit-line-len(line: string, n: int)
     if line.count <= n then line
     else
       val n3 = n / 3
       val (x, y) = line.list.split(2 * n3)
-      val pre = x.reverse.drop-while(fn(c) !c.isSpace).reverse
-      val post = y.reverse.take(n3).reverse.drop-while(fn(c) !c.isSpace)
+      val pre = x.reverse.drop-while(fn(c) !c.is-space).reverse
+      val post = y.reverse.take(n3).reverse.drop-while(fn(c) !c.is-space)
       pre.string ++ " ... " ++ post.string
   fun limit-lines(ls: list<string>, n: int)
     if ls.length <= n then ls.remove-indent
@@ -78,4 +78,4 @@ Something long: there"#) fn()
     val end = Pos(source, 9, 2, 3)
     expect(r#"hello
 wor"#) fn()
-      doc-from-range(Range(start, end)).show
+      doc-from-range(Range(start, end, False)).show

@@ -6,8 +6,6 @@ import compiler/type/type
 import compiler/type/typevar
 import compiler/common/name
 import compiler/common/name-prim
-import std/data/linearmap
-import std/data/linearset
 import compiler/kind/importmap
 import compiler/platform/config
 import compiler/common/nice
@@ -15,6 +13,8 @@ import compiler/type/kind
 import compiler/kind/kind
 import compiler/kind/pretty
 import compiler/common/syntax
+import std/data/linearmap
+import std/data/linearset
 import std/core/undiv
 
 alias prec = int;
@@ -114,8 +114,8 @@ fun list/compress(l: list<char>): list<char>
   match l
     Nil -> Nil
     Cons(c, cs) ->
-      if c == '\n' then compress(cs.drop-while(isSpace).pretend-decreasing)
-      elif c.isSpace then  Cons(' ', compress(cs.drop-while(isSpace).pretend-decreasing))
+      if c == '\n' then compress(cs.drop-while(is-space).pretend-decreasing)
+      elif c.is-space then  Cons(' ', compress(cs.drop-while(is-space).pretend-decreasing))
       else Cons(c, compress(cs))
 
 fun niceType(tp)

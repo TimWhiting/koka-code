@@ -1,11 +1,12 @@
 import compiler/type/type
-import std/data/linearset
-import std/data/linearmap
 import compiler/core/core
 import compiler/type/kind
 import compiler/kind/kind
 import compiler/common/syntax
 import compiler/common/name
+import compiler/common/range
+import std/data/linearset
+import std/data/linearmap
 import std/core/undiv
 
 pub infixr 5 (|->)

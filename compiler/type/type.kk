@@ -173,7 +173,7 @@ fun coninfo/show(c: conInfo): string
   c.name.name/name/show
 
 fun coninfo/size(c: conInfo, p: platform)
-  syntax/full/size(p, c.valueRepr)
+  syntax/size(p, c.valueRepr)
 
 fun scan-count(c: conInfo)
   syntax/scanCount(c.valueRepr)
@@ -195,15 +195,15 @@ fun syninfo/(==)(s1: synInfo, s2: synInfo): bool
 fun syninfo/show(s: synInfo): string
   s.name.name/name/show
 
-fun is-bound(t: typeVar): bool
+fun tv/is-bound(t: typeVar): bool
   t.flavour == Bound
 
 // unifiable
-fun is-meta(t: typeVar): bool
+fun tv/is-meta(t: typeVar): bool
   t.flavour == Meta
 
 // not unifiable
-fun is-skolem(t: typeVar): bool
+fun tv/is-skolem(t: typeVar): bool
   t.flavour == Skolem
 
 fun pred-type(p: pred): exn ktype

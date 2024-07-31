@@ -54,7 +54,7 @@ fun makeVector(tp: ktype, exprs: list<expr>): expr
 fun wrapOptional(tp: ktype, ex: expr): expr
   val a = TypeVar(0, kindStar, Bound)
   val tpOptional = TForAll([a], [], TFun([(name/nil, TVar(a))], typeTotal, makeOptionalType(TVar(a))))
-  val conInfo = ConAsJust(nameTpOptional, DataAsMaybe, valueReprScan(1), nameOptionalNone, 0)
+  val conInfo = ConAsJust(nameTpOptional, DataAsMaybe, value-repr-scan(1), nameOptionalNone, 0)
   App(TypeApp(Con(TName(nameOptional, tpOptional), conInfo), [tp]), [ex])
 
 fun makeList(tp: ktype, exprs: list<expr>): expr
@@ -63,7 +63,7 @@ fun makeList(tp: ktype, exprs: list<expr>): expr
   val nilCon = Con(TName(nameNull, nilTp), ConSingleton(nameTpList, DataAsList, zero, 0))
   val nil = TypeApp(nilCon, [tp])
   val consTp = TForAll([a], [], TFun([(name/nil, TVar(a)), (name/nil, TApp(typeList, [TVar(a)]))], typeTotal, TApp(typeList, [TVar(a)])))
-  val consCon = Con(TName(nameCons, consTp), ConAsCons(nameTpList, DataAsList, valueReprScan(2), name/nil, CtxNone, 2))
+  val consCon = Con(TName(nameCons, consTp), ConAsCons(nameTpList, DataAsList, value-repr-scan(2), name/nil, CtxNone, 2))
   fun cons(e, xs)
     App(TypeApp(consCon, [tp]), [e, xs])
   exprs.foldr(nil, cons)
@@ -330,9 +330,9 @@ fun scanCount(repr: conRepr)
 fun allocSize(c: conRepr, p: platform)
   c.allocSizeScan(p).fst
 
-fun allocSizeScan(c: conRepr, p: platform)
-  val (size, scan) = p.scan/size(c.vrepr)
-  if c.is-value then (0, scan) else (size, scan)
+fun allocSizeScan(c: conRepr, p: platform): (int, int)
+  val (sz, sc) = p.scan-size(c.vrepr)
+  if c.is-value then (0, sc) else (sz, sc)
 
 fun dataRepr/is-value(d: dataRepr): bool
   match d

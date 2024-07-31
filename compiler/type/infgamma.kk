@@ -18,7 +18,7 @@ pub infixr 5 (|->)
 // inf gamma
 // Environment mapping names to type schemes. Due to overloading
 // there may be multiple entries for the same name
-alias infGamma = name-map<nameInfo>
+alias infGamma = name-map<list<nameInfo>>
 
 effect infGammaEff
   fun infGammaExtend(name: name, ni: nameInfo): ()
@@ -26,50 +26,55 @@ effect infGammaEff
   fun infGammaSet(inf: infGamma): ()
   fun infGammaGet(): infGamma
 
-fun withinfGamma(ig0: infGamma, f: () -> <infGammaEff,exn,comp-flags|e> a): <exn,comp-flags|e> a
+fun inf-gamma(ig0: infGamma, f: () -> <infGammaEff,exn,comp-flags|e> a): <exn,comp-flags|e> a
   var ig := ig0
   with handler
-    fun infGammaExtend(name: name, ni: nameInfo) ig := infGammaExtend(ig, name, ni)
-    fun infGammaLookupX(name: name) infGammaLookupX(ig, name)
+    fun infGammaExtend(name: name, ni: nameInfo) ig := ig.extend(name, ni)
+    fun infGammaLookupX(name: name) Nothing // ig.lookup(name)
     fun infGammaSet(inf: infGamma) ig := inf
     fun infGammaGet() ig
   f()
 
-fun infGammaUnions(ks: list<infGamma>)
-  unions(ks)
-fun infGammaExtend(ig: infGamma, name: name, ni: nameInfo)
-  ig.set(name.unqualify, ni)
-fun infGammaLookupX(ig: infGamma, name: name): maybe<nameInfo>
-  ig.maybeGet(name)
+fun ni/combine(nis: list<nameInfo>, nis2: list<nameInfo>): exn list<nameInfo>
+  match nis
+    [] -> nis2
+    Cons(ni, nis) -> combine(nis, Cons(ni, nis2.filter(fn(ni2) ni.cname != ni2.cname)))
 
-fun infGammaLookup(name: name)
-  infGammaLookupX(name).map(fn(InfoVal(_, cname, tp, _, _)) (cname, tp))
-fun infGammaLookup(ig: infGamma, name: name): exn maybe<(name, ktype)>
-  ig.infGammaLookupX(name).map(fn(InfoVal(_, cname, tp, _, _)) (cname, tp))
+// TODO: Update
+// note: qualified names can get inserted into gamma due to recursive definitions, or
+// during inference by inserting fully qualified expressions (in resolveAppName)
+// (if isQualified name then trace ("infGammaExtend: insert qualified: " ++ show name) else id) $
+// overwrite previous names
+fun inf-gamma/extend(ig: infGamma, name: name, ni: nameInfo): <exn> infGamma
+  ig.update(name.unqualify, [ni], ni/combine)
 
-fun infGammaExtendTp(name: name, cname: name, tp: ktype)
-  infGammaExtendX(name, cname, tp, rangeNull, False)
-fun infGammaExtendTp(ig: infGamma, name: name, cname: name, tp: ktype)
-  ig.infGammaExtendX(name, cname, tp, rangeNull, False)
-fun infGammaExtendX(name: name, cname: name, tp: ktype, rng: range, isVar: bool)
-  infGammaExtend(name, InfoVal(Public, cname, tp, rng, isVar))
-fun infGammaExtendX(ig: infGamma, name: name, cname: name, tp: ktype, rng: range, isVar: bool)
-  ig.set(name, InfoVal(Public, cname, tp, rng, isVar))
-fun infGammaExtends(ig: infGamma, tnames: list<(name,ktype)>)
-  tnames.foldl(ig, fn(ig', (name,tp)) infGammaExtendTp(ig', name, name, tp))
-fun infGammaExtends(tnames: list<(name,ktype)>)
-  tnames.foreach(fn((name,tp)) infGammaExtendTp(name, name, tp))
+fun inf-gamma-eff/extends(tnames: list<(name,ktype,string)>)
+  tnames.foreach(fn((name,tp,doc)) extend-tp(name, name, tp, doc))
+fun inf-gamma/extends(ig: infGamma, tnames: list<(name,ktype,string)>)
+  tnames.foldl(ig, fn(ig', (name,tp,doc)) ig'.extend-tp(name, name, tp, doc))
 
-fun infGammaList(ig: infGamma): pure list<(name, ktype)>
+fun inf-gamma-eff/extend-tp(name: name, cname: name, tp: ktype, doc: string)
+  extend-x(name, cname, tp, range/range/null, False, doc)
+fun inf-gamma/extend-tp(ig: infGamma, name: name, cname: name, tp: ktype, doc: string)
+  ig.extend-x(name, cname, tp, range/range/null, False, doc)
+
+fun inf-gamma-eff/extend-x(name: name, cname: name, tp: ktype, rng: range, isVar: bool, doc: string)
+  infGammaExtend(name, InfoVal(Public, cname, tp, rng, isVar, doc))
+fun inf-gamma/extend-x(ig: infGamma, name: name, cname: name, tp: ktype, rng: range, isVar: bool, doc: string)
+  ig.set(name, InfoVal(Public, cname, tp, rng, isVar, doc))
+
+// fun inf-gamma-eff/lookup(name: name): <infGammaEff,exn> maybe<(name,ktype)>
+//   infGammaLookupX(name).map(fn(InfoVal(_, cname, tp, _, _)) (cname, tp))
+// fun inf-gamma/lookup(ig: infGamma, name: name): exn maybe<(name, ktype)>
+//   ig.lookup(name).map(fn(InfoVal(_, cname, tp, _, _)) (cname, tp))
+
+fun inf-gamma/list(ig: infGamma): pure list<(name, ktype)>
   ig.list.map(fn((name, InfoVal(typ=tp))) (name, tp))
 
-fun infGammaList()
+fun inf-gamma-eff/list()
   infGammaGet().list.map(fn((name, InfoVal(typ=tp))) (name, tp))
 
-val eqK = fn(ni1:nameInfo, ni2:nameInfo) ni1 == ni2
-val showK = fn(ni:nameInfo) ni.show
-
-val emptyInfGamma = LinearMap([])
+val inf-gamma/empty: infGamma = LinearMap([])
 
 fun (|->)(sub: sub, inf: infGamma): pure infGamma
   inf.map(fn(k, ni) (k, sub |-> ni))

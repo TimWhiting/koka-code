@@ -19,8 +19,8 @@ fun (|->)(s: sub, e: evidence): pure evidence
 fun free-type-vars(e: evidence)
   typevar/free-type-vars(e.pred)
 
-// fun boundTypeVars(e: evidence)
-//   typevar/boundTypeVars(e.pred)
+// fun bound-type-vars(e: evidence)
+//   typevar/bound-type-vars(e.pred)
 
 fun show(e: evidence)
   compiler/type/type/show(e.pred)

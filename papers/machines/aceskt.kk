@@ -77,10 +77,12 @@ fun lambda/show(l: lambda): div string
     Lam(x, e) -> x ++ "." ++ e.show
 
 fun storeable/show(s: storeable): div string
-  s.show
+  match s
+    Left(k) -> k.list/show
+    Right(v) -> v.show
 
 fun storeables/show(s: storeables): div string
-  s.vs.list/show
+  s.vs.show
 
 fun evalue/show(v: evalue): div string
   match v
@@ -91,8 +93,8 @@ fun frame/show(f: frame): div string
     AppL(e, env) -> "AppL(" ++ e.show ++ ", " ++ env.show ++ ")"
     AppR(v) -> "AppR(" ++ v.show ++ ")"
 
-fun state/show(s: state): div string
-  match s
+fun state/show(s0: state): div string
+  match s0
     Eval(e, rho, st, k) -> "Eval(" ++ e.show ++ ", " ++ rho.show ++ ", " ++ st.show ++ ", " ++ k.list/show ++ ")"
     Continue(k, v, st) -> "Continue(" ++ k.list/show ++ ", " ++ v.show ++ ", " ++ st.show ++ ")"
     Ans(v) -> "Ans(" ++ v.show ++ ")"
@@ -101,36 +103,37 @@ fun join(s: storeables, st: storeable)
   Storeables(s.vs + st)
 
 fun empty(): storeables
-  Storeables([])
+  Storeables(LinearSet([]))
 
 tail fun state/eval(s: state): <pure,abstraction,cache,salloc<state>> state
   with memo(s)
   match s
     Eval(Var(x), env, st, k) ->
-      val Right(v) = each(st.lookup(env.lookup(x).unjust).unjust.vs)
-      Continue(k, v, st).eval()
+      val Right(v) = each(st.lookup(env.lookup(x).unjust).unjust.vs.list)
+      Continue(k, v, st)
     Eval(App(e0, e1), env, st, k) ->
-      Eval(e0, env ~! e0.fv, st, Cons(AppL(e1, env ~! e1.fv), k)).eval()
+      Eval(e0, env ~! e0.fv, st, Cons(AppL(e1, env ~! e1.fv), k))
     Eval(Lambda(l), p, st, k) ->
-      Continue(k, Clos(l, p ~! l.e.fv), st).eval()
+      Continue(k, Clos(l, p ~! l.e.fv), st)
     Continue(Nil, v, _) -> Ans(v)
     Continue(Cons(AppL(e, p'), rst), v, st) -> 
-      Eval(e, p', st, Cons(AppR(v), rst)).eval()
+      Eval(e, p', st, Cons(AppR(v), rst))
     Continue(Cons(AppR(Clos(Lam(x, e), p)), rst), v, st) ->
       val a = salloc(s)
-      Eval(e, (p + (x, a)) ~! e.fv, st.join(a, Right(v)), rst).eval()
-    _ -> 
-      s.show.trace
-      s
+      Eval(e, (p.set(x, a)) ~! e.fv, st.join(a, Right(v)), rst)
+    Continue(_, v, _) -> 
+      v.show.trace
+      Ans(v)
 
-fun memo(s: state, s': () -> <cache,abstraction|e> state): <cache,abstraction|e> state
+fun memo(s: state, s': () -> <cache,pure,abstraction,salloc<state>|e> state): <cache,pure,abstraction,salloc<state>|e> state
   val res = get-cache(s)
   match res
     Nothing ->
       val r = s'()
       add-cache(s, r)
-      r
-    Just(rs) -> each(rs)
+      r.eval()
+    Just() -> 
+      each([])
 
 effect cache
   fun get-cache(s: state): maybe<linearSet<state>>
@@ -138,34 +141,38 @@ effect cache
 
 fun expr/eval(e: expr): <pure,console> ()
   var x := 0
-  var cache: linearMap<state, linearSet<state>> := []
-  var cacheids: linearMap<state, int> := []
+  var cache: linearMap<state, linearSet<state>> := LinearMap([])
+  var cacheids: linearMap<(env,string), int> := LinearMap([])
   with handler
     fun get-cache(s: state)
       cache.lookup(s)
     fun add-cache(s: state, s': state)
-      val ss = cache.lookup(s).default([])
+      val ss = cache.lookup(s).default(LinearSet([]))
       cache := cache.set(s, member/(+)(ss, s'))
   with handler
-    fun salloc(z)
-      match cacheids.map/lookup(z)
-        Nothing ->
-          cacheids := cacheids.linearmap/set(z,x)
-          x := x + 1
-          x
-        Just(y) -> y
+    fun salloc(s)
+      match s
+        Continue(Cons(AppR(Clos(Lam(x0, _), p)), _), _, _) ->
+          match cacheids.map/lookup((p, x0))
+            Nothing ->
+              cacheids := cacheids.linearmap/set((p, x0),x)
+              x := x + 1
+              x
+            Just(y) -> y
   val res =
     with handler
       ctl each(xs)
         xs.map(resume).concat()
       return (res) 
         [res]
-    Eval(e, [], [], []).eval()
-  res.map(fn(Ans(Clos(e1, _))) e1.show).join("\n").println
+    Eval(e, LinearMap([]), LinearMap([]), []).eval()
+  if res.length == 0 then
+    "Bottom".println
+  else
+    res.map(fn(Ans(Clos(e1, _))) e1.show).join("\n").println
 
 fun tests(): <pure, console> ()
   App(Lambda(Lam("x", App(Var("x"), Var("x")))), Lambda(Lam("y", App(Var("y"), Var("y"))))).eval
-
 
 fun lam/fv(l: lambda): div linearSet<identifier>
   match l
@@ -173,6 +180,6 @@ fun lam/fv(l: lambda): div linearSet<identifier>
 
 fun expr/fv(e: expr): div linearSet<identifier>
   match e
-    Var(x) -> [x]
+    Var(x) -> LinearSet([x])
     App(e1, e2) -> e1.fv.union(e2.fv)
     Lambda(l) -> fv(l)

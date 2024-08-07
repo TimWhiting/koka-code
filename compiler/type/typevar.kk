@@ -93,7 +93,7 @@ fun ktype/free-type-vars(tp: ktype): div tvs
     TApp(t, args) -> t.free-type-vars + args.map(fn(a) a.free-type-vars).unions
     TSyn(_, xs, t) -> t.free-type-vars + xs.map(free-type-vars).unions
 
-fun free-type-vars(e0: expr): div tvs
+fun exp/free-type-vars(e0: expr): div tvs
   match e0
     Lam(tn, eff, e) -> 
       val tv1: tvs = tn.free-type-vars + eff.free-type-vars

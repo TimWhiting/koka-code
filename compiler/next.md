@@ -4,7 +4,7 @@ Work on Syntax, Parsing, and Formatter
 ## Fully up to date
 // compiler/lib/* 07/23/24 updated
 // compiler/common/* 07/23/24 updated - other than parse, and some missing functions in range and file
-// compiler/syntax/lexeme & layout 08/05/24
+// compiler/syntax/lexeme & layout 08/05/24, range-map 08/06/24
 
 ## Syntax errors
 

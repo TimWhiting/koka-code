@@ -5,7 +5,7 @@
 // terms of the Apache License, Version 2.0. A copy of the License can be
 // found in the LICENSE file at the root of this distribution.
 //----------------------------------------------------------------------------
-// Updated as of 8/5/24: Commit 5087104
+// Updated as of 8/5/24: Commit 5087104, needs is-literal-doc, and extract-literate
 
 // Add braces and semicolons based on layout.
 
@@ -18,18 +18,18 @@ import std/os/file
 import std/os/path
 import std/core/undiv
 import std/core/unsafe
+import std/core-extras
 
 // Lex a source
-fun lex-source(source: source, line: int, allow-at: bool, semi-insert: bool, preprocess: list<lexeme> -> e list<lexeme>): e list<lexeme>
-  val input = if source.name.is-literal-doc then rawinput.extract-literate else rawinput
-  lexing(source, line, input).layout(allow-at, semi-insert).preprocess
+fun lex-source(source: source, line: int, allow-at: bool, semi-insert: bool, preprocess: list<lexeme> -> <pure|e> list<lexeme>): <pure|e> list<lexeme>
+  // val input = if source.name.is-literal-doc then rawinput.extract-literate else rawinput
+  val rawinput = source.contents
+  lexing(source, line, rawinput).layout(allow-at, semi-insert).preprocess
 
-// 
-fun layout(lexemes: list<lexeme>, allow-at: bool, semi-insert: bool): e list<lexeme>
-  fun semi(v: list<lexeme>, f: (list<lexeme>) -> e list<lexeme>) if semi-insert then f(v) else v
+fun layout(lexemes: list<lexeme>, allow-at: bool, semi-insert: bool): list<lexeme>
+  fun semi(v: list<lexeme>, f: (list<lexeme>) -> list<lexeme>) if semi-insert then f(v) else v
   val adjustwhite = lexemes.semi(check-comments)
-      .combine-line-comments.remove-whitespace
-      .associate-comments.remove-white
+      .combine-line-comments.remove-whitespace.associate-comments.remove-white
   val at = if allow-at then adjustwhite else adjustwhite.check-ids
   at.semi(indent-layout)
 
@@ -72,7 +72,7 @@ val doc-keywords = ["fun","val","ctl","final","raw"
 fun is-doc-keyword(lex: string)
   doc-keywords.find(fn(x) x == lex).bool
 
-fun comment-line(r: rng, comment: string)
+fun comment-line(r: range, comment: string)
   if comment.ends-with("\n").bool then r.end.line else r.end.line + 1
 
 fun is-valid-prefix(l: lex): bool
@@ -83,17 +83,17 @@ fun is-valid-prefix(l: lex): bool
     LexSpecial(s) -> ["(", ")", "{", "}", ","].any(fn(x) x == s)
     _ -> False
 
-fun scan-doc-keyword(doc: string, line: int, acc: ctx<list<lexeme>>, ls: list<lexeme>): maybe<(list<lexeme>, list<lexeme>)>
+fun scan-doc-keyword(doc: string, dline: int, acc: ctx<list<lexeme>>, ls: list<lexeme>): maybe<(list<lexeme>, list<lexeme>)>
   match ls
     [] -> Nothing
-    Cons(Lexeme(rng, lex)) | rng.start.line != line -> Nothing
+    Cons(Lexeme(rng)) | rng.start.line != dline -> Nothing
     Cons(Lexeme(r, LexKeyword(k)), rst) | k.is-doc-keyword ->
       Just((acc ++. Cons(Lexeme(r, LexKeyword(k, doc)), Nil), rst))
     Cons(Lexeme(r, LexCons(c)), rst) ->
       Just((acc ++. Cons(Lexeme(r, LexCons(c, doc)), Nil), rst))
-    Cons(l = Lexeme(_, lex), rst) ->
+    Cons(l as Lexeme(_, lex), rst) ->
       if lex.is-valid-prefix then
-        scan-doc-keyword(doc, line, acc ++. Cons(l, Nil), rst)
+        scan-doc-keyword(doc, dline, acc ++ ctx Cons(l, _), rst)
       else Nothing
 
 // Associate comments that precede a declaration
@@ -101,13 +101,12 @@ fun scan-doc-keyword(doc: string, line: int, acc: ctx<list<lexeme>>, ls: list<le
 fun associate-comments(lexs: list<lexeme>): list<lexeme>
   match lexs
     // Special comments
-    Cons(Lexeme(r1, LexComment(c1)), ls) | (c1.starts-with("//.").bool 
-      && ! (c1.slice.subslice(3, c1.count).string.trim-right.list.any(is-space))) -> 
+    Cons(Lexeme(r1, LexComment(c1)), ls) | (c1.starts-with("//.").bool  && !(c1.slice.subslice(3, c1.count).string.trim-right.list.any(is-space))) -> 
         Cons(Lexeme(r1, LexSpecial(c1.trim-right)), ls.associate-comments)
     // Comment association
-    Cons(l1 = Lexeme(r1, LexComment(comment)), ls) ->
-      match scan-doc-keyword(comment, comment-line(r1, comment), [], ls)
-        Just((pre, rest)) -> Cons(l1, pre) ++ rest.associate-comments
+    Cons(l1 as Lexeme(r1, LexComment(comment)), ls) ->
+      match scan-doc-keyword(comment, comment-line(r1, comment), ctx _, ls)
+        Just((pre, rest)) -> Cons(l1, pre) ++ rest.pretend-decreasing.associate-comments
         Nothing -> Cons(l1, ls.associate-comments)
     Cons(l,ls) -> Cons(l, ls.associate-comments)
     Nil -> Nil
@@ -127,13 +126,13 @@ fun combine-line-comments(lexs: list<lexeme>): list<lexeme>
 fun check-ids(lexs: list<lexeme>): list<lexeme>
   match lexs
     Nil -> Nil
-    Cons(lex1 = Lexeme(_, LexKeyword(keyw)), Cons(lex2 = Lexeme(_, LexId(id)), lexes)) | ["fun", "val", "extern"].any(fn(n) n == keyw) ->
+    Cons(lex1 as Lexeme(_, LexKeyword(keyw)), Cons(lex2 as Lexeme(_, LexId), lexes)) | ["fun", "val", "extern"].any(fn(n) n == keyw) ->
       // Ok to define @ functions
       Cons(lex1, Cons(lex2, lexes.check-ids))
-    Cons(lex = Lexeme(rng, lex), lexes) ->
-      fun check-id(id: name)
-        if id.nameStem.any(fn(c) c == '@') then
-          Cons(Lexeme(rng, LexError("\"@\": identifiers cannot contain '@' characters (in '" ++ id.show ++ "')")), lexes.check-ids)
+    Cons(l as Lexeme(rng, lex), lexes) ->
+      fun check-id(idn: name)
+        if idn.nameStem.list.any(fn(c) c == '@') then
+          Cons(Lexeme(rng, LexError("\"@\": identifiers cannot contain '@' characters (in '" ++ idn.show ++ "')")), lexes.check-ids)
         else
           lexes
       val lexes' = match lex
@@ -144,7 +143,7 @@ fun check-ids(lexs: list<lexeme>): list<lexeme>
         LexIdOp(id) -> id.check-id
         LexWildCard(id) -> id.check-id
         _ -> lexes.check-ids
-      Cons(lexeme, lexes')
+      Cons(l, lexes')
 
 // Check for comments in indentation
 fun check-comments(lexs: list<lexeme>): list<lexeme>
@@ -160,7 +159,7 @@ fun check(prev-line: int, comment-rng: range, l: list<lexeme>): list<lexeme>
         _ -> check-indent(prev-line, rng, comment-rng) ++ check(rng.end-line, comment-rng, ls)
       Cons(Lexeme(rng, lex), newR)
 
-fun check-indent(prev-line: int, rng: range, comment-rng: list<lexeme>)
+fun check-indent(prev-line: int, rng: range, comment-rng: range)
   if rng.start-line > prev-line && rng.start-line == comment-rng.end-line && comment-rng.end-col > 1 then 
   // For wrap-around line columns
     [Lexeme(comment-rng, LexError("layout: comments cannot be placed in the indentation of a line"))]

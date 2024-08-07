@@ -130,9 +130,17 @@ fun niceList(schemes: list<ktype>, f: (ktype) -> ppTypeEff doc): ppTypeEff list<
   schemes.map(f)
 
 // Pretty print a type
-fun ktp/pretty(t: ktype): <documentation,ppEnvEff,pure,comp-flags,colorSchemeEffect> doc
+fun ktp/ppretty(t: ktype): <documentation,ppEnvEff,pure,comp-flags,colorSchemeEffect> doc
   with handlePrettyEff
   with niceEnv
+  t.ppType
+
+fun ktp/pretty(t: ktype): <comp-flags, pure> doc
+  with defaultPPEnv
+  with defaultDocEnv
+  with handlePrettyEff
+  with niceEnv
+  with color-scheme-default
   t.ppType
 
 fun tv/pretty(tv: typeVar): <documentation,ppEnvEff,pure,comp-flags,colorSchemeEffect> doc

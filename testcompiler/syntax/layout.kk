@@ -1,16 +1,21 @@
 import compiler/syntax/layout
+import compiler/syntax/lexer
+import compiler/syntax/lexeme
+import compiler/common/range
+import std/os/path
+import std/os/file
 
 fun main()
-  val f = read-text-file("compiler/syntax/lexer.kk".path)
-  test(f).trace-show
+  val f = read-text-file("testcompiler/syntax/layout.kk".path)
+  test(f)
 
 fun test-file(fname: string)
   val f = read-text-file(("test/" ++ fname).path)
-  testEx(fname, f).trace-show
+  test-ex(fname, f)
 
 fun test(xs: string)
-  testEx("", xs)
+  test-ex("", xs)
 
-fun testEx(fname: string, input: string)
+fun test-ex(fname: string, input: string)
   val tokens = lexing(Source(fname, input), 1, input)
-  layout(True, tokens).map(show).unlines.println
+  tokens.layout(True, True).map(show).unlines.println

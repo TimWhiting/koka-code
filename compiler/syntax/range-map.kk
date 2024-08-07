@@ -5,7 +5,7 @@
 // terms of the Apache License, Version 2.0. A copy of the License can be
 // found in the LICENSE file at the root of this distribution.
 //----------------------------------------------------------------------------
-// Updated as of 8/6/24: Commit 7d99cb0, updated till find-in
+// Updated as of 8/6/24: Commit 7d99cb0
 
 import compiler/common/failure
 import compiler/lib/pprint

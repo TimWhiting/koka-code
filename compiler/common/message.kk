@@ -12,6 +12,7 @@ import compiler/common/range
 import compiler/common/color-scheme
 import compiler/lib/printer
 import std/os/path
+import std/core-extras
 import newstd/test
 // Updated as of 7/23/24: Commit: c7c0ac6
 

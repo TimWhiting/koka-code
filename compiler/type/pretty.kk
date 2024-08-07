@@ -16,6 +16,7 @@ import compiler/common/syntax
 import std/data/linearmap
 import std/data/linearset
 import std/core/undiv
+import std/core-extras
 
 alias prec = int;
 val precTopTop = -1 // most outer level: used to suppress 'forall'

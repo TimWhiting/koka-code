@@ -174,17 +174,25 @@ type expr<t>
   Let(d: defGroup<t>, e: expr<t>, range: range)
   Bind(d: def<t>, e: expr<t>, range: range)
   App(e: expr<t>, args: list<(maybe<(name, range)>, expr<t>)>, range: range)
-  Var(name: name, isOp: bool, range: range)
+  Var(name: name, isOp: bool, range: range) // The var is an op
   Literal(l: lit, range: range = l.range)
   Ann(e: expr<t>, t: t, range: range)
   Case(e: expr<t>, cases: list<branch<t>>, range: range)
-  Parens(e: expr<t>, name: name, range: range)
+  Parens(e: expr<t>, name: name, d: string, range: range) // name and string are used for the range map
   Inject(t: t, e: expr<t>, behind: bool, range: range)
   Handler(
-    sort: handlerSort, scope: handlerScope, hOverride: handlerOverride, allowMask: maybe<bool>, 
-    hEffect: maybe<t>, localPars: list<valueBinder<maybe<t>, ()>>, 
-    initially: maybe<expr<t>>, hReturn: maybe<expr<t>>, 
-    finally: maybe<expr<t>>, branches: list<handlerBranch<t>>, declRange: range, range: range)
+    sort: handlerSort, 
+    scope: handlerScope, 
+    hOverride: handlerOverride, 
+    allowMask: maybe<bool>, 
+    hEffect: maybe<t>, 
+    localPars: list<valueBinder<maybe<t>, ()>>, 
+    initially: maybe<expr<t>>,
+    hReturn: maybe<expr<t>>, 
+    finally: maybe<expr<t>>, 
+    branches: list<handlerBranch<t>>, 
+    declRange: range, 
+    range: range)
 
 // fun expr/show(expr: expr<t>): string
 //   ""
@@ -199,7 +207,7 @@ fun expr/show(expr: expr<t>, ?show: (t) -> <div|e1> string): <div|e1> string
     Literal(l) -> "Literal " ++ l.show
     Ann(e, t, rng) -> "Ann " ++ e.show ++ " " ++ t.show ++ " " ++ rng.show
     // Case(e, cases, rng) -> "Case " ++ e.show ++ " " ++ cases.list/show ++ " " ++ rng.show
-    Parens(e, n, rng) -> "Parens " ++ e.show ++ " " ++ n.show ++ " " ++ rng.show
+    Parens(e, n, d, rng) -> "Parens " ++ e.show ++ " " ++ n.show ++ " " ++ d ++ " " ++ rng.show
     // Inject(t, e, behind, rng) -> "Inject " ++ t.show ++ " " ++ e.show ++ " " ++ behind.show ++ " " ++ rng.show
     _ -> ""
     // Handler(sort, scope, hOverride, allowMask, hEffect, localPars, initially, hReturn, fin, branches, declRange, rng) -> 
@@ -362,20 +370,20 @@ fun uhb/range(uhb: userHandlerBranch): range
   uhb.branchPatRange.combine(uhb.branchExpr.range)
 
 // free type variables
-fun maybe/free-type-vars(m: maybe<a>, f: (a) -> div nameSet): div nameSet
+fun maybe/free-type-vars(m: maybe<a>, ?free-type-vars: (a) -> div nameSet): div nameSet
   match m
     Nothing -> LinearSet([])
-    Just(x) -> f(x)
+    Just(x) -> ?free-type-vars(x)
 
-fun list/free-type-vars(l: list<a>, f: (a) -> div nameSet): div nameSet
-  l.foldl(LinearSet([]), fn(s:nameSet, x) s + f(x))
+fun list/free-type-vars(l: list<a>, ?free-type-vars: (a) -> div nameSet): div nameSet
+  l.foldl(LinearSet([]), fn(s:nameSet, x) s + ?free-type-vars(x))
 
 fun kut/free-type-vars(tp: kUserType<k>): div nameSet
   match tp
     TpQuan(_, TypeBinder(name), tp, _) -> tp.free-type-vars - name
-    TpQual(preds, tp) -> free-type-vars(Cons(tp, preds), free-type-vars)
-    TpFun(args, eff, tp) -> free-type-vars(Cons(tp,Cons(eff,args.map(snd))), free-type-vars)
-    TpApp(tp, args) -> tp.free-type-vars + args.free-type-vars(free-type-vars)
+    TpQual(preds, tp) -> free-type-vars(Cons(tp, preds))
+    TpFun(args, eff, tp) -> free-type-vars(Cons(tp,Cons(eff,args.map(snd))))
+    TpApp(tp, args) -> tp.free-type-vars + args.free-type-vars
     TpVar(name) -> LinearSet([name])
     TpCon -> LinearSet([])
     TpParens(tp) -> tp.free-type-vars

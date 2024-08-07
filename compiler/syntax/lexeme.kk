@@ -19,7 +19,7 @@ import compiler/common/id
 
 val typeVarRegex = "^[a-z][0-9]*$".regex();
 
-pub fun isTypeVar(n: name): bool
+pub fun is-type-var(n: name): bool
   !typeVarRegex.exec(n.nameStem).is-empty
 
 // Lexer tokens

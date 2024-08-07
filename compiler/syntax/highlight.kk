@@ -16,6 +16,7 @@ import compiler/syntax/lexeme
 import compiler/syntax/lexer
 import compiler/syntax/layout
 import std/os/path
+import std/core-extras
 // TODO: Isocline stuff
 
 // TODO: HighlightPrint, FmtPrint, FmtAttr, HighlightInput, lex-comment 
@@ -262,6 +263,66 @@ fun adjust-context(c: highlight-ctx, l: lex, lexes: list<lexeme>)
         LexSpecial("]") -> pop(NestBracket, nest0)
         _ -> adjust-context(CtxNormal, l, lexes)
 
+fun scan-tag(lineno: int, lacc: ctx<list<token-comment<lexeme>>>, chs: list<char>)
+  match chs
+    _ -> []
+
+fun scan-math(lineno: int, lacc: ctx<list<token-comment<lexeme>>>, chs: list<char>)
+  match chs
+    _ -> []
+
+fun scan-code(lineno: int, com: (list<lexeme>, string) -> token-comment<lexeme>, lacc: ctx<list<token-comment<lexeme>>>, acc: ctx<list<char>>, chs: list<char>)
+  match chs
+    _ -> []
+
+fun comCode(l, s)
+  ComCode(l, s)
+
+fun comCodeBlock(cls)
+  fn(l, s)
+    ComCodeBlock(cls, l, s)
+
+fun comCodeLit(cls)
+  fn(l, s)
+    ComCodeLit(cls, l, s)
+
+fun scan(lineno: int, lacc: ctx<list<token-comment<lexeme>>>, acc: ctx<list<char>>, chs: list<char>)
+  match chs
+    // Skip inside tags (so html renders correctly)
+    Cons('<', Cons(c, rest)) | !c.is-space -> scan-tag(lineno, lacc ++ ctx Cons(ComText((acc ++. Nil).string), _), Cons('<', Cons(c, rest)))
+    // Skip inside $ (so math renders correctly)
+    Cons('$', Cons(c, rest)) -> scan-math(lineno, lacc ++ ctx Cons(ComText((acc ++. Nil).string), _), Cons(c, rest))
+    // Code
+    Cons('`', Cons(c, rest)) 
+      | c != '`' -> scan-code(lineno, comCode, lacc ++ ctx Cons(ComText((acc ++. Nil).string), _), ctx _, Cons(c, rest))
+      | c == ':' -> scan-code(lineno, comCode, lacc ++ ctx Cons(ComText((acc ++. Nil).string), _), ctx Cons(':', _), rest)
+    Cons('`', Cons('`', Cons('`', Cons(c, rest)))) | (acc ++. Nil).white-line && c != '`' ->
+      val (pre, xpost) = Cons(c, rest).span(fn(c) c != '\n' && c != "{" && c != ' ')
+      val (attr, post) = xpost.span(fn(c) c != '\n')
+      val cls = 
+        match attr.drop-while(fn(c) c != '.')
+          Nil -> ""
+          Cons(_, cs) -> cs.take-while(is-alpha-num)
+      val pres = pre.string
+      val attrs = attr.string
+      val clss = cls.string
+      val comcode = if pres == "unchecked" then comCodeBlock(clss) else comCodeLit(clss)
+      if pre == "unchecked" || pre == "koka" || pre == "" then
+        scan-code-block(lineno + 1, comCode, n + 1, lacc ++ ctx Cons(ComText((acc ++ Nil).drop-line), _), ctx _, post.drop-line)
+      else
+        scan-pre-block(3, lineno, lacc ++ ctx Cons(ConText((acc ++ pre ++. Cons('`', Cons('`', Cons('`', Nil))))), _), ctx _, post)
+    Cons('`', rest) ->
+      val (pre, pos) = acc.span(fn(c) c != '`')
+      val lacc' = lacc ++ ctx Cons(ComCode(acc ++ pre ++. Cons('`', Nil), ""), _)
+      if (acc ++. Nil).white-line && pre.length >= 2 then
+        scan-pre-block(pre.length + 1, lineno, lacc', ctx _, post)
+      else
+        scan-pre(pre.length + 1, lineno, lacc', ctx _, post)
+    // regular
+    Cons('\n', rest) -> scan(lineno + 1, lacc, acc ++ ctx Cons('\n', _), rest)
+    Cons(c, rest) -> scan(lineno, lacc, acc ++ ctx Cons(c, _), rest)
+    Nil -> lacc ++. Cons(ComText((acc ++ Nil).string), Nil)
+
 // Parse comment formatters
-fun lex-comment(source: string, lineno: int, content: string): list<token-comment<lexeme>>
-  []// TODO: 
+fun lex-comment(source: string, lineno: int, content: string): exn list<token-comment<lexeme>>
+  scan(lineno, ctx _, ctx _, content.list.filter(fn(c) c != '\r'))

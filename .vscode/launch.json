@@ -20,7 +20,7 @@
       "name": "(lldb) Launch Macos",
       "type": "cppdbg",
       "request": "launch",
-      "program": "${workspaceRoot}/.koka/v3.1.2-vscode/clang-debug/compiler_syntax_lexer2__main",
+      "program": "${workspaceRoot}/.koka/v3.1.2-vscode/clang-debug/testcompiler_syntax_highlight__main",
       "args": [],
       "stopAtEntry": false,
       "cwd": "${workspaceRoot}/.koka/v3.1.2-vscode/clang-debug",

@@ -21,37 +21,47 @@ import std/core-extras
 
 // TODO: FmtAttr
 
+effect fmt
+  fun fmt(t: token<lexeme>, l: lexeme, s: string): token<lexeme>
+  val source-file: string
+
+alias highlight-eff = <colorSchemeEffect,coloredPrinter,printer,pure>
+alias highlight = <fmt,pure>
 // -----------------------------------------------------------
 // Easy syntax highlighting
 // ----------------------------------------------------------
 // | Print source in color, given a color scheme, source name, 
 // initial line number, the input string, and a 'Printer'.
-fun highlight-print(source-name: path, line-no: int, input: string): highlight-eff ()
-  highlight(fmt-print, id, CtxNormal, source-name, line-no, input)
+fun highlight-print(source-name: path, line-no: int, input: string): <colorSchemeEffect,coloredPrinter,printer,pure> ()
+  val cls = ColorScheme()
+  with handler 
+    val source-file = source-name.string
+    fun fmt(token, lex, s)
+      match token
+        TokId -> write(s)
+        TokOp -> write(s)
+        TokTypeVar -> s.print-colored(cls.colorTypeVar)
+        TokTypeId -> s.print-colored(cls.colorTypeCon)
+        TokTypeOp -> s.print-colored(cls.colorTypeCon)
+        TokTypeSpecial -> s.print-colored(cls.colorTypeSpecial)
+        TokTypeParam -> s.print-colored(cls.colorTypeParam)
+        TokModule -> s.print-colored(cls.colorModule)
+        TokCons -> s.print-colored(cls.colorCons)
+        TokNumber -> s.print-colored(cls.colorNumber)
+        TokString -> s.print-colored(cls.colorString)
+        TokSpecial -> s.print-colored(cls.colorSpecial)
+        TokTypeKeyword ->
+          if !s.is-keyword-op then s.print-colored(cls.colorTypeKeyword)
+          else s.print-colored(cls.colorTypeKeywordOp)
+        TokKeyword -> s.print-colored(cls.colorKeyword)
+        TokComment -> s.print-colored(cls.colorComment)
+        TokRichComment -> s.print-colored(cls.colorComment)
+        TokWhite -> write(s)
+        TokError -> ()
+      token
+  highlight(id, CtxNormal, line-no, input)
   ()
 
-fun fmt-print(token: token<lexeme>, _: lexeme, s: string)
-  match token
-    TokId -> write(s)
-    TokOp -> write(s)
-    TokTypeVar ->s.print-colored(colors.colorTypeVar)
-    TokTypeId -> s.print-colored(colors.colorTypeCon)
-    TokTypeOp -> s.print-colored(colors.colorTypeCon)
-    TokTypeSpecial -> s.print-colored(colors.colorTypeSpecial)
-    TokTypeParam -> s.print-colored(colors.colorTypeParam)
-    TokModule -> s.print-colored(colors.colorModule)
-    TokCons -> s.print-colored(colors.colorCons)
-    TokNumber -> s.print-colored(colors.colorNumber)
-    TokString -> s.print-colored(colors.colorString)
-    TokSpecial -> s.print-colored(colors.colorSpecial)
-    TokTypeKeyword ->
-      if !s.is-keyword-op then s.print-colored(colors.colorTypeKeyword)
-      else s.print-colored(colors.colorTypeKeywordOp)
-    TokKeyword -> s.print-colored(colors.colorKeyword)
-    TokComment -> s.print-colored(colors.colorComment)
-    TokRichComment -> s.print-colored(colors.colorComment)
-    TokWhite -> write(s)
-    TokError -> ()
 
 fun highlight/show(Lexeme(_, lex): lexeme): exn string
   match lex
@@ -159,34 +169,30 @@ fun nesting(n: highlight-ctx): int
     CtxType(n) -> n.length
     _ -> 0
 
-alias highlight-eff = <colorSchemeEffect,coloredPrinter,printer,pure>
+fun fmt/highlight(transform: list<lexeme> -> pure list<lexeme>, c: highlight-ctx, lineNo: int, str: string): highlight list<token<lexeme>>
+  val xs = lexer(source-file, lineNo, str)
+  highlight-lexemes(transform, c, [], xs.combine-line-comments.transform)
 
-fun fmt/highlight(fmt: (token<lexeme>, lexeme, string) -> highlight-eff a, transform: list<lexeme> -> pure list<lexeme>, c: highlight-ctx, source: path, lineNo: int, str: string): highlight-eff list<a>
-  val xs = lexer(source.string, lineNo, str)
-  highlight-lexemes(transform, fmt, c, ctx _, xs.combine-line-comments.transform)
-
-fun highlight-lexemes(transform: list<lexeme> -> pure list<lexeme>, fmt: (token<lexeme>, lexeme, string) -> highlight-eff a, c: highlight-ctx, acc: ctx<list<a>>, lexes: list<lexeme>): highlight-eff list<a>
+fun highlight-lexemes(transform: list<lexeme> -> pure list<lexeme>, c: highlight-ctx, acc: list<token<lexeme>>, lexes: list<lexeme>): highlight list<token<lexeme>>
   match lexes
     Cons(l, lexes') ->
-      val (ctx', content) = highlight-lexeme(transform, fmt, c, l, lexes')
-      highlight-lexemes(transform, fmt, ctx', acc ++ ctx Cons(content, _), lexes')
-    Nil -> acc ++. Nil
+      val (ctx', content) = highlight-lexeme(transform, c, l, lexes')
+      highlight-lexemes(transform, ctx', Cons(content, acc), lexes')
+    Nil -> acc.reverse
 
-fun highlight-lexeme(transform: list<lexeme> -> pure list<lexeme>, fmt0: (token<lexeme>, lexeme, string) -> highlight-eff a, ctx0: highlight-ctx, lexeme: lexeme, lexs: list<lexeme>): highlight-eff (highlight-ctx, a)
+fun highlight-lexeme(transform: list<lexeme> -> pure list<lexeme>, ctx0: highlight-ctx, lexeme: lexeme, lexs: list<lexeme>): highlight (highlight-ctx, token<lexeme>)
   val Lexeme(rng, lex) = lexeme
-  fun fmt(tok, s)
-    fmt0(tok, lexeme, s)
   fun show-id(n: name): string
     if n.nameStem == "!" || n.nameLocalQual == "~" then n.show-plain else n.show
   fun show-op(n: name): string
     match n.nameStem.slice.next
       Just((c, _)) | c.is-alpha-num -> "`" ++ n.show ++ "`"
       _ -> n.show-plain
-  fun highlight-comment(com)
+  fun highlight-comment(com: token-comment<lexeme>): <pure,fmt> token-comment<token<lexeme>>
     match com
-      ComCode(lexs', s) -> ComCode(highlight-lexemes(transform, fmt0, CtxNormal, ctx _, lexs'.transform), s)
-      ComCodeBlock(cls, lexs', s) -> ComCodeBlock(cls, highlight-lexemes(transform, fmt0, CtxNormal, ctx _, lexs'.transform), s)
-      ComCodeLit(cls, lexs', s) -> ComCodeLit(cls, highlight-lexemes(transform, fmt0, CtxNormal, ctx _, lexs'.transform), s)
+      ComCode(lexs', s) -> ComCode(highlight-lexemes(transform, CtxNormal, [], lexs'.transform), s)
+      ComCodeBlock(cls, lexs', s) -> ComCodeBlock(cls, highlight-lexemes(transform, CtxNormal, [], lexs'.transform), s)
+      ComCodeLit(cls, lexs', s) -> ComCodeLit(cls, highlight-lexemes(transform, CtxNormal, [], lexs'.transform), s)
       ComText(s) -> ComText(s)
       ComEmph(s) -> ComEmph(s)
       ComUrl(s) -> ComUrl(s)
@@ -205,8 +211,8 @@ fun highlight-lexeme(transform: list<lexeme> -> pure list<lexeme>, fmt0: (token<
               Cons(Lexeme(_, LexKeyword(":"))) | ctx1.nesting > 0 -> TokTypeParam
               _ -> if id.is-type-var then TokTypeVar else TokTypeId(id)
           else TokId(id, "")
-        fmt(tok, id.unqualify.show-id)
-      LexWildCard(id) -> fmt(if ctx1.is-ctxType then TokTypeVar else TokId(id, ""), id.show)
+        fmt(tok, lexeme, id.unqualify.show-id)
+      LexWildCard(id) -> fmt(if ctx1.is-ctxType then TokTypeVar else TokId(id, ""), lexeme, id.show)
       LexOp(id) -> 
         val token = 
           if ctx1.is-ctxType then 
@@ -214,28 +220,28 @@ fun highlight-lexeme(transform: list<lexeme> -> pure list<lexeme>, fmt0: (token<
             if ["<", ">", "|", "::"].any(fn(id0) idp == id0) then TokTypeSpecial 
             else TokTypeOp(id)
           else TokOp(id, "")
-        fmt(token, id.unqualify.show-op)
-      LexPrefix(id) -> fmt(TokOp(id, ""), id.unqualify.show-id)
-      LexIdOp(id) -> fmt(TokOp(id, ""), id.unqualify.show-id)
-      LexInt -> fmt(TokNumber, lex.show)
-      LexFloat -> fmt(TokNumber, lex.show)
-      LexString(s) -> fmt(TokString, s.show)
-      LexChar(c) -> fmt(TokString, c.show)
-      LexModule(id, mid) -> fmt(TokModule(mid), id.show)
-      LexCons(id) -> fmt(if ctx1.is-ctxType then TokTypeId(id) else TokCons(id), id.unqualify.show-id)
-      LexTypedId(id, tp) -> fmt(TokId(id, tp), id.unqualify.show-id)
-      LexKeyword(":") -> fmt(TokTypeKeyword, ":")
-      LexKeyword(k) -> fmt(if ctx1.is-ctxType then TokTypeKeyword else TokKeyword, k.normalize)
-      LexSpecial(s) -> fmt(if ctx1.is-ctxType then TokTypeSpecial else TokSpecial, s.normalize)
-      LexComment(s) -> fmt(TokRichComment(lex-comment(rng.source.name, rng.start.line, s)), s)
-      LexWhite(w) -> fmt(TokWhite, w)
-      LexInsLCurly -> fmt(TokWhite, "")
-      LexInsRCurly -> fmt(TokWhite, "")
-      LexInsSemi -> fmt(TokWhite, "")
-      LexError(msg) -> fmt(TokError, msg)
+        fmt(token, lexeme, id.unqualify.show-op)
+      LexPrefix(id) -> fmt(TokOp(id, ""), lexeme, id.unqualify.show-id)
+      LexIdOp(id) -> fmt(TokOp(id, ""), lexeme, id.unqualify.show-id)
+      LexInt -> fmt(TokNumber, lexeme, lex.show)
+      LexFloat -> fmt(TokNumber, lexeme, lex.show)
+      LexString(s) -> fmt(TokString, lexeme, s.show)
+      LexChar(c) -> fmt(TokString, lexeme, c.show)
+      LexModule(id, mid) -> fmt(TokModule(mid), lexeme, id.show)
+      LexCons(id) -> fmt(if ctx1.is-ctxType then TokTypeId(id) else TokCons(id), lexeme, id.unqualify.show-id)
+      LexTypedId(id, tp) -> fmt(TokId(id, tp), lexeme, id.unqualify.show-id)
+      LexKeyword(":") -> fmt(TokTypeKeyword, lexeme, ":")
+      LexKeyword(k) -> fmt(if ctx1.is-ctxType then TokTypeKeyword else TokKeyword, lexeme, k.normalize)
+      LexSpecial(s) -> fmt(if ctx1.is-ctxType then TokTypeSpecial else TokSpecial, lexeme, s.normalize)
+      LexComment(s) -> fmt(TokRichComment(lex-comment(rng.start.line, s)), lexeme, s)
+      LexWhite(w) -> fmt(TokWhite, lexeme, w)
+      LexInsLCurly -> fmt(TokWhite, lexeme, "")
+      LexInsRCurly -> fmt(TokWhite, lexeme, "")
+      LexInsSemi -> fmt(TokWhite, lexeme, "")
+      LexError(msg) -> fmt(TokError,lexeme,  msg)
   (ctx1, con0)
 
-fun adjust-context(c: highlight-ctx, l: lex, lexes: list<lexeme>)
+fun adjust-context(c: highlight-ctx, l: lex, lexes: list<lexeme>): div highlight-ctx
   match c
     CtxNormal ->
       match l
@@ -287,11 +293,11 @@ fun adjust-context(c: highlight-ctx, l: lex, lexes: list<lexeme>)
         _ -> adjust-context(CtxNormal, l, lexes)
 
 // scanTag: ignore things inside "<tag...>" and "<script .. </script>" or "<style .. </style>" tags
-fun scan-tag(file-path: string, n: int, lacc: ctx<list<token-comment<lexeme>>>, content: list<char>)
+fun scan-tag(n: int, lacc: ctx<list<token-comment<lexeme>>>, content: list<char>): <pure,fmt> list<token-comment<lexeme>>
   fun default()
     val (tag, clos) = content.span(fn(c) c != '>' && c != '\n')
     val (end, rest) = if clos.is-nil then ([], []) else ([clos.string.head-char.unjust], clos.tail)
-    scan(file-path, if end.string.head-char.unjust == '\n' then n + 1 else n, lacc ++ ctx Cons(ComText(tag.string ++ end.string), _), [], rest)
+    scan(if end.string.head-char.unjust == '\n' then n + 1 else n, lacc ++ ctx Cons(ComText(tag.string ++ end.string), _), [], rest)
   match content
     Cons('<', rest) ->
       val (tagName, _) = rest.span(is-alpha-num)
@@ -313,40 +319,40 @@ fun scan-tag(file-path: string, n: int, lacc: ctx<list<token-comment<lexeme>>>, 
               span-to-end-tag(Cons(pre, acc), post)
         val (elem, after) = span-to-end-tag([], content)
         val m = elem.filter(fn(e) e == '\n').length
-        scan(file-path, n + m, lacc ++ ctx Cons(ComText(elem.string), _), [], after)
+        scan(n + m, lacc ++ ctx Cons(ComText(elem.string), _), [], after)
       else
         default()
-  default()
+    _ -> default()
 
-fun scan-math(file-path: string, n: int, lacc: ctx<list<token-comment<lexeme>>>, content: list<char>)
+fun scan-math(n: int, lacc: ctx<list<token-comment<lexeme>>>, content: list<char>): <pure,fmt> list<token-comment<lexeme>>
   val (math, clos) = content.span(fn(c) c != '$' && c != '\n')
   val (end, rest) = if clos.is-nil then ([], []) else ([clos.string.head-char.unjust], clos.tail)
-  scan(file-path, if end.string.head-char.unjust == '\n' then n + 1 else n, lacc ++ ctx Cons(ComText("$" ++ math.string ++ end.string), _), [], rest)
+  scan(if end.string.head-char.unjust == '\n' then n + 1 else n, lacc ++ ctx Cons(ComText("$" ++ math.string ++ end.string), _), [], rest)
 
 // scanPre formatted ``pre``
-fun scan-pre(file-path: string, m: int, n: int, lacc: ctx<list<token-comment<lexeme>>>, acc: list<char>, chs: list<char>)
+fun scan-pre(m: int, n: int, lacc: ctx<list<token-comment<lexeme>>>, acc: list<char>, chs: list<char>): <pure,fmt> list<token-comment<lexeme>>
   match chs
     Cons('`', rest) ->
       val (pre, post) = rest.span(fn(c) c == '`')
       if m == pre.length + 1 then
-        scan(file-path, n, lacc, Cons('`', pre ++ acc), post)
+        scan(n, lacc, Cons('`', pre ++ acc), post)
       else
-        scan-pre(file-path, m, n, lacc, Cons('`', acc), rest)
-    Cons('\n', rest) -> scan(file-path, n, lacc, acc, Cons('\n', rest)) // don't go through newlines
-    Cons(c, rest) -> scan-pre(file-path, m, n, lacc, Cons(c, acc), rest)
-    Nil -> scan(file-path, n, lacc, acc, [])
+        scan-pre(m, n, lacc, Cons('`', acc), rest)
+    Cons('\n', rest) -> scan(n, lacc, acc, Cons('\n', rest)) // don't go through newlines
+    Cons(c, rest) -> scan-pre(m, n, lacc, Cons(c, acc), rest)
+    Nil -> scan(n, lacc, acc, [])
 
 // scanCode "f(x)"
-fun scan-code(file-path: string, n: int, com: (list<lexeme>, string) -> token-comment<lexeme>, lacc: ctx<list<token-comment<lexeme>>>, acc: list<char>, chs: list<char>)
+fun scan-code(n: int, com: (list<lexeme>, string) -> token-comment<lexeme>, lacc: ctx<list<token-comment<lexeme>>>, acc: list<char>, chs: list<char>): <pure,fmt> list<token-comment<lexeme>>
   match chs
-    Cons('`', rest) -> end-code(file-path, n, com, lacc, acc, [], rest)
-    Cons('\n', rest) -> end-code(file-path, n, com, lacc, acc, ['\n'], rest)
-    Cons(c, rest) -> scan-code(file-path, n, com, lacc, Cons(c, acc), rest)
-    Nil -> end-code(file-path, n, com, lacc, acc, [], [])
+    Cons('`', rest) -> end-code(n, com, lacc, acc, [], rest)
+    Cons('\n', rest) -> end-code(n, com, lacc, acc, ['\n'], rest)
+    Cons(c, rest) -> scan-code(n, com, lacc, Cons(c, acc), rest)
+    Nil -> end-code(n, com, lacc, acc, [], [])
 
-fun end-code(file-path: string, n: int, com: (list<lexeme>, string) -> token-comment<lexeme>, lacc: ctx<list<token-comment<lexeme>>>, acc: list<char>, post: list<char>, rest: list<char>)
-  val lexemes = lexer(file-path, n, acc.drop-while(is-space).reverse.string)
-  scan(file-path, n, lacc ++ ctx Cons(com(lexemes, acc.reverse.string), _), post.reverse, rest)
+fun end-code(n: int, com: (list<lexeme>, string) -> token-comment<lexeme>, lacc: ctx<list<token-comment<lexeme>>>, acc: list<char>, post: list<char>, rest: list<char>): <pure,fmt> list<token-comment<lexeme>>
+  val lexemes = lexer(source-file, n, acc.drop-while(is-space).reverse.string)
+  scan(n, lacc ++ ctx Cons(com(lexemes, acc.reverse.string), _), post.reverse, rest)
 
 fun comCode(l, s)
   ComCode(l, s)
@@ -359,48 +365,48 @@ fun comCodeLit(cls)
   fn(l, s)
     ComCodeLit(cls, l, s)
 
-fun scan-pre-block(file-path: string, m: int, n: int, lacc: ctx<list<token-comment<lexeme>>>, acc: list<char>, chs: list<char>)
+fun scan-pre-block(m: int, n: int, lacc: ctx<list<token-comment<lexeme>>>, acc: list<char>, chs: list<char>): <pure,fmt> list<token-comment<lexeme>>
   match chs
     Cons('`', rest) ->
       val (pre, post) = rest.span(fn(c) c == '`')
       if m == pre.length + 1 then
-        scan(file-path, n, lacc, Cons('`', pre ++ acc), post)
+        scan(n, lacc, Cons('`', pre ++ acc), post)
       else
-        scan-pre-block(file-path, m, n, lacc, Cons('`', acc), rest)
-    Cons(c, rest) -> scan-pre-block(file-path, m, if c == '\n' then n + 1 else n, lacc, Cons(c, acc), rest)
-    Nil -> scan(file-path, n, lacc, acc, [])
+        scan-pre-block(m, n, lacc, Cons('`', acc), rest)
+    Cons(c, rest) -> scan-pre-block(m, if c == '\n' then n + 1 else n, lacc, Cons(c, acc), rest)
+    Nil -> scan(n, lacc, acc, [])
 
-fun scan-code-block(file-path: string, n: int, com: (list<lexeme>, string) -> token-comment<lexeme>, m: int, lacc: ctx<list<token-comment<lexeme>>>, acc: list<char>, chs: list<char>)
+fun scan-code-block(n: int, com: (list<lexeme>, string) -> token-comment<lexeme>, m: int, lacc: ctx<list<token-comment<lexeme>>>, acc: list<char>, chs: list<char>): <pure,fmt> list<token-comment<lexeme>>
   match chs
     Cons('/', Cons('/', Cons('/', Cons('/', rest)))) | on-line(acc, rest) ->
-      scan-code-block2(file-path, n + 1, comCodeLit(""), n + 1, lacc, acc.reverse, [], rest.drop-line)
+      scan-code-block2(n + 1, comCodeLit(""), n + 1, lacc, acc.reverse, [], rest.drop-line)
     Cons('`', Cons('`', Cons('`', rest))) | on-line(acc, rest) ->
-      end-code-block(file-path, n + 1, com, m, lacc, [], acc, rest.drop-line)
-    Cons(c, rest) -> scan-code-block(file-path, if c == '\n' then n + 1 else n, com, m, lacc, Cons(c, acc), rest)
-    Nil -> end-code-block(file-path, n, com, m, lacc, acc.reverse, [], [])
+      end-code-block(n + 1, com, m, lacc, [], acc, rest.drop-line)
+    Cons(c, rest) -> scan-code-block(if c == '\n' then n + 1 else n, com, m, lacc, Cons(c, acc), rest)
+    Nil -> end-code-block(n, com, m, lacc, acc.reverse, [], [])
 
-fun scan-code-block2(file-path: string, n: int, com: (list<lexeme>, string) -> token-comment<lexeme>, m: int, lacc: ctx<list<token-comment<lexeme>>>, pre: list<char>, acc: list<char>, chs: list<char>)
+fun scan-code-block2(n: int, com: (list<lexeme>, string) -> token-comment<lexeme>, m: int, lacc: ctx<list<token-comment<lexeme>>>, pre: list<char>, acc: list<char>, chs: list<char>): <pure,fmt> list<token-comment<lexeme>>
   match chs
     Cons('`', Cons('`', Cons('`', rest))) | on-line(acc, rest) ->
-      end-code-block(file-path, n + 1, com, m, lacc, pre, acc, rest.drop-line)
-    Cons(c, rest) -> scan-code-block2(file-path, if c == '\n' then n + 1 else n, com, m, lacc, pre, Cons(c, acc), rest)
-    Nil -> end-code-block(file-path, n, com, m, lacc, pre, acc, [])
+      end-code-block(n + 1, com, m, lacc, pre, acc, rest.drop-line)
+    Cons(c, rest) -> scan-code-block2(if c == '\n' then n + 1 else n, com, m, lacc, pre, Cons(c, acc), rest)
+    Nil -> end-code-block(n, com, m, lacc, pre, acc, [])
  
-fun end-code-block(file-path: string, n: int, com: (list<lexeme>, string) -> token-comment<lexeme>, m: int, lacc: ctx<list<token-comment<lexeme>>>, pre: list<char>, acc: list<char>, rest: list<char>)
+fun end-code-block(n: int, com: (list<lexeme>, string) -> token-comment<lexeme>, m: int, lacc: ctx<list<token-comment<lexeme>>>, pre: list<char>, acc: list<char>, rest: list<char>): <pure,fmt> list<token-comment<lexeme>>
   val src = acc.reverse.drop-line.string
-  val lexes = lexer(file-path, m, src)
-  scan(file-path, n, lacc ++ ctx Cons(com(lexes, if pre.is-nil then src else pre.string ++ "\n" ++ src), _), [], rest)
+  val lexes = lexer(source-file, m, src)
+  scan(n, lacc ++ ctx Cons(com(lexes, if pre.is-nil then src else pre.string ++ "\n" ++ src), _), [], rest)
 
-fun scan(file-path: string, lineno: int, lacc: ctx<list<token-comment<lexeme>>>, acc: list<char>, chs: list<char>)
+fun scan(lineno: int, lacc: ctx<list<token-comment<lexeme>>>, acc: list<char>, chs: list<char>): <pure,fmt> list<token-comment<lexeme>>
   match chs
     // Skip inside tags (so html renders correctly)
-    Cons('<', Cons(c, rest)) | !c.is-space -> scan-tag(file-path, lineno, lacc ++ ctx Cons(ComText(acc.reverse.string), _), Cons('<', Cons(c, rest)))
+    Cons('<', Cons(c, rest)) | !c.is-space -> scan-tag(lineno, lacc ++ ctx Cons(ComText(acc.reverse.string), _), Cons('<', Cons(c, rest)))
     // Skip inside $ (so math renders correctly)
-    Cons('$', Cons(c, rest)) -> scan-math(file-path, lineno, lacc ++ ctx Cons(ComText(acc.reverse.string), _), Cons(c, rest))
+    Cons('$', Cons(c, rest)) -> scan-math(lineno, lacc ++ ctx Cons(ComText(acc.reverse.string), _), Cons(c, rest))
     // Code
     Cons('`', Cons(c, rest)) 
-      | c != '`' -> scan-code(file-path, lineno, comCode, lacc ++ ctx Cons(ComText(acc.reverse.string), _), [], Cons(c, rest))
-      | c == ':' -> scan-code(file-path, lineno, comCode, lacc ++ ctx Cons(ComText(acc.reverse.string), _), [':'], rest)
+      | c != '`' -> scan-code(lineno, comCode, lacc ++ ctx Cons(ComText(acc.reverse.string), _), [], Cons(c, rest))
+      | c == ':' -> scan-code(lineno, comCode, lacc ++ ctx Cons(ComText(acc.reverse.string), _), [':'], rest)
     Cons('`', Cons('`', Cons('`', Cons(c, rest)))) | acc.white-line && c != '`' ->
       val (pre, xpost) = Cons(c, rest).span(fn(c') c != '\n' && c' != '{' && c' != ' ')
       val (attr, post) = xpost.span(fn(c') c' != '\n')
@@ -412,34 +418,34 @@ fun scan(file-path: string, lineno: int, lacc: ctx<list<token-comment<lexeme>>>,
       val attrs = attr.string
       val ccode = if pres == "unchecked" then comCodeBlock(cls) else comCodeLit(cls)
       if pres == "unchecked" || pres == "koka" || pres == "" then
-        scan-code-block(file-path, lineno + 1, ccode, lineno + 1, lacc ++ ctx Cons(ComText(acc.drop-line.string), _), [], post.drop-line)
+        scan-code-block(lineno + 1, ccode, lineno + 1, lacc ++ ctx Cons(ComText(acc.drop-line.string), _), [], post.drop-line)
       else
-        scan-pre-block(file-path, 3, lineno, lacc ++ ctx Cons(ComText(("```".list ++ pre ++ acc).reverse.string), _), [], post)
+        scan-pre-block(3, lineno, lacc ++ ctx Cons(ComText(("```".list ++ pre ++ acc).reverse.string), _), [], post)
     Cons('`', rest) ->
       val (pre, post) = rest.span(fn(c) c != '`')
       val lacc' = lacc ++ ctx Cons(ComText(Cons('`', pre ++ acc).reverse.string), _)
       if acc.white-line && pre.length >= 2 then
-        scan-pre-block(file-path, pre.length + 1, lineno, lacc', [], post)
+        scan-pre-block(pre.length + 1, lineno, lacc', [], post)
       else
-        scan-pre(file-path, pre.length + 1, lineno, lacc', [], post)
+        scan-pre(pre.length + 1, lineno, lacc', [], post)
     // regular
-    Cons('\n', rest) -> scan(file-path, lineno + 1, lacc, Cons('\n', acc), rest)
-    Cons(c, rest) -> scan(file-path, lineno, lacc, Cons(c, acc), rest)
+    Cons('\n', rest) -> scan(lineno + 1, lacc, Cons('\n', acc), rest)
+    Cons(c, rest) -> scan(lineno, lacc, Cons(c, acc), rest)
     Nil -> lacc ++. Cons(ComText(acc.reverse.string), Nil)
 
 // Parse comment formatters
-fun lex-comment(source: string, lineno: int, content: string): pure list<token-comment<lexeme>>
-  scan(source, lineno, ctx _, [], content.list.filter(fn(c) c != '\r'))
+fun lex-comment(lineno: int, content: string): <pure,fmt> list<token-comment<lexeme>>
+  scan(lineno, ctx _, [], content.list.filter(fn(c) c != '\r'))
 
-fun on-line(pre: list<char>, post: list<char>)
+fun on-line(pre: list<char>, post: list<char>): bool
   pre.white-line && post.white-line
 
-fun white-line(s: list<char>)
+fun white-line(s: list<char>): bool
   match s.drop-while(fn(c) c == ' ' || c == '\t' || c == '\r')
     Cons(c) -> c == '\n'
     [] -> True
 
-fun drop-line(s: list<char>)
+fun drop-line(s: list<char>): list<char>
   match s.drop-while(fn(c) c == ' ' || c == '\t' || c == '\r')
     Cons('\n', rest) -> rest
     cs -> cs

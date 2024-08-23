@@ -238,7 +238,7 @@ fun highlight-lexeme(transform: list<lexeme> -> pure list<lexeme>, ctx0: highlig
       LexInsLCurly -> fmt(TokWhite, lexeme, "")
       LexInsRCurly -> fmt(TokWhite, lexeme, "")
       LexInsSemi -> fmt(TokWhite, lexeme, "")
-      LexError(msg) -> fmt(TokError,lexeme,  msg)
+      LexError(msg) -> fmt(TokError, lexeme, msg)
   (ctx1, con0)
 
 fun adjust-context(c: highlight-ctx, l: lex, lexes: list<lexeme>): div highlight-ctx

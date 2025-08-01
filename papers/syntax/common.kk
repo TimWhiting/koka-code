@@ -5,22 +5,6 @@ import std/core/undiv
 alias identifier = string
 alias variable = identifier
 
-fun listdiv/(==)(l: list<a>, l2: list<a>, ?a/(==): (a,a) -> e bool): e bool
-  match (l, l2)
-    (Nil, Nil) -> True
-    (Cons(a, l'), Cons(a', l2')) ->
-      if a == a' then listdiv/(==)(l'.pretend-decreasing, l2'.pretend-decreasing)
-      else False
-    _ -> False
-
-fun listdiv/show(l: list<a>, ?a/show: a -> e string): e string
-  match l
-    Nil -> "[]"
-    Cons(a, l') -> a.show ++ ", " ++ l'.listdiv/show
-
-fun tuple2div/(==)(t1: (a,b), t2: (a,b), ?a/(==): (a,a) -> e bool, ?b/(==): (b,b) -> e bool): e bool
-  t1.fst == t2.fst && t1.snd == t2.snd
-
 fun set/join(l: linearMap<a,linearSet<b>>, a: a, b: b, ?a/(==): (a,a) -> e bool, ?b/(==): (b,b) -> e bool): e linearMap<a,linearSet<b>>
   LinearMap(l.list.join(a,b))
 

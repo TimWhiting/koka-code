@@ -13,7 +13,7 @@ struct lambda
   body: call
 
 fun lambda/(==)(l1: lambda, l2: lambda): div bool
-  listdiv/(==)(l1.vars, l2.vars) && l1.body == l2.body
+  l1.vars == l2.vars && l1.body == l2.body
 
 fun atomicExpr/(==)(e1: atomicExpr, e2: atomicExpr): div bool
   match (e1, e2)
@@ -22,4 +22,4 @@ fun atomicExpr/(==)(e1: atomicExpr, e2: atomicExpr): div bool
     (_, _) -> False
 
 fun call/(==)(c1: call, c2: call): div bool
-  c1.funct == c2.funct && listdiv/(==)(c1.args, c2.args)
+  c1.funct == c2.funct && c1.args == c2.args

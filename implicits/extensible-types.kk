@@ -18,7 +18,7 @@ type terma
   Num(i: int)
   Add(l: term, r: term)
 
-rec type func
+div type func
   Funct(f: some<e> interpm<evalue> -> e interpm<evalue>)
 
 struct interpm<t>

@@ -1,5 +1,5 @@
 import papers/syntax/common
-
+import std/data/linearset
 effect malloc
   fun alloc(v: identifier): addr
 effect salloc<s>

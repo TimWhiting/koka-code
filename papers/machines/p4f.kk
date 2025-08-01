@@ -10,7 +10,7 @@ type state
 alias env = linearMap<identifier,addr>
 struct storeables { vs: linearSet<storeable> }
 alias store = linearMap<addr, storeables>
-alias storeable = either<kont, evalue>
+struct storeable { st: either<kont, evalue> }
 
 fun expr/(==)(e1: expr, e2: expr): div bool
   match (e1, e2)
@@ -27,41 +27,38 @@ fun evalue/(==)(v1: evalue, v2: evalue): div bool
   match (v1, v2)
     (Clos(l1, env1), Clos(l2, env2)) -> l1 == l2 && env1 == env2
 
-fun storeable/(==)(s1: storeable, s2: storeable): div bool
-  match (s1, s2)
-    (Left(k1), Left(k2)) -> listdiv/(==)(k1, k2)
-    (Right(v1), Right(v2)) -> v1 == v2
-    (_, _) -> False
-
 fun frame/(==)(f1: frame, f2: frame): div bool
   match (f1, f2)
     (AppL(e1, env1), AppL(e2, env2)) -> e1 == e2 && env1 == env2
     (AppR(v1), AppR(v2)) -> v1 == v2
     (_, _) -> False
 
+fun storeable/(==)(s1: storeable, s2: storeable): div bool
+  s1.st == s2.st
+
 fun storeables/(==)(s1: storeables, s2: storeables): div bool
-  linearset/(==)(s1.vs, s2.vs)
+  s1.vs == s2.vs
 
 fun state/(==)(s1: state, s2: state): div bool
   match (s1, s2)
-    (Eval(e1, rho1, st1, k1), Eval(e2, rho2, st2, k2)) -> e1 == e2 && rho1 == rho2 && st1 == st2 && listdiv/(==)(k1, k2)
-    (Continue(k1, v1, st1), Continue(k2, v2, st2)) -> listdiv/(==)(k1, k2) && v1 == v2 && st1 == st2
+    (Eval(e1, rho1, st1, k1), Eval(e2, rho2, st2, k2)) -> e1 == e2 && rho1 == rho2 && st1 == st2 && k1 == k2
+    (Continue(k1, v1, st1), Continue(k2, v2, st2)) -> k1 == k2 && v1 == v2 && st1 == st2
     (Ans(v1), Ans(v2)) -> v1 == v2
     (_, _) -> False
 
 alias kont = list<frame>
 
-rec type frame
+div type frame
   AppL(e: expr, env: env)
   AppR(v: evalue)
 
-rec type evalue
+div type evalue
   Clos(l: lambda, env: env)
 
-rec type lambda
+div type lambda
   Lam(x: identifier, e: expr)
 
-rec type expr
+div type expr
   Var(x: identifier)
   App(e1: expr, e2: expr)
   Lambda(l: lambda)
@@ -77,7 +74,7 @@ fun lambda/show(l: lambda): div string
     Lam(x, e) -> x ++ "." ++ e.show
 
 fun storeable/show(s: storeable): div string
-  match s
+  match s.st
     Left(k) -> k.list/show
     Right(v) -> v.show
 
@@ -109,7 +106,7 @@ tail fun state/eval(s: state): <pure,abstraction,cache,salloc<state>> state
   with memo(s)
   match s
     Eval(Var(x), env, st, k) ->
-      val Right(v) = each(st.lookup(env.lookup(x).unjust).unjust.vs.list)
+      val Storeable(Right(v)) = each(st.lookup(env.lookup(x).unjust).unjust.vs.list)
       Continue(k, v, st)
     Eval(App(e0, e1), env, st, k) ->
       Eval(e0, env ~! e0.fv, st, Cons(AppL(e1, env ~! e1.fv), k))
@@ -120,7 +117,7 @@ tail fun state/eval(s: state): <pure,abstraction,cache,salloc<state>> state
       Eval(e, p', st, Cons(AppR(v), rst))
     Continue(Cons(AppR(Clos(Lam(x, e), p)), rst), v, st) ->
       val a = salloc(s)
-      Eval(e, (p.set(x, a)) ~! e.fv, st.join(a, Right(v)), rst)
+      Eval(e, (p.set(x, a)) ~! e.fv, st.join(a, Storeable(Right(v))), rst)
     Continue(_, v, _) -> 
       v.show.trace
       Ans(v)
@@ -152,9 +149,9 @@ fun expr/eval(e: expr): <pure,console> ()
     fun salloc(s)
       match s
         Continue(Cons(AppR(Clos(exp, p)), _), _, _) ->
-          match cacheids.map/lookup((p, exp), ?(==)=fn(p1,p2) tuple2div/(==)(p1,p2))
+          match cacheids.map/lookup((p, exp))
             Nothing ->
-              cacheids := cacheids.linearmap/set((p, exp),x, ?(==)=fn(p1,p2) tuple2div/(==)(p1,p2))
+              cacheids := cacheids.linearmap/set((p, exp),x)
               x := x + 1
               x
             Just(y) -> y

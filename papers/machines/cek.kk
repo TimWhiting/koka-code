@@ -5,17 +5,17 @@ type state
   Eval(e: expr, p: env, k: kont)
   Continue(k: kont, v: evalue)
   Ans(v: evalue)
-alias env = list<(identifier,evalue)>
+alias env = linearMap<identifier,evalue>
 alias kont = list<frame>
 
-rec type frame
+div type frame
   AppL(e: expr, env: env)
   AppR(v: evalue)
-rec type evalue
+div type evalue
   Clos(l: lambda, env: env)
-rec type lambda
+div type lambda
   Lam(x: identifier, e: expr)
-rec type expr
+div type expr
   Var(x: identifier)
   App(e1: expr, e2: expr)
   Lambda(l: lambda)
@@ -36,7 +36,7 @@ fun state/eval(s: state): pure state
 
 
 fun expr/eval(e: expr): <pure,console> ()
-  val res = Eval(e, [], []).eval()
+  val res = Eval(e, LinearMap([]), []).eval()
   res.show.println
 
 fun tests(): <pure, console> ()
@@ -49,7 +49,7 @@ fun lam/fv(l: lambda): div linearSet<identifier>
 
 fun expr/fv(e: expr): div linearSet<identifier>
   match e
-    Var(x) -> [x]
+    Var(x) -> [x].LinearSet
     App(e1, e2) -> e1.fv.union(e2.fv)
     Lambda(l) -> fv(l)
 
@@ -65,18 +65,18 @@ fun lambda/show(l: lambda): div string
 
 fun result/show(r: evalue): div string
   match r
-    Clos(l, env) -> l.show ++ " " ++ env.show
+    Clos(l, env) -> l.show ++ " " ++ env.show-env
 
-fun env/show(e: env): div string
-  "<env>[" ++ e.map(fn((x, v)) x ++ " -> " ++ v.result/show).join(", ") ++ "]"
+fun show-env(e: env): div string
+  "<env>[" ++ e.list.map(fn((x,v)) x ++ " -> " ++ v.show).join(", ") ++ "]"
 
 fun frame/show(f: frame): div string
   match f
-    AppL(e, env) -> "AppL(" ++ e.show ++ ", " ++ env.show ++ ")"
+    AppL(e, env) -> "AppL(" ++ e.show ++ ", " ++ env.show-env ++ ")"
     AppR(v) -> "AppR(" ++ v.result/show ++ ")"
 
 fun state/show(s: state): div string
   match s
-    Eval(e, env, kont) -> e.show ++ " " ++ env.show ++ " " ++ kont.listdiv/show()
-    Continue(k, v) -> k.listdiv/show ++ " " ++ v.show
+    Eval(e, env, kont) -> e.show ++ " " ++ env.show-env ++ " " ++ kont.show()
+    Continue(k, v) -> k.show ++ " " ++ v.show
     Ans(v) -> v.show

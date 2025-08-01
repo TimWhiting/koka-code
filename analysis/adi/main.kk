@@ -15,9 +15,9 @@ fun handleTellAbs(f)
       val (a:expr, b:env<int>, c:linearMap<int,abvalue<int>>) = x
       val indent = " ".repeat(depth)
       val indent2 = " ".repeat(depth+1)
-      (indent ++ "Config: \n" ++ indent2 ++ "expr:" ++ a.show ++ "\n" ++ indent2 ++ "env:" ++ b.show(show) ++ "\n" ++ indent2 ++ "store:" ++ c.list.show(show)).trace
+      (indent ++ "Config: \n" ++ indent2 ++ "expr:" ++ a.show ++ "\n" ++ indent2 ++ "env:" ++ b.show ++ "\n" ++ indent2 ++ "store:" ++ c.list.show).trace
     fun tellResult(s:abvalue<int>, depth)
-      (" ".repeat(depth) ++ "Result: " ++ s.show(showA)).trace
+      (" ".repeat(depth) ++ "Result: " ++ s.show).trace
       s
     val expressionDepth = 0
   f()

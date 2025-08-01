@@ -11,7 +11,7 @@ type expr
   App(e0: expr, e1: expr)
   Let(v: string, e0: expr, e1s: list<expr>)
 
-fun show(e: expr): div string
+fun expr/show(e: expr): div string
   match e
     Num(n) -> n.show
     If0(e0, e1, e2) -> "if0 " ++ show(e0) ++ " then " ++ show(e1) ++ " else " ++ show(e2)
@@ -22,8 +22,7 @@ fun show(e: expr): div string
     App(e0, e1) -> "(" ++ show(e0) ++ " " ++ show(e1) ++ ")"  
     Let(v, e0, e1) -> "let " ++ v ++ " = " ++ show(e0) ++ " in " ++ show-list(e1, show)
 
-fun (==)(e1: expr, e2: expr): div bool
-  with traceEq(e1, e2) 
+fun expr/(==)(e1: expr, e2: expr): div bool
   match (e1, e2)
     (Num(i1), Num(i2)) -> i1 == i2
     (If0(e1, e2, e3), If0(e4, e5, e6)) -> e1 == e4 && e2 == e5 && e3 == e6
@@ -32,8 +31,8 @@ fun (==)(e1: expr, e2: expr): div bool
     (Rec(x1, e1), Rec(x2, e2)) -> x1 == x2 && e1 == e2
     (Lam(x1, e1), Lam(x2, e2)) -> x1 == x2 && e1 == e2
     (App(e1, e2), App(e3, e4)) -> e1 == e3 && e2 == e4
-    (Let(x1, e1, e2), Let(x2, e3, e4)) -> x1 == x2 && e1 == e3 && eql/(==)(e2, e4)
-    _ -> False
+    (Let(x1, e1, e2), Let(x2, e3, e4)) -> x1 == x2 && e1 == e3 && e2 == e4
+    _ -> False 
 
 fun subexprs(e: expr): div list<expr>
   match e

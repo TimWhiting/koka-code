@@ -29,7 +29,7 @@ struct ident
   name: string
   signature: maybe<typeScheme> = Nothing;
 
-rec type expr
+div type expr
   ELit(v: literal, tp: maybe<typeScheme> = Nothing)
   ETup(e0: list<expr>, tp: maybe<typeScheme> = Nothing)
   EVar(ident: ident, tp: maybe<typeScheme> = Nothing)
@@ -40,7 +40,7 @@ rec type expr
   Over(ident: ident, cond: typeScheme, e: expr)
   Inst(ident: ident, cond: typeScheme, e0: expr, e1: expr);
 
-rec type evalue
+div type evalue
   Bool(b: bool)
   Int(i: int)
   Char(c: char)
@@ -103,13 +103,13 @@ fun ident/show(t: ident): div string
 
 fun expr/show(e: expr): div string
   match e
-    ELit(value, t) -> "(Lit " ++ value.show ++ ": " ++ t.show ++ ")"
-    ETup(es, t) -> "(" ++ es.foldl("", fn(acc, i) acc ++ i.show ++ ",") ++ ")" ++ " : " ++ t.show
-    EVar(ident, t) -> ident.show ++ ": " ++ t.show
-    App(e0, e1, t) -> "\n(" ++ e0.show ++ " " ++ e1.show ++ ")" ++ ": " ++ t.show
-    Lam(ident, e0, t) -> "\n(\\" ++ ident.name ++ "." ++ e0.show ++ ": " ++ t.show ++ ")"
+    ELit(value, t) -> "(Lit " ++ value.show ++ ": " ++ t.mscheme/show ++ ")"
+    ETup(es, t) -> "(" ++ es.foldl("", fn(acc, i) acc ++ i.show ++ ",") ++ ")" ++ " : " ++ t.mscheme/show
+    EVar(ident, t) -> ident.show ++ ": " ++ t.mscheme/show
+    App(e0, e1, t) -> "\n(" ++ e0.show ++ " " ++ e1.show ++ ")" ++ ": " ++ t.mscheme/show
+    Lam(ident, e0, t) -> "\n(\\" ++ ident.name ++ "." ++ e0.show ++ ": " ++ t.mscheme/show ++ ")"
     PrimOp(ident, _, t) -> "(Primitive " ++ ident.name ++ ": " ++ t.show ++ ")"
-    Let(ident, e0, e1, t) -> "\n(let " ++ ident.show ++ " = " ++ e0.show ++ " in " ++ e1.show ++ ": " ++ t.show ++ ")"
+    Let(ident, e0, e1, t) -> "\n(let " ++ ident.show ++ " = " ++ e0.show ++ " in " ++ e1.show ++ ": " ++ t.mscheme/show ++ ")"
     Over(ident, cond, e0) -> "\nover " ++ ident.name ++ " " ++ cond.show ++ " " ++ e0.show
     Inst(ident, cond, e0, e1) -> "\ninst " ++ ident.name ++ " " ++ cond.show ++ " " ++ e0.show ++ " " ++ e1.show
 
@@ -120,10 +120,10 @@ fun evalue/show(v: evalue): div string
     Char(c) -> c.show
     Float(f) -> f.show
     Tuple(vals) -> "(" ++ vals.foldl("", fn(acc, i) -> acc ++ i.show ++ ",") ++ ")"
-    Clos(arg, body, env) -> "Clos(" ++ arg.name.show ++ ", " ++ body.show ++ ", " ++ env.show ++ ")"
+    Clos(arg, body, env) -> "Clos(" ++ arg.name.show ++ ", " ++ body.show ++ ", " ++ show-env(env) ++ ")"
     PrimClos(_) -> "Primitive Operation"
 
-fun env/show(l: environment): div string
+fun show-env(l: environment): div string
   if l.is-empty then "Environment: ()" else
     "Environment: (\n\t" ++ l.map(fn(x) x.fst.name ++ " = " ++ x.snd.show).join("\n\t") ++ ")\n"
 
@@ -152,7 +152,6 @@ fun tv/(==)(a: typeVar, b: typeVar): bool
 fun tc/(==)(a: typeConstructor, b: typeConstructor): bool
   a.name == b.name
 
-
 fun tt/(==)(t1: ttype, t2: ttype): div bool
   match (t1, t2)
     (TVar(a), TVar(b)) -> a == b
@@ -168,9 +167,6 @@ fun tpscheme/(==)(t1: typeScheme, t2: typeScheme): div bool
 fun tpred/(==)(t1: typePred, t2: typePred): div bool
   match (t1, t2)
     (TPred(aas, a), TPred(bs, b)) -> aas == bs && a == b 
-
-fun mix/(==)(t1: (ident, ttype), t2: (ident, ttype)): div bool
-  t1.fst == t2.fst && t1.snd == t2.snd
 
 fun ident/(==)(i1: ident, i2: ident): div bool
   match (i1, i2)

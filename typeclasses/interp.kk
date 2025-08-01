@@ -1,6 +1,7 @@
 import datastructure
 import utils
 import primitives
+import std/core/undiv
 
 fun eval(x: expr, env: environment = []): <exn,console,div> evalue
   // (x.show() ++ " where bindings " ++ env.show()).println()
@@ -35,9 +36,8 @@ fun eval(x: expr, env: environment = []): <exn,console,div> evalue
     _ -> throw("Not implemented yet " ++ x.show)
   y
 
-fun lookupIdent(x: ident, env: environment): <> maybe<(ident,evalue)>
-  env.find fn(a) 
-    unsafe-total
-      // trace("lookupIdent " ++ x.show ++ " " ++ a.fst.show)
-      a.fst.removePred == x
+fun lookupIdent(x: ident, env: environment): div maybe<(ident,evalue)>
+  env.find fn(a)
+    // trace("lookupIdent " ++ x.show ++ " " ++ a.fst.show)
+    a.fst.removePred == x
     

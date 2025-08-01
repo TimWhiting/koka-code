@@ -15,7 +15,7 @@ fun tupleT(types: list<ttype>): ttype
   TApp(tcTuple, types)
 
 // Get typeScheme from expression
-fun typeOf(e: expr): maybe<ttype>
+fun expr/typeOf(e: expr): maybe<ttype>
   match e
     ELit(_, t) -> Just(t.typeOf)
     ETup(_, t) -> Just(t.typeOf)
@@ -63,10 +63,10 @@ fun getPred(t: maybe<typeScheme>): maybe<typeScheme>
     Just(ForAll(_, TPred(Cons((_, t1), _), _))) -> Just(ForAll([], TPred([], t1)))
     _ -> Nothing
 
-fun removePred(i: ident): ident
+fun id/removePred(i: ident): ident
     Ident(i.name, i.signature.removePred)
 
-fun removePred(t: maybe<typeScheme>): maybe<typeScheme>
+fun maybe/removePred(t: maybe<typeScheme>): maybe<typeScheme>
   match t
     Just(ForAll(vars, TPred(_, tp))) -> Just(ForAll(vars, TPred([], tp)))
     _ -> t
@@ -80,19 +80,19 @@ fun typePred(t: maybe<typeScheme>): typePred
     Just(x) -> x.tp
     Nothing -> ErrorT.pred
 
-fun typeOf(t: typeScheme): ttype
+fun ts/typeOf(t: typeScheme): ttype
   t.tp.tp
 
-fun typeOf(t: maybe<typeScheme>): ttype
+fun maybe/typeOf(t: maybe<typeScheme>): ttype
   match t
     Just(x) -> x.tp.tp
     Nothing -> ErrorT
 
 // Helper functions for creating types
-fun scheme(t: typePred, vars: list<typeVar> = []): typeScheme
+fun pred/scheme(t: typePred, vars: list<typeVar> = []): typeScheme
   ForAll([],t)
 
-fun scheme(t: ttype, vars: list<typeVar> = []): typeScheme
+fun type/scheme(t: ttype, vars: list<typeVar> = []): typeScheme
   ForAll(vars, TPred([], t))
 
 fun pred(t: ttype, vars: list<(ident, ttype)> = []): typePred
@@ -118,7 +118,7 @@ fun eVar(name: string): expr
   EVar(Ident(name), Nothing)
 
 // A class type is just a list of the types of the functions that make it up
-fun classT(types: list<ttype>): ttype
+fun list/classT(types: list<ttype>): ttype
   TApp(tcTuple, types)
 
 fun classT(t: ttype): ttype
@@ -146,10 +146,10 @@ fun freeVars(t: typeScheme): list<typeVar>
       _ -> x
   res
 
-fun freeVars(TPred(l, t): typePred, env: typeEnv): div list<typeVar>
+fun pred/freeVars(TPred(l, t): typePred, env: typeEnv): div list<typeVar>
   l.map(fn (x) x.snd.freeVars(env)).flatmap(fn (x) x) ++ t.freeVars(env)
 
-fun freeVars(t: ttype, env: typeEnv): div list<typeVar>
+fun type/freeVars(t: ttype, env: typeEnv): div list<typeVar>
   match t
     TVar(a) -> 
       match envFreeVars(env).find(fn(x) x == a) 
@@ -159,10 +159,10 @@ fun freeVars(t: ttype, env: typeEnv): div list<typeVar>
     TFun(a, b) -> a.freeVars(env) ++ b.freeVars(env)
     ErrorT -> []
 
-fun map(t: typeScheme, f: (ttype) -> e ttype): e typeScheme
+fun scheme/map(t: typeScheme, f: (ttype) -> e ttype): e typeScheme
   match t
     ForAll(vars, t1) -> ForAll(vars, t1.map(f))
 
-fun map(t: typePred, f: (ttype) -> e ttype): e typePred
+fun pred/map(t: typePred, f: (ttype) -> e ttype): e typePred
   match t
     TPred(preds, t1) -> TPred(preds.map(fn(x) (x.fst, f(x.snd))), f(t1))

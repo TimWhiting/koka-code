@@ -38,7 +38,7 @@ fun infer(x: expr, env: typeEnv = [], assums: assumptions = []): <div,exit,exn,n
         throw-exn(e)
       else
         setExit(True)
-        throw("Error inferring type of " ++ x.show ++ "\n" ++ env.show ++ "\n" ++ assums.show ++ "\n\tInner error " ++ e.message)
+        throw("Error inferring type of " ++ x.show ++ "\n" ++ env.tpenv/show ++ "\n" ++ assums.assums/show ++ "\n\tInner error " ++ e.message)
   val y = match x
     ELit(v,t) -> (ELit(v,t), [])
     ETup(v,_) -> 
@@ -56,7 +56,7 @@ fun infer(x: expr, env: typeEnv = [], assums: assumptions = []): <div,exit,exn,n
               val xt = t.instantiatePred(i).scheme
               // trace("Instantiated to " ++ xt.show)
               (EVar(x1, Just(xt)), [])
-            Nothing -> throw("Unbound variable " ++ x1.name ++ " in environment " ++ env.show)
+            Nothing -> throw("Unbound variable " ++ x1.name ++ " in environment " ++ env.tpenv/show)
             _ -> throw("Did not find instance")
     // Needed to instantiate in order to allow for type variables in a primitive op to unify with different types 
     // This would happen in the var case if the operations were variables. 
@@ -169,15 +169,13 @@ fun over(assum: assumption, id: ident): bool
     Instance(_, _, _) -> False
     Variable(_, _, _) -> False
 
-fun inst(assum: assumption, pred: (ident,ttype)): bool
+fun inst(assum: assumption, pred: (ident,ttype)): div bool
   match assum
     Overloaded(_, _) -> False
     Instance(i, t, _) ->
-      unsafe-total
         // trace("Checking " ++ i.show ++ t.show ++ " against " ++ pred.fst.show ++ pred.snd.show ++ "\n")
         i == pred.fst && t.tp.tp == pred.snd
     Variable(i, t, _) -> 
-      unsafe-total
         i == pred.fst && t.tp.tp == pred.snd
 
 fun fits(assum: assumption, id: ident, t: typeScheme): bool
@@ -193,7 +191,7 @@ fun doesUnify(t1: ttype, t2: ttype): div bool
   unify(t1, t2)
   True
 
-fun unify(t1: typeScheme, t2: typeScheme): <div,exn> subst
+fun scheme/unify(t1: typeScheme, t2: typeScheme): <div,exn> subst
   // trace("Attempting to unify " ++ t1.show() ++ " with " ++ t2.show())
   with handler
     final ctl throw-exn(e)
@@ -204,13 +202,13 @@ fun unify(t1: typeScheme, t2: typeScheme): <div,exn> subst
   // trace("Found substitution " ++ result.show())
   result
 
-fun unify(t1: typePred, t2: typePred): <div,exn> subst
+fun pred/unify(t1: typePred, t2: typePred): <div,exn> subst
   match (t1, t2)
     (TPred(_, tt1), TPred(_, tt2)) -> 
       unify(tt1, tt2)
 
 // TODO: I need to be consistent about which side to add to the substitution
-fun unify(t1: ttype, t2: ttype): <div,exn> subst
+fun type/unify(t1: ttype, t2: ttype): <div,exn> subst
   match (t1, t2)
     (TVar(a), TVar(b)) -> if a == b then [] else [(a, t2.scheme), (b, t1.scheme)]
     (TVar(a), _) -> 
@@ -264,24 +262,24 @@ fun replace(t: ttype, l: list<(typeVar, ttype)>): div ttype
     ErrorT -> ErrorT
 
 // Apply replaces type variables in the predicates and types with the type from the substitution map
-fun apply(s: subst, t: maybe<typeScheme>): div maybe<typeScheme>
+fun subst/apply(s: subst, t: maybe<typeScheme>): div maybe<typeScheme>
   match t
     Just(a) -> Just(apply(s, a))
     Nothing -> Nothing
   
-fun apply(s: subst, env: typeEnv): div typeEnv
+fun substenv/apply(s: subst, env: typeEnv): div typeEnv
   env.map(fn(x) (x.fst, apply(s, x.snd)))
 
-fun apply(s: (typeVar, typeScheme), t: typeScheme): div typeScheme
+fun type/apply(s: (typeVar, typeScheme), t: typeScheme): div typeScheme
   t.map(fn(x) apply(s, x))
 
-fun apply(s: subst, t: typeScheme): div typeScheme
+fun substscheme/apply(s: subst, t: typeScheme): div typeScheme
   s.foldl(t, fn(acc:typeScheme, x:(typeVar, typeScheme)) apply(x, acc))
 
-fun apply(s: subst, t: ttype): div ttype
+fun substtype/apply(s: subst, t: ttype): div ttype
   s.foldl(t, fn(acc:ttype, x:(typeVar, typeScheme)) apply(x, acc))
 
-fun apply(s: (typeVar, typeScheme), t: ttype): div ttype
+fun substvar/apply(s: (typeVar, typeScheme), t: ttype): div ttype
   match t
     TApp(a, Nil) -> TApp(a, Nil)
     TVar(a) -> if a == s.fst then s.snd.typeOf else TVar(a)
@@ -301,7 +299,7 @@ fun compose(s1: subst, s2: subst): div subst
 fun contains(l: list<a>, a: a, equal: (a,a) -> e bool): e bool
   l.foldl(False, fn(acc, x) x.equal(a) || acc)
 
-fun greater(t1: typeScheme, t2: typeScheme, assums: assumptions): <exn,div> bool
+fun scheme/greater(t1: typeScheme, t2: typeScheme, assums: assumptions): <exn,div> bool
   val fr = t1.freeVars
   val notFree = t2.vars.all(fn(x) fr.contains(x, fn(x1, x2) x1 == x2))
   // trace("Prior to unification: " ++ t1.show() ++ " and " ++ t2.show())
@@ -317,15 +315,15 @@ fun greater(t1: typeScheme, t2: typeScheme, assums: assumptions): <exn,div> bool
 //   // TODO: This is a hack??
 //   t1.tp.tp == t2
 
-fun greater(t1: typePred, t2: typePred, assums: assumptions): <exn,div> bool
+fun pred/greater(t1: typePred, t2: typePred, assums: assumptions): <exn,div> bool
   match (t1, t2)
     (TPred(a, tt1), TPred(c, tt2)) -> 
       tt1 == tt2 && a.all(fn(x) c.contains(x, fn(x1, x2) x1 == x2) || assums.eliminates(x)) 
 
-fun eliminates(assums: assumptions, t: (ident,ttype)): <exn,div> bool
+fun as/eliminates(assums: assumptions, t: (ident,ttype)): <exn,div> bool
   assums.any(fn(x) x.eliminates(t, assums))
 
-fun eliminates(assum: assumption, t: (ident, ttype), assums: assumptions): <exn,div> bool
+fun assums/eliminates(assum: assumption, t: (ident, ttype), assums: assumptions): <exn,div> bool
   match assum
     Overloaded(_, _) -> False
     Instance(i, ty, _) -> 

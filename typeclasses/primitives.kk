@@ -1,6 +1,7 @@
 
 import datastructure
 import utils
+import std/num/float64
 // Primitives
 // Type Vars
 val alpha = Ident("alpha")

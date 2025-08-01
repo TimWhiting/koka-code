@@ -23,7 +23,7 @@ val tupleEqT =
 
 fun inferEval(e: expr, evaluate: bool = False, out: bool = True)
   val res = doInfer(e, [], [])
-  if out then res.show(show, show).println else ()
+  if out then res.show.println else ()
   if evaluate then res.fst.eval.show.println else ()
   res.fst
 
@@ -52,7 +52,7 @@ fun assume(evaluate:bool = False)
   createEqFun(App(eqE, ETup([eChar('a'), eChar('a')]))).inferEval(evaluate)
 
 
-fun eqExample()
+fun example-eq()
   val eqE = EVar(eqI, Nothing)
   val x = 
     Over(eqI, forAllEq, 
@@ -85,7 +85,7 @@ fun eqExample()
   x.doInfer.fst.show.println
   // x.eval()
 
-fun primitiveTests()
+fun example-tests1()
   App(eEqChar, ETup([eChar('b'), eChar('b')])).eval.show.println()
   App(eEqChar, ETup([eChar('b'), eChar('c')])).eval.show.println()
   App(eEqInt, ETup([eInt(1), eInt(1)])).eval.show.println()
@@ -101,15 +101,15 @@ fun primitiveTests()
   val eA = EVar(a)
   App(Lam(a, App(eA, ETup([eChar('b'), eChar('b')]))), eEqChar).eval.show.println()
 
-fun inferTests()
-  doInfer(ETup([eInt(1), eChar('a')])).show(show, show).println()
-  doInfer(App(eEqChar, ETup([eChar('b'), eChar('b')]))).show(show, show).println()
+fun example-tests2()
+  doInfer(ETup([eInt(1), eChar('a')])).show.println()
+  doInfer(App(eEqChar, ETup([eChar('b'), eChar('b')]))).show.println()
   // doInfer(
   //   Let(Ident("test"), 
   //     Lam(Ident("x"), Lam(Ident("y"), 
   //       App(eAddInt, ETup([App(eMultInt, ETup([eVar("x"), eVar("x")])), App(eMultInt, ETup([eVar("y"), eVar("y")]))])))),
   //   App(App(eVar("test"), eInt(2)), eInt(3)))).fst.show.println()
-  eqExample()
+  example-eq()
 
 fun main()
   // notrace()
